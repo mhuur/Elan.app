@@ -93,7 +93,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
       checkReady()
     })
     const u2 = store.subscribe('sessions', (d) => {
-      setSessions((d as unknown as Session[]).slice().sort((a, b) => a.createdAt - b.createdAt))
+      setSessions(
+        (d as unknown as Session[])
+          .slice()
+          .sort(
+            (a, b) =>
+              (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) ||
+              a.createdAt - b.createdAt,
+          ),
+      )
       flags.sessions = true
       checkReady()
     })

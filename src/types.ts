@@ -21,6 +21,29 @@ export interface SessionItem {
   target?: number
   /** Étirements : durée de la posture en secondes */
   durationSec?: number
+  /** Consigne libre affichée pendant la séance (tempo, posture…) */
+  comment?: string
+}
+
+/** Mesure personnalisée définie sur une séance, saisie à la complétion */
+export interface MetricDef {
+  key: string
+  label: string
+  unit: string
+}
+
+/** Lien utile attaché à une séance (YouTube ou autre) */
+export interface LinkDef {
+  label: string
+  url: string
+}
+
+/** Valeur de mesure enregistrée dans un log (dénormalisée) */
+export interface MetricValue {
+  key: string
+  label: string
+  unit: string
+  value: number
 }
 
 export interface Session {
@@ -36,9 +59,15 @@ export interface Session {
   restSec?: number
   /** HIIT : nombre de tours */
   rounds?: number
-  /** Vélo : puissance cible en watts */
+  /** Mesures saisies à la fin de la séance (vélo par défaut, personnalisable partout) */
+  metrics?: MetricDef[]
+  /** Liens utiles à ouvrir (vidéos, programmes…) */
+  links?: LinkDef[]
+  /** Ordre d'affichage dans le planning et la journée */
+  sortOrder?: number
+  /** Vélo (hérité) : puissance cible en watts */
   targetPowerW?: number
-  /** Vélo : durée cible en minutes */
+  /** Vélo (hérité) : durée cible en minutes */
   targetDurationMin?: number
   notes?: string
   createdAt: number
@@ -52,6 +81,7 @@ export interface ExerciseResult {
   sets: number[]
 }
 
+/** Hérité (anciens logs vélo) : conservé pour l'affichage */
 export interface VeloData {
   powerW?: number
   durationMin?: number
@@ -67,6 +97,9 @@ export interface Log {
   sessionId: string
   sessionName: string
   category: Category
+  /** Mesures saisies (vélo et champs personnalisés) */
+  metrics?: MetricValue[]
+  /** Hérité : anciens logs vélo */
   velo?: VeloData
   results?: ExerciseResult[]
   note?: string

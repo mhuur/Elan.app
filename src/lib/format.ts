@@ -1,4 +1,5 @@
 import type { Session } from '../types'
+import { effectiveMetrics } from './metrics'
 
 /** « 12:05 » à partir de secondes */
 export function mmss(totalSec: number): string {
@@ -33,10 +34,9 @@ export function summarizeSession(s: Session): string {
     case 'running':
       return s.notes || 'À cocher une fois la sortie faite'
     case 'velo': {
-      const parts: string[] = []
-      if (s.targetPowerW) parts.push(`${s.targetPowerW} W`)
-      if (s.targetDurationMin) parts.push(`${s.targetDurationMin} min`)
-      return parts.length ? parts.join(' · ') : 'Saisie des perfs à la fin'
+      const m = effectiveMetrics(s)
+      if (!m.length) return 'Saisie des perfs à la fin'
+      return m.slice(0, 3).map((x) => x.label).join(' · ') + (m.length > 3 ? '…' : '')
     }
     case 'muscu':
       return `${s.items.length} exercice${s.items.length > 1 ? 's' : ''}`

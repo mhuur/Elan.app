@@ -11,17 +11,9 @@ import {
   YAxis,
 } from 'recharts'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, type VeloData } from '../types'
+import { CATEGORY_META, type MetricValue } from '../types'
 import { addDays, formatDayMonth, formatShortFr, startOfWeek } from '../lib/dates'
 import { Chip, EmptyState, PageHeader } from '../components/ui'
-
-const VELO_METRICS: { key: keyof VeloData; label: string; unit: string }[] = [
-  { key: 'distanceKm', label: 'Distance', unit: 'km' },
-  { key: 'durationMin', label: 'Durée', unit: 'min' },
-  { key: 'powerW', label: 'Puissance', unit: 'W' },
-  { key: 'avgSpeedKmh', label: 'Vitesse', unit: 'km/h' },
-  { key: 'avgBpm', label: 'BPM', unit: 'bpm' },
-]
 
 const axisStyle = { fontSize: 11, fontFamily: 'Nunito', fill: '#717d72' }
 
@@ -35,7 +27,7 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 }
 
 export default function Progress() {
-  const { logs, exercises } = useData()
+  const { logs, exercises, sessions } = useData()
 
   // Séances par semaine (8 dernières semaines)
   const weekly = useMemo(() => {
@@ -53,17 +45,35 @@ export default function Progress() {
 
   const thisWeekCount = weekly[7]?.count ?? 0
 
-  // Vélo
-  const veloLogs = useMemo(() => logs.filter((l) => l.velo).slice().reverse(), [logs])
-  const [veloMetric, setVeloMetric] = useState<keyof VeloData>('distanceKm')
-  const veloData = useMemo(
-    () =>
-      veloLogs
-        .map((l) => ({ date: formatShortFr(l.date), value: l.velo?.[veloMetric] }))
-        .filter((d): d is { date: string; value: number } => d.value != null),
-    [veloLogs, veloMetric],
+  // Mesures par séance (vélo et champs personnalisés)
+  const metricSessions = useMemo(
+    () => sessions.filter((s) => logs.some((l) => l.sessionId === s.id && l.metrics?.length)),
+    [sessions, logs],
   )
-  const veloUnit = VELO_METRICS.find((m) => m.key === veloMetric)?.unit ?? ''
+  const [msId, setMsId] = useState('')
+  const selectedSession = metricSessions.find((s) => s.id === msId) ?? metricSessions[0]
+  const metricDefs = useMemo(() => {
+    if (!selectedSession) return []
+    const seen = new Map<string, MetricValue>()
+    for (const l of logs) {
+      if (l.sessionId !== selectedSession.id) continue
+      for (const mv of l.metrics ?? []) if (!seen.has(mv.key)) seen.set(mv.key, mv)
+    }
+    return [...seen.values()]
+  }, [logs, selectedSession])
+  const [metricKey, setMetricKey] = useState('')
+  const selDef = metricDefs.find((d) => d.key === metricKey) ?? metricDefs[0]
+  const metricData = useMemo(() => {
+    if (!selectedSession || !selDef) return []
+    return logs
+      .slice()
+      .reverse()
+      .flatMap((l) => {
+        if (l.sessionId !== selectedSession.id) return []
+        const mv = l.metrics?.find((x) => x.key === selDef.key)
+        return mv ? [{ date: formatShortFr(l.date), value: mv.value }] : []
+      })
+  }, [logs, selectedSession, selDef])
 
   // Muscu : exercices ayant au moins un résultat enregistré
   const exosWithLogs = useMemo(() => {
@@ -129,30 +139,50 @@ export default function Progress() {
           </>
         )}
 
-        {veloLogs.length > 0 && (
-          <ChartCard title={`${CATEGORY_META.velo.emoji} Vélo d'appartement`}>
+        {metricSessions.length > 0 && selectedSession && (
+          <ChartCard title="📈 Mesures par séance">
+            <select
+              value={selectedSession.id}
+              onChange={(e) => {
+                setMsId(e.target.value)
+                setMetricKey('')
+              }}
+              className="mb-3 w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
+            >
+              {metricSessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {CATEGORY_META[s.category].emoji} {s.name}
+                </option>
+              ))}
+            </select>
             <div className="mb-3 flex flex-wrap gap-1.5">
-              {VELO_METRICS.map((m) => (
-                <Chip key={m.key} active={veloMetric === m.key} onClick={() => setVeloMetric(m.key)}>
-                  {m.label}
+              {metricDefs.map((d) => (
+                <Chip key={d.key} active={selDef?.key === d.key} onClick={() => setMetricKey(d.key)}>
+                  {d.label}
                 </Chip>
               ))}
             </div>
-            {veloData.length >= 2 ? (
+            {metricData.length >= 2 ? (
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={veloData} margin={{ top: 4, right: 8, left: -22, bottom: 0 }}>
+                  <LineChart data={metricData} margin={{ top: 4, right: 8, left: -22, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#eee9dd" vertical={false} />
                     <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                     <YAxis tick={axisStyle} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
-                    <Tooltip formatter={(v) => [`${v} ${veloUnit}`, '']} />
-                    <Line type="monotone" dataKey="value" stroke="#5b89ad" strokeWidth={3} dot={{ r: 4, fill: '#5b89ad' }} />
+                    <Tooltip formatter={(v) => [`${v}${selDef?.unit ? ' ' + selDef.unit : ''}`, '']} />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke={CATEGORY_META[selectedSession.category].hex}
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: CATEGORY_META[selectedSession.category].hex }}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             ) : (
               <p className="py-6 text-center text-sm font-semibold text-ink-soft">
-                Encore une séance vélo et la courbe apparaît 🚴
+                Encore une séance avec cette mesure et la courbe apparaît 📈
               </p>
             )}
           </ChartCard>

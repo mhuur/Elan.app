@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useData } from '../data/DataContext'
-import { CATEGORIES, CATEGORY_META, type Category, type SessionItem } from '../types'
+import { CATEGORIES, CATEGORY_META, type Category, type LinkDef, type MetricDef, type SessionItem } from '../types'
 import { DAY_LETTER, DAY_NAMES } from '../lib/dates'
-import { Chip, Field, GhostButton, NumInput, PrimaryButton, Stepper, TextArea, TextInput } from '../components/ui'
+import { DEFAULT_VELO_METRICS, effectiveMetrics, newMetric } from '../lib/metrics'
+import { Chip, Field, GhostButton, PrimaryButton, Stepper, TextArea, TextInput } from '../components/ui'
+
+const smallInput =
+  'rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
 
 export default function SessionForm() {
   const { id } = useParams()
@@ -15,11 +19,11 @@ export default function SessionForm() {
   const [category, setCategory] = useState<Category>(existing?.category ?? 'muscu')
   const [days, setDays] = useState<number[]>(existing?.days ?? [])
   const [items, setItems] = useState<SessionItem[]>(existing?.items ?? [])
+  const [metrics, setMetrics] = useState<MetricDef[]>(existing ? effectiveMetrics(existing) : [])
+  const [links, setLinks] = useState<LinkDef[]>(existing?.links ?? [])
   const [workSec, setWorkSec] = useState(existing?.workSec ?? 45)
   const [restSec, setRestSec] = useState(existing?.restSec ?? 15)
   const [rounds, setRounds] = useState(existing?.rounds ?? 2)
-  const [targetPowerW, setTargetPowerW] = useState<number | undefined>(existing?.targetPowerW)
-  const [targetDurationMin, setTargetDurationMin] = useState<number | undefined>(existing?.targetDurationMin)
   const [notes, setNotes] = useState(existing?.notes ?? '')
 
   const catExercises = exercises.filter((e) => e.category === category)
@@ -31,6 +35,7 @@ export default function SessionForm() {
     if (items.length && !window.confirm('Changer de catégorie videra la liste des exercices de la séance. Continuer ?')) return
     setCategory(c)
     setItems([])
+    if (c === 'velo' && metrics.length === 0) setMetrics(DEFAULT_VELO_METRICS)
   }
 
   const toggleDay = (d: number) =>
@@ -64,16 +69,30 @@ export default function SessionForm() {
       return copy
     })
 
+  const setMetric = (idx: number, patch: Partial<MetricDef>) =>
+    setMetrics((p) => p.map((m, i) => (i === idx ? { ...m, ...patch } : m)))
+  const setLink = (idx: number, patch: Partial<LinkDef>) =>
+    setLinks((p) => p.map((l, i) => (i === idx ? { ...l, ...patch } : l)))
+
   const save = async () => {
+    const cleanMetrics = metrics
+      .filter((m) => m.label.trim())
+      .map((m) => ({ key: m.key, label: m.label.trim(), unit: m.unit.trim() }))
+    const cleanLinks = links
+      .filter((l) => l.url.trim())
+      .map((l) => ({ label: l.label.trim() || 'Lien', url: l.url.trim() }))
+    const maxOrder = sessions.reduce((a, s) => Math.max(a, s.sortOrder ?? -1), -1)
     const data = {
       name: name.trim() || 'Séance',
       category,
       days,
       items: hasItems ? items : [],
+      metrics: cleanMetrics,
+      links: cleanLinks,
       notes: notes.trim(),
+      sortOrder: existing?.sortOrder ?? maxOrder + 1,
       createdAt: existing?.createdAt ?? Date.now(),
       ...(category === 'hiit' ? { workSec, restSec, rounds } : {}),
-      ...(category === 'velo' ? { targetPowerW, targetDurationMin } : {}),
     }
     if (existing) await updateSession(existing.id, data)
     else await addSession(data)
@@ -131,17 +150,6 @@ export default function SessionForm() {
             ))}
           </div>
         </Field>
-
-        {category === 'velo' && (
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Puissance cible">
-              <NumInput value={targetPowerW} onChange={setTargetPowerW} suffix="W" placeholder="120" />
-            </Field>
-            <Field label="Durée cible">
-              <NumInput value={targetDurationMin} onChange={setTargetDurationMin} suffix="min" placeholder="30" />
-            </Field>
-          </div>
-        )}
 
         {category === 'hiit' && (
           <div className="rounded-2xl bg-sage-50 p-3">
@@ -219,6 +227,14 @@ export default function SessionForm() {
                         <Stepper value={it.durationSec ?? 30} onChange={(v) => setItem(idx, { durationSec: v })} min={5} step={5} suffix="s" />
                       </div>
                     )}
+
+                    <input
+                      type="text"
+                      value={it.comment ?? ''}
+                      onChange={(e) => setItem(idx, { comment: e.target.value })}
+                      placeholder="Commentaire (tempo, consigne…)"
+                      className={smallInput + ' mt-2 w-full'}
+                    />
                   </div>
                 )
               })}
@@ -238,6 +254,77 @@ export default function SessionForm() {
             </div>
           </Field>
         )}
+
+        <Field label="Mesures à saisir en fin de séance">
+          <div className="space-y-2">
+            {metrics.map((m, idx) => (
+              <div key={m.key} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={m.label}
+                  onChange={(e) => setMetric(idx, { label: e.target.value })}
+                  placeholder="Ex. Puissance"
+                  className={smallInput + ' min-w-0 flex-1'}
+                />
+                <input
+                  type="text"
+                  value={m.unit}
+                  onChange={(e) => setMetric(idx, { unit: e.target.value })}
+                  placeholder="unité"
+                  className={smallInput + ' w-24'}
+                />
+                <button type="button" aria-label="Retirer la mesure" onClick={() => setMetrics((p) => p.filter((_, i) => i !== idx))} className="px-1 text-ink-soft/60">
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setMetrics((p) => [...p, newMetric()])}
+              className="rounded-full bg-sage-100 px-4 py-2 text-xs font-extrabold text-sage-700 active:bg-sage-200"
+            >
+              + Ajouter une mesure
+            </button>
+            {metrics.length === 0 && (
+              <p className="text-xs font-semibold text-ink-soft/70">
+                Optionnel — ex. durée, calories, niveau de résistance… Saisies à chaque séance et suivies dans Progrès.
+              </p>
+            )}
+          </div>
+        </Field>
+
+        <Field label="Liens utiles (YouTube, programme…)">
+          <div className="space-y-2">
+            {links.map((l, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={l.label}
+                  onChange={(e) => setLink(idx, { label: e.target.value })}
+                  placeholder="Titre"
+                  className={smallInput + ' w-28'}
+                />
+                <input
+                  type="url"
+                  value={l.url}
+                  onChange={(e) => setLink(idx, { url: e.target.value })}
+                  placeholder="https://…"
+                  className={smallInput + ' min-w-0 flex-1'}
+                />
+                <button type="button" aria-label="Retirer le lien" onClick={() => setLinks((p) => p.filter((_, i) => i !== idx))} className="px-1 text-ink-soft/60">
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setLinks((p) => [...p, { label: '', url: '' }])}
+              className="rounded-full bg-sage-100 px-4 py-2 text-xs font-extrabold text-sage-700 active:bg-sage-200"
+            >
+              + Ajouter un lien
+            </button>
+          </div>
+        </Field>
 
         <Field label="Notes (optionnel)">
           <TextArea value={notes} onChange={setNotes} rows={2} placeholder="Ex. 8 × 400 m, récup 1 min" />

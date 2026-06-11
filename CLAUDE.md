@@ -4,10 +4,14 @@ App PWA mobile-first de suivi sportif (running, vélo d'appartement, muscu, HIIT
 
 ## Commandes
 
-- `npm run dev` — serveur de dev (http://localhost:5173)
+- `npm run dev` — serveur de dev (http://localhost:5173), mode cloud si `.env` rempli
+- `npm run dev:demo` — serveur en mode local forcé (port 5174, `.env.demo` vide les clés Firebase)
 - `npm run build` — tsc + vite build vers `dist/`
-- `node scripts/smoke.mjs` — test de fumée Playwright (dev server requis), captures dans `screenshots/`
+- `node scripts/smoke.mjs` — test de fumée Playwright (lancer `dev:demo` avant), captures dans `screenshots/`
+- `node scripts/check-cloud.mjs` — vérifie l'écran de connexion Google sur 5173
 - `node scripts/make-icons.mjs` — régénère les PNG PWA depuis `public/icon.svg`
+
+Le `.env` (gitignoré) contient la config Firebase du projet `routine-sport-ca440` de l'utilisateur.
 
 ## Environnement
 

@@ -9,6 +9,7 @@ interface Step {
   type: 'prep' | 'work' | 'rest'
   label: string
   sec: number
+  comment?: string
 }
 
 function buildSteps(session: Session, exercises: Exercise[]): Step[] {
@@ -20,14 +21,14 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
     const rest = session.restSec ?? 15
     for (let r = 0; r < rounds; r++) {
       session.items.forEach((it, i) => {
-        steps.push({ type: 'work', label: nameOf(it.exerciseId), sec: it.durationSec ?? work })
+        steps.push({ type: 'work', label: nameOf(it.exerciseId), sec: it.durationSec ?? work, comment: it.comment })
         const isLast = r === rounds - 1 && i === session.items.length - 1
         if (!isLast && rest > 0) steps.push({ type: 'rest', label: 'Repos', sec: rest })
       })
     }
   } else {
     for (const it of session.items) {
-      steps.push({ type: 'work', label: nameOf(it.exerciseId), sec: it.durationSec ?? 30 })
+      steps.push({ type: 'work', label: nameOf(it.exerciseId), sec: it.durationSec ?? 30, comment: it.comment })
     }
   }
   return steps
@@ -251,6 +252,7 @@ export default function Player() {
           {step.type === 'work' ? meta.label : step.type === 'rest' ? 'Récupération' : 'Préparation'}
         </p>
         <h1 className="text-3xl font-extrabold leading-tight">{step.label}</h1>
+        {step.comment && <p className="text-sm font-semibold text-ink-soft">💡 {step.comment}</p>}
         <p className="my-2 text-8xl font-extrabold tabular-nums tracking-tight">{mmss(remaining)}</p>
         {next && (
           <p className="text-sm font-bold text-ink-soft">

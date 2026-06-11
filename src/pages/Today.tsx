@@ -8,6 +8,12 @@ import CompleteSheet from '../components/CompleteSheet'
 import SettingsSheet from '../components/SettingsSheet'
 
 function logSummary(l: Log): string {
+  if (l.metrics?.length) {
+    return l.metrics
+      .slice(0, 3)
+      .map((m) => `${m.value}${m.unit ? ' ' + m.unit : ''}`)
+      .join(' · ')
+  }
   if (l.velo) {
     const parts: string[] = []
     if (l.velo.durationMin) parts.push(`${l.velo.durationMin} min`)

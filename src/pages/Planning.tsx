@@ -1,34 +1,135 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Session } from '../types'
-import { DAY_NAMES, mondayIndex } from '../lib/dates'
-import { PageHeader, Sheet } from '../components/ui'
-import { summarizeSession } from '../lib/format'
+import { DAY_LETTER, DAY_NAMES, mondayIndex } from '../lib/dates'
+import { EmptyState, PageHeader } from '../components/ui'
+
+/** Grille commune : poignée · nom · 7 jours */
+const GRID = 'grid grid-cols-[1rem_minmax(0,1fr)_repeat(7,1.85rem)] items-center gap-x-0.5'
+
+function Row({
+  session,
+  todayIdx,
+  onToggle,
+  onEdit,
+}: {
+  session: Session
+  todayIdx: number
+  onToggle: (day: number) => void
+  onEdit: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: session.id })
+  const meta = CATEGORY_META[session.category]
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={
+        GRID +
+        ' rounded-2xl bg-surface px-1.5 py-1 shadow-sm ' +
+        (isDragging ? 'relative z-10 shadow-lg ring-2 ring-sage-300' : '')
+      }
+    >
+      <button
+        type="button"
+        aria-label={`Déplacer ${session.name}`}
+        {...attributes}
+        {...listeners}
+        className="flex h-9 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+          <circle cx="9" cy="6" r="1.7" />
+          <circle cx="15" cy="6" r="1.7" />
+          <circle cx="9" cy="12" r="1.7" />
+          <circle cx="15" cy="12" r="1.7" />
+          <circle cx="9" cy="18" r="1.7" />
+          <circle cx="15" cy="18" r="1.7" />
+        </svg>
+      </button>
+      <button type="button" onClick={onEdit} className="min-w-0 truncate px-1 text-left text-xs font-extrabold leading-9">
+        {meta.emoji} {session.name}
+      </button>
+      {Array.from({ length: 7 }, (_, d) => {
+        const active = session.days.includes(d)
+        return (
+          <button
+            key={d}
+            type="button"
+            aria-label={`${session.name} — ${DAY_NAMES[d]}`}
+            aria-pressed={active}
+            onClick={() => onToggle(d)}
+            className={
+              'flex h-10 items-center justify-center rounded-lg transition-colors ' +
+              (d === todayIdx ? 'bg-sage-50' : '')
+            }
+          >
+            <span
+              className={'rounded-full transition-all ' + (active ? 'h-4 w-4 shadow-sm' : 'h-2 w-2 bg-sand')}
+              style={active ? { backgroundColor: meta.hex } : undefined}
+            />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function Planning() {
   const { sessions, updateSession } = useData()
-  const [addingDay, setAddingDay] = useState<number | null>(null)
+  const navigate = useNavigate()
   const todayIdx = mondayIndex()
 
+  // Ordre local optimiste pendant le drag & drop
+  const [orderIds, setOrderIds] = useState<string[]>(() => sessions.map((s) => s.id))
+  useEffect(() => {
+    setOrderIds(sessions.map((s) => s.id))
+  }, [sessions])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+  )
+
+  const ordered = orderIds.map((id) => sessions.find((s) => s.id === id)).filter((s): s is Session => !!s)
   const perWeek = sessions.reduce((a, s) => a + s.days.length, 0)
 
-  const addToDay = async (s: Session, day: number) => {
-    setAddingDay(null)
-    await updateSession(s.id, { days: [...s.days, day].sort((a, b) => a - b) })
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const oldIdx = orderIds.indexOf(String(active.id))
+    const newIdx = orderIds.indexOf(String(over.id))
+    if (oldIdx === -1 || newIdx === -1) return
+    const next = arrayMove(orderIds, oldIdx, newIdx)
+    setOrderIds(next)
+    next.forEach((sid, i) => {
+      const s = sessions.find((x) => x.id === sid)
+      if (s && s.sortOrder !== i) void updateSession(sid, { sortOrder: i })
+    })
   }
 
-  const removeFromDay = (s: Session, day: number) => {
-    if (!window.confirm(`Retirer « ${s.name} » du ${DAY_NAMES[day].toLowerCase()} ?`)) return
-    void updateSession(s.id, { days: s.days.filter((d) => d !== day) })
+  const toggle = (s: Session, day: number) => {
+    const days = s.days.includes(day) ? s.days.filter((d) => d !== day) : [...s.days, day].sort((a, b) => a - b)
+    void updateSession(s.id, { days })
   }
-
-  const candidates = addingDay === null ? [] : sessions.filter((s) => !s.days.includes(addingDay))
 
   return (
     <div>
       <PageHeader kicker="Semaine type" title="Planning" />
       <p className="-mt-2 px-5 pb-4 text-xs font-semibold text-ink-soft">
-        Votre routine se répète chaque semaine : ajoutez vos séances aux jours voulus.
+        Touchez un rond pour planifier une séance ce jour-là · glissez{' '}
+        <span className="inline-block align-middle text-ink-soft/60">⠿</span> pour réordonner.
         {perWeek > 0 && (
           <span className="ml-1 text-sage-600">
             {perWeek} séance{perWeek > 1 ? 's' : ''} / semaine.
@@ -36,84 +137,51 @@ export default function Planning() {
         )}
       </p>
 
-      <div className="space-y-3 px-5">
-        {DAY_NAMES.map((name, day) => {
-          const daySessions = sessions.filter((s) => s.days.includes(day))
-          const isToday = day === todayIdx
-          return (
-            <div key={day} className={'rounded-3xl bg-surface p-4 shadow-sm ' + (isToday ? 'ring-2 ring-sage-300' : '')}>
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-extrabold">
-                  {name}
-                  {isToday && (
-                    <span className="ml-2 rounded-full bg-sage-100 px-2 py-0.5 text-[10px] font-extrabold text-sage-700">
-                      aujourd'hui
-                    </span>
-                  )}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setAddingDay(day)}
-                  className="rounded-full bg-sage-100 px-3 py-1.5 text-xs font-extrabold text-sage-700 active:bg-sage-200"
-                >
-                  + Ajouter
-                </button>
-              </div>
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                {daySessions.length === 0 && <p className="text-xs font-semibold text-ink-soft/50">Repos 🌙</p>}
-                {daySessions.map((s) => {
-                  const meta = CATEGORY_META[s.category]
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => removeFromDay(s, day)}
-                      title="Retirer de ce jour"
-                      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-extrabold ${meta.soft} ${meta.text}`}
-                    >
-                      {meta.emoji} {s.name}
-                      <span className="opacity-50">✕</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      <Sheet
-        open={addingDay !== null}
-        onClose={() => setAddingDay(null)}
-        title={addingDay !== null ? `Ajouter au ${DAY_NAMES[addingDay].toLowerCase()}` : undefined}
-      >
-        <div className="space-y-1.5">
-          {candidates.map((s) => {
-            const meta = CATEGORY_META[s.category]
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => void addToDay(s, addingDay!)}
-                className="flex w-full items-center gap-3 rounded-2xl bg-sage-50 px-4 py-3 text-left active:bg-sage-100"
-              >
-                <span className="text-xl">{meta.emoji}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-extrabold">{s.name}</span>
-                  <span className="block truncate text-xs font-semibold text-ink-soft">{summarizeSession(s)}</span>
-                </span>
-              </button>
-            )
-          })}
-          {candidates.length === 0 && (
-            <p className="py-4 text-center text-sm font-semibold text-ink-soft">
-              Toutes vos séances sont déjà sur ce jour.
-              <br />
-              Créez-en de nouvelles dans l'onglet Exercices.
-            </p>
-          )}
+      {sessions.length === 0 ? (
+        <div className="px-5">
+          <EmptyState emoji="🗂️" text="Créez d'abord une séance dans l'onglet Exercices." />
         </div>
-      </Sheet>
+      ) : (
+        <div className="px-3">
+          {/* En-tête des jours */}
+          <div className={GRID + ' px-1.5 pb-1'}>
+            <span />
+            <span />
+            {DAY_LETTER.map((letter, d) => (
+              <span
+                key={d}
+                title={DAY_NAMES[d]}
+                className={
+                  'mx-auto flex h-7 w-7 items-center justify-center rounded-full text-xs font-extrabold ' +
+                  (d === todayIdx ? 'bg-sage-500 text-white shadow-sm' : 'text-ink-soft')
+                }
+              >
+                {letter}
+              </span>
+            ))}
+          </div>
+
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={orderIds} strategy={verticalListSortingStrategy}>
+              <div className="space-y-1.5">
+                {ordered.map((s) => (
+                  <Row
+                    key={s.id}
+                    session={s}
+                    todayIdx={todayIdx}
+                    onToggle={(d) => toggle(s, d)}
+                    onEdit={() => navigate(`/session/${s.id}`)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+
+          <p className="px-2 pt-4 text-center text-xs font-semibold text-ink-soft/60">
+            Votre semaine type se répète automatiquement. Touchez le nom d'une séance pour la modifier.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

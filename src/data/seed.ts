@@ -1,5 +1,6 @@
 import type { Category, Exercise, Measure, Session, SessionItem } from '../types'
 import { youtubeSearch } from '../lib/format'
+import { DEFAULT_VELO_METRICS } from '../lib/metrics'
 import type { Store, StoreDoc } from './store'
 
 interface SeedEx {
@@ -72,6 +73,7 @@ export function buildSeed(): { exercises: Exercise[]; sessions: Session[] } {
       days: [],
       items: [],
       notes: 'Footing tranquille, 30-40 min',
+      sortOrder: 0,
       createdAt: now,
     },
     {
@@ -81,6 +83,7 @@ export function buildSeed(): { exercises: Exercise[]; sessions: Session[] } {
       days: [],
       items: [],
       notes: 'Endurance fondamentale, 1 h et plus',
+      sortOrder: 1,
       createdAt: now + 1,
     },
     {
@@ -90,6 +93,7 @@ export function buildSeed(): { exercises: Exercise[]; sessions: Session[] } {
       days: [],
       items: [],
       notes: 'Ex. 8 × 400 m, récup 1 min',
+      sortOrder: 2,
       createdAt: now + 2,
     },
     {
@@ -98,8 +102,8 @@ export function buildSeed(): { exercises: Exercise[]; sessions: Session[] } {
       category: 'velo',
       days: [],
       items: [],
-      targetPowerW: 120,
-      targetDurationMin: 30,
+      metrics: DEFAULT_VELO_METRICS,
+      sortOrder: 3,
       createdAt: now + 3,
     },
     {
@@ -110,10 +114,11 @@ export function buildSeed(): { exercises: Exercise[]; sessions: Session[] } {
       items: [
         item('Pompes', { sets: 3, target: 12 }),
         item('Squats', { sets: 3, target: 15 }),
-        item('Fentes', { sets: 3, target: 10 }),
-        item('Gainage', { sets: 3, target: 45 }),
+        item('Fentes', { sets: 3, target: 10, comment: '10 par jambe' }),
+        item('Gainage', { sets: 3, target: 45, comment: 'Dos bien droit, ne pas creuser' }),
         item('Pont fessier', { sets: 3, target: 15 }),
       ],
+      sortOrder: 4,
       createdAt: now + 4,
     },
     {
@@ -131,6 +136,7 @@ export function buildSeed(): { exercises: Exercise[]; sessions: Session[] } {
       workSec: 45,
       restSec: 15,
       rounds: 2,
+      sortOrder: 5,
       createdAt: now + 5,
     },
     {
@@ -147,6 +153,7 @@ export function buildSeed(): { exercises: Exercise[]; sessions: Session[] } {
         item('Papillon (adducteurs)', { durationSec: 30 }),
         item('Torsion allongée', { durationSec: 40 }),
       ],
+      sortOrder: 6,
       createdAt: now + 6,
     },
   ]

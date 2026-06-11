@@ -1,9 +1,9 @@
 // Test de fumée : parcourt les écrans principaux en mode local et prend des captures.
-// Prérequis : `npm run dev` lancé, puis `node scripts/smoke.mjs`
+// Prérequis : `npm run dev:demo` lancé, puis `BASE_URL=http://localhost:5174 node scripts/smoke.mjs`
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 
-const BASE = process.env.BASE_URL ?? 'http://localhost:5173'
+const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
 const DIR = 'screenshots'
 mkdirSync(DIR, { recursive: true })
 
@@ -31,22 +31,24 @@ try {
   await page.click('text=Marquer comme faite')
   await page.waitForSelector('text=Terminées')
 
-  // --- Séance libre : vélo avec saisie des perfs
+  // --- Séance libre : vélo avec saisie des perfs (vitesse auto-calculée)
   await page.click('text=Séance libre')
   await page.waitForSelector('text=Choisir une séance')
   await page.click('text=appartement')
   await page.waitForSelector('text=Puissance')
   const nums = page.locator('input[type="number"]')
-  await nums.nth(2).fill('12.5') // distance
+  await nums.nth(1).fill('30') // durée min
+  await nums.nth(2).fill('12.5') // distance km
   await nums.nth(4).fill('128') // bpm
   await shot('03-sheet-velo')
   await page.click('text=Enregistrer ✓')
   await page.waitForSelector('text=12.5 km')
 
-  // --- Séance libre : muscu (steppers préremplis)
+  // --- Séance libre : muscu (steppers préremplis + commentaire d'exercice)
   await page.click('text=Séance libre')
   await page.click('text=Full body')
   await page.waitForSelector('text=Série 1')
+  await page.waitForSelector('text=Dos bien droit')
   await shot('04-sheet-muscu')
   await page.click('text=Enregistrer ✓')
   await page.waitForSelector('text=5 exercices · 15 séries')
@@ -66,34 +68,37 @@ try {
   await page.click('[aria-label="Quitter"]') // confirm auto-accepté
   await page.waitForSelector('text=Séance libre')
 
-  // --- Planning : ajouter le HIIT au lundi
+  // --- Planning : grille, toggle d'un rond (HIIT le lundi)
   await page.click('text=Planning')
   await page.waitForSelector('text=Semaine type')
-  await page.locator('button:has-text("+ Ajouter")').first().click()
-  await page.waitForSelector('text=Ajouter au lundi')
-  await page.click('text=Cardio express')
-  await page.waitForSelector('text=🔥 HIIT — Cardio express')
+  await page.click('[aria-label="HIIT — Cardio express — Lundi"]')
+  await page.waitForSelector('[aria-label="HIIT — Cardio express — Lundi"][aria-pressed="true"]')
   await shot('08-planning')
 
-  // --- Bibliothèque : séances et exercices
+  // --- Bibliothèque : séances, formulaire de séance (mesures + liens)
   await page.click('text=Exercices')
   await page.waitForSelector('text=Bibliothèque')
   await shot('09-bibliotheque-seances')
-  await page.getByRole('button', { name: 'Exercices', exact: true }).click() // segment "Exercices"
-  await page.waitForSelector('button:has-text("Pompes")')
-  await shot('10-bibliotheque-exos')
-
-  // --- Fiche exercice (lien vidéo)
-  await page.click('text=Pompes')
-  await page.waitForSelector("text=Modifier l'exercice")
-  await shot('11-fiche-exercice')
+  await page.click('text=appartement')
+  await page.waitForSelector('text=Mesures à saisir')
+  await shot('10-seance-form')
   await page.click('[aria-label="Retour"]')
 
-  // --- Progrès
+  // --- Banque d'exercices + fiche
+  await page.getByRole('button', { name: "Banque d'exercices", exact: true }).click()
+  await page.waitForSelector('button:has-text("Pompes")')
+  await shot('11-bibliotheque-exos')
+  await page.click('button:has-text("Pompes")')
+  await page.waitForSelector("text=Modifier l'exercice")
+  await shot('12-fiche-exercice')
+  await page.click('[aria-label="Retour"]')
+
+  // --- Progrès : activité + mesures par séance
   await page.click('text=Progrès')
   await page.waitForSelector('text=Séances complétées par semaine')
+  await page.waitForSelector('text=Mesures par séance')
   await page.waitForTimeout(800)
-  await shot('12-progres')
+  await shot('13-progres')
 
   if (errors.length) {
     console.error('ERREURS DÉTECTÉES :')

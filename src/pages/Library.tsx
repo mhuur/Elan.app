@@ -17,8 +17,8 @@ export default function Library() {
       <div className="px-5 pb-4">
         <Seg
           options={[
-            { value: 'seances' as const, label: 'Séances' },
-            { value: 'exos' as const, label: 'Exercices' },
+            { value: 'seances' as const, label: 'Mes séances' },
+            { value: 'exos' as const, label: "Banque d'exercices" },
           ]}
           value={tab}
           onChange={(v) => setParams(v === 'exos' ? { tab: 'exos' } : {})}

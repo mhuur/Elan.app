@@ -95,4 +95,5 @@ L'URL `https://votre-projet.web.app` est affichée à la fin.
 - React 19 + TypeScript + Vite, Tailwind CSS 4, Recharts, Firebase (Auth Google + Firestore avec cache hors-ligne), PWA via vite-plugin-pwa.
 - Données : `users/{uid}/exercises|sessions|logs` dans Firestore, ou `localStorage` en mode local (même interface `Store`, voir [src/data/store.ts](src/data/store.ts)).
 - `npm run build` : compile dans `dist/`. `node scripts/make-icons.mjs` : régénère les icônes PNG depuis [public/icon.svg](public/icon.svg).
-- `node scripts/smoke.mjs` : test de fumée Playwright (nécessite `npm run dev` lancé).
+- `npm run dev:demo` : serveur en mode local forcé (port 5174), même si `.env` est configuré — pratique pour tester sans toucher aux vraies données.
+- `node scripts/smoke.mjs` : test de fumée Playwright (nécessite `npm run dev:demo` lancé). `node scripts/check-cloud.mjs` : vérifie l'écran de connexion en mode cloud.
