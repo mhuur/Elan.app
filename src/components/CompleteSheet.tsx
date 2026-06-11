@@ -4,7 +4,7 @@ import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Log, type MetricValue, type Session, type SessionItem } from '../types'
 import { todayStr } from '../lib/dates'
 import { mmss } from '../lib/format'
-import { effectiveMetrics } from '../lib/metrics'
+import { effectiveMetrics, objectiveTargets } from '../lib/metrics'
 import { tone } from '../lib/audio'
 import { Field, GhostButton, NumInput, PrimaryButton, Sheet, Stepper, TextArea } from './ui'
 
@@ -155,12 +155,22 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
     const mv = buildMetricValues()
     if (mv.length) extra.metrics = mv
     const achieved: string[] = []
-    // Objectif de séance (sur une mesure) atteint ?
-    if (session.objective) {
-      const o = session.objective
-      const got = mv.find((x) => x.key === o.metricKey)
-      if (got && got.value >= o.value) {
-        achieved.push(`${o.label} : ${got.value}${o.unit ? ' ' + o.unit : ''} (objectif ${o.value})`)
+    // Objectif de séance : toutes les cibles remplies dans cette séance ?
+    const targets = objectiveTargets(session)
+    if (targets.length) {
+      const allMet = targets.every((t) => {
+        const got = mv.find((x) => x.key === t.key)
+        return !!got && got.value >= t.value
+      })
+      if (allMet) {
+        achieved.push(
+          targets
+            .map((t) => {
+              const got = mv.find((x) => x.key === t.key)!
+              return `${t.label} : ${got.value}${t.unit ? ' ' + t.unit : ''} (objectif ${t.value})`
+            })
+            .join(' · '),
+        )
       }
     }
     if (isMuscu && session.items.length) {

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 export function PageHeader({ kicker, title, right }: { kicker?: string; title: string; right?: ReactNode }) {
   return (
@@ -64,19 +64,50 @@ export function NumInput({ value, onChange, placeholder, suffix }: { value: numb
 }
 
 export function Stepper({ value, onChange, min = 0, max = 990, step = 1, suffix, small }: { value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; suffix?: string; small?: boolean }) {
+  // Le chiffre est saisissable directement, en plus des boutons − / +
+  const [text, setText] = useState(String(value))
+  const editingRef = useRef(false)
+  useEffect(() => {
+    if (!editingRef.current) setText(String(value))
+  }, [value])
+  const clamp = (n: number) => Math.min(max, Math.max(min, n))
+  const commit = (t: string) => {
+    const n = Number(t.replace(',', '.'))
+    if (t.trim() !== '' && !Number.isNaN(n)) onChange(clamp(n))
+  }
   const btn = small
     ? 'h-8 w-8 shrink-0 rounded-full bg-sage-100 text-base font-extrabold text-sage-700 active:bg-sage-200'
     : 'h-11 w-11 shrink-0 rounded-full bg-sage-100 text-xl font-extrabold text-sage-700 active:bg-sage-200'
   return (
     <div className="inline-flex items-center gap-1">
-      <button type="button" aria-label="Diminuer" className={btn} onClick={() => onChange(Math.max(min, value - step))}>
+      <button type="button" aria-label="Diminuer" className={btn} onClick={() => onChange(clamp(value - step))}>
         −
       </button>
-      <div className={small ? 'min-w-9 text-center' : 'min-w-14 text-center'}>
-        <span className={(small ? 'text-sm' : 'text-lg') + ' font-extrabold tabular-nums'}>{value}</span>
-        {suffix && <span className="ml-0.5 text-xs font-bold text-ink-soft">{suffix}</span>}
+      <div className="flex items-baseline">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={text}
+          onFocus={(e) => {
+            editingRef.current = true
+            e.target.select()
+          }}
+          onChange={(e) => {
+            setText(e.target.value)
+            commit(e.target.value)
+          }}
+          onBlur={() => {
+            editingRef.current = false
+            setText(String(value))
+          }}
+          className={
+            (small ? 'w-9 text-sm' : 'w-12 text-lg') +
+            ' rounded-lg border border-transparent bg-transparent text-center font-extrabold tabular-nums outline-none focus:border-sage-300 focus:bg-surface'
+          }
+        />
+        {suffix && <span className="text-xs font-bold text-ink-soft">{suffix}</span>}
       </div>
-      <button type="button" aria-label="Augmenter" className={btn} onClick={() => onChange(Math.min(max, value + step))}>
+      <button type="button" aria-label="Augmenter" className={btn} onClick={() => onChange(clamp(value + step))}>
         +
       </button>
     </div>

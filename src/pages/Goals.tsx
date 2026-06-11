@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Exercise, type Session } from '../types'
-import { effectiveMetrics } from '../lib/metrics'
+import { effectiveMetrics, objectiveTargets } from '../lib/metrics'
 import { EmptyState, Fab, Field, NumInput, PageHeader, PrimaryButton, Seg, Sheet } from '../components/ui'
 
 function ProgressBar({ ratio, reached }: { ratio: number; reached: boolean }) {
@@ -32,23 +32,27 @@ export default function Goals() {
   const [selExId, setSelExId] = useState('')
   const selEx = sessionExercises.find((e) => e.id === selExId) ?? sessionExercises[0]
   const [exMetric, setExMetric] = useState<'best' | 'volume'>('best')
-  const [selMetricKey, setSelMetricKey] = useState('')
-  const selMetric = selMetrics.find((m) => m.key === selMetricKey) ?? selMetrics[0]
   const [targetValue, setTargetValue] = useState<number | undefined>(undefined)
+  // Multi-mesures : une valeur cible par mesure (vide = ignorée)
+  const [mtargets, setMtargets] = useState<Record<string, number | undefined>>({})
 
   const isMuscuTarget = selSession?.category === 'muscu' && sessionExercises.length > 0
-  const canCreate = !!targetValue && (isMuscuTarget ? !!selEx : !!selMetric)
+  const filledTargets = selMetrics.filter((m) => mtargets[m.key] != null)
+  const canCreate = isMuscuTarget ? !!targetValue && !!selEx : filledTargets.length > 0
 
   const createGoal = async () => {
-    if (!targetValue || !selSession) return
-    if (isMuscuTarget && selEx) {
+    if (!selSession) return
+    if (isMuscuTarget && selEx && targetValue) {
       await updateExercise(selEx.id, { goal: { metric: exMetric, value: targetValue } })
-    } else if (selMetric) {
+    } else if (filledTargets.length) {
       await updateSession(selSession.id, {
-        objective: { metricKey: selMetric.key, label: selMetric.label, unit: selMetric.unit, value: targetValue },
+        objective: {
+          targets: filledTargets.map((m) => ({ key: m.key, label: m.label, unit: m.unit, value: mtargets[m.key]! })),
+        },
       })
     }
     setTargetValue(undefined)
+    setMtargets({})
     setAddOpen(false)
   }
 
@@ -63,18 +67,18 @@ export default function Goals() {
     }
     return best
   }
-  const bestForSession = (s: Session): number => {
+  const bestMetric = (s: Session, key: string): number => {
     let best = 0
     for (const l of logs) {
       if (l.sessionId !== s.id) continue
-      const mv = l.metrics?.find((x) => x.key === s.objective?.metricKey)
+      const mv = l.metrics?.find((x) => x.key === key)
       if (mv && mv.value > best) best = mv.value
     }
     return best
   }
 
   const exerciseGoals = exercises.filter((e) => e.goal)
-  const sessionGoals = sessions.filter((s) => s.objective)
+  const sessionGoals = sessions.filter((s) => objectiveTargets(s).length > 0)
   const total = exerciseGoals.length + sessionGoals.length
 
   return (
@@ -83,7 +87,7 @@ export default function Goals() {
 
       <div className="space-y-3 px-5">
         {total === 0 && (
-          <EmptyState emoji="🎯" text="Fixez un objectif sur une séance (ex. Pompes : 20 en une série, ou Vélo : 15 km) et suivez votre progression ici." />
+          <EmptyState emoji="🎯" text="Fixez un objectif sur une séance (ex. Pompes : 20 en une série, ou Vélo : 45 min à 130 bpm) et suivez votre progression ici." />
         )}
 
         {exerciseGoals.map((e) => {
@@ -128,9 +132,16 @@ export default function Goals() {
         })}
 
         {sessionGoals.map((s) => {
-          const o = s.objective!
-          const cur = bestForSession(s)
-          const reached = cur >= o.value
+          const targets = objectiveTargets(s)
+          // Atteint si une même séance remplit toutes les cibles
+          const reachedAll = logs.some(
+            (l) =>
+              l.sessionId === s.id &&
+              targets.every((t) => {
+                const mv = l.metrics?.find((x) => x.key === t.key)
+                return !!mv && mv.value >= t.value
+              }),
+          )
           return (
             <div key={s.id} className="rounded-3xl bg-surface p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
@@ -138,9 +149,9 @@ export default function Goals() {
                   <p className="truncate text-sm font-extrabold">
                     {CATEGORY_META[s.category].emoji} {s.name}
                   </p>
-                  <p className="text-xs font-semibold text-ink-soft">
-                    {o.label} ≥ {o.value} {o.unit}
-                  </p>
+                  {targets.length > 1 && (
+                    <p className="text-[11px] font-semibold text-ink-soft">À réussir dans une même séance :</p>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -153,15 +164,27 @@ export default function Goals() {
                   ✕
                 </button>
               </div>
-              <div className="mt-2.5">
-                <ProgressBar ratio={o.value ? cur / o.value : 0} reached={reached} />
-                <p className="mt-1.5 text-xs font-extrabold">
-                  {reached ? (
-                    <span className="text-sage-600">🎉 Atteint — record {cur} {o.unit}</span>
+              <div className="mt-2 space-y-2">
+                {targets.map((t) => {
+                  const cur = bestMetric(s, t.key)
+                  const ok = cur >= t.value
+                  return (
+                    <div key={t.key}>
+                      <div className="mb-1 flex items-baseline justify-between">
+                        <span className="text-xs font-bold text-ink-soft">{t.label}</span>
+                        <span className={'text-xs font-extrabold ' + (ok ? 'text-sage-600' : 'text-ink-soft')}>
+                          {cur} / {t.value} {t.unit} {ok && '✓'}
+                        </span>
+                      </div>
+                      <ProgressBar ratio={t.value ? cur / t.value : 0} reached={ok} />
+                    </div>
+                  )
+                })}
+                <p className="text-xs font-extrabold">
+                  {reachedAll ? (
+                    <span className="text-sage-600">🎉 Objectif complet atteint !</span>
                   ) : (
-                    <span className="text-ink-soft">
-                      {cur} / {o.value} {o.unit} — encore {Math.round((o.value - cur) * 10) / 10}
-                    </span>
+                    <span className="text-ink-soft">En cours…</span>
                   )}
                 </p>
               </div>
@@ -180,7 +203,7 @@ export default function Goals() {
               onChange={(e) => {
                 setSelSessionId(e.target.value)
                 setSelExId('')
-                setSelMetricKey('')
+                setMtargets({})
               }}
               className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
             >
@@ -224,24 +247,27 @@ export default function Goals() {
           )}
 
           {!isMuscuTarget && selMetrics.length > 0 && (
-            <>
-              <Field label="Mesure">
-                <select
-                  value={selMetric?.key ?? ''}
-                  onChange={(e) => setSelMetricKey(e.target.value)}
-                  className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
-                >
-                  {selMetrics.map((m) => (
-                    <option key={m.key} value={m.key}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Valeur à atteindre">
-                <NumInput value={targetValue} onChange={setTargetValue} suffix={selMetric?.unit || undefined} placeholder="Ex. 15" />
-              </Field>
-            </>
+            <Field label="Cibles (remplissez une ou plusieurs mesures)">
+              <div className="space-y-2">
+                {selMetrics.map((m) => (
+                  <div key={m.key} className="flex items-center gap-3">
+                    <span className="w-28 shrink-0 truncate text-sm font-bold">{m.label}</span>
+                    <div className="min-w-0 flex-1">
+                      <NumInput
+                        value={mtargets[m.key]}
+                        onChange={(v) => setMtargets((p) => ({ ...p, [m.key]: v }))}
+                        suffix={m.unit || undefined}
+                        placeholder="—"
+                      />
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs font-semibold text-ink-soft">
+                  Avec plusieurs cibles, l'objectif est atteint quand une même séance les remplit toutes (ex. 45 min ET
+                  130 bpm ET 15 W).
+                </p>
+              </div>
+            </Field>
           )}
 
           {!isMuscuTarget && selMetrics.length === 0 && (

@@ -40,7 +40,7 @@ function groupedOptions(list: Exercise[]): [string, Exercise[]][] {
 export default function SessionForm() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { sessions, exercises, addSession, updateSession, removeSession, updateExercise } = useData()
+  const { sessions, exercises, addSession, updateSession, removeSession, updateExercise, addExercise } = useData()
   const existing = sessions.find((s) => s.id === id)
 
   // Cycle d'alternance : la séance « propriétaire » porte la planification, les
@@ -65,6 +65,20 @@ export default function SessionForm() {
   const [stretchRest, setStretchRest] = useState(existing?.category === 'etirements' ? (existing.restSec ?? 0) : 5)
   const [muscuRounds, setMuscuRounds] = useState(existing?.category === 'muscu' ? (existing.rounds ?? 1) : 1)
   const [notes, setNotes] = useState(existing?.notes ?? '')
+  const [quickName, setQuickName] = useState('')
+
+  /** Ordre de rotation prévisualisé (même logique que la sauvegarde) */
+  const previewRotation = (): string[] => {
+    const selfId = existing?.id ?? '__self__'
+    const wanted = [selfId, ...altIds]
+    const prev = cycleOwner ? cycleIdsOf(cycleOwner) : []
+    const cycle = [...prev.filter((x) => wanted.includes(x)), ...wanted.filter((x) => !prev.includes(x))].filter(
+      (x, i, a) => a.indexOf(x) === i,
+    )
+    return cycle.map((cid) =>
+      cid === selfId ? `${name.trim() || 'Cette séance'} ★` : (sessions.find((x) => x.id === cid)?.name ?? '?'),
+    )
+  }
 
   const catExercises = exercises.filter((e) => e.category === category)
   const exOf = (exId: string) => exercises.find((e) => e.id === exId)
@@ -92,9 +106,35 @@ export default function SessionForm() {
     if (category === 'muscu') {
       base.sets = 3
       base.target = exOf(next.id)?.measure === 'sec' ? 30 : 10
+      base.restSec = 60
     }
     if (category === 'etirements') base.durationSec = 30
     setItems((p) => [...p, base])
+  }
+
+  /** Crée un exercice à la volée et l'ajoute à la séance, sans quitter le formulaire */
+  const quickCreate = async () => {
+    const nm = quickName.trim()
+    if (!nm) return
+    const exId = await addExercise({
+      name: nm,
+      category,
+      subtypes: [],
+      subtype: '',
+      measure: 'reps',
+      description: '',
+      videoUrl: '',
+      createdAt: Date.now(),
+    })
+    const base: SessionItem = { exerciseId: exId }
+    if (category === 'muscu') {
+      base.sets = 3
+      base.target = 10
+      base.restSec = 60
+    }
+    if (category === 'etirements') base.durationSec = 30
+    setItems((p) => [...p, base])
+    setQuickName('')
   }
 
   const setItem = (idx: number, patch: Partial<SessionItem>) =>
@@ -317,10 +357,18 @@ export default function SessionForm() {
                     ))}
                 </select>
                 {altIds.length > 0 && (
-                  <p className="mt-1.5 text-xs font-semibold text-ink-soft">
-                    Les séances tournent dans l'ordre : celle-ci, puis {altIds.length > 1 ? 'chacune des séances ci-dessus' : 'la séance ci-dessus'}.
-                    L'alternance est partagée — elle apparaît aussi dans la fiche des autres séances.
-                  </p>
+                  <div className="mt-2 rounded-xl bg-surface px-3 py-2.5">
+                    <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">
+                      🔁 Rotation ({everyDays === 1 ? 'chaque jour' : `tous les ${everyDays} jours`})
+                    </p>
+                    <p className="text-xs font-extrabold leading-relaxed">
+                      {previewRotation().join('  →  ')} <span className="text-ink-soft">→ on recommence</span>
+                    </p>
+                    <p className="mt-1 text-[11px] font-semibold text-ink-soft">
+                      ★ = cette séance. Les séances tournent dans l'ordre ; l'alternance est partagée et modifiable
+                      depuis la fiche de chacune.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
@@ -502,6 +550,24 @@ export default function SessionForm() {
               >
                 + Ajouter un exercice
               </button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={quickName}
+                  onChange={(e) => setQuickName(e.target.value)}
+                  placeholder="Ou créez un nouvel exercice ici…"
+                  className={smallInput + ' min-w-0 flex-1 py-2'}
+                />
+                {quickName.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => void quickCreate()}
+                    className="shrink-0 rounded-full bg-sage-500 px-3.5 py-2 text-xs font-extrabold text-white active:bg-sage-600"
+                  >
+                    + Créer
+                  </button>
+                )}
+              </div>
               {category === 'hiit' && items.length > 0 && (
                 <p className="text-center text-xs font-semibold text-ink-soft">
                   {items.length} exercice{items.length > 1 ? 's' : ''} × {rounds} tour{rounds > 1 ? 's' : ''} ·{' '}

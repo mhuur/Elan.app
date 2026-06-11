@@ -1,4 +1,4 @@
-import type { MetricDef, Session } from '../types'
+import type { MetricDef, MetricTarget, Session } from '../types'
 
 /** Mesures par défaut des séances vélo (clés stables pour les graphiques) */
 export const DEFAULT_VELO_METRICS: MetricDef[] = [
@@ -21,4 +21,15 @@ export function effectiveMetrics(session: Session): MetricDef[] {
 
 export function newMetric(): MetricDef {
   return { key: crypto.randomUUID(), label: '', unit: '' }
+}
+
+/** Cibles de l'objectif d'une séance (gère l'ancien format à mesure unique) */
+export function objectiveTargets(s: Session): MetricTarget[] {
+  const o = s.objective
+  if (!o) return []
+  if (o.targets && o.targets.length) return o.targets
+  if (o.metricKey && o.value != null) {
+    return [{ key: o.metricKey, label: o.label ?? 'Mesure', unit: o.unit ?? '', value: o.value }]
+  }
+  return []
 }

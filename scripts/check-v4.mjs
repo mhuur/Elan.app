@@ -74,11 +74,37 @@ try {
   await page.click('text=Objectifs')
   await page.waitForSelector('text=Atteint — record 12 reps')
 
+  // --- Objectif multi-mesures sur le vélo : durée ≥ 25 min ET bpm ≥ 120
+  await page.click('text=+ Objectif')
+  await page.waitForSelector('text=Nouvel objectif')
+  await page.locator('select').first().selectOption({ label: '🚴 Vélo d’appartement' })
+  await page.waitForSelector('text=Cibles')
+  const goalNums = page.locator('input[type="number"]')
+  await goalNums.nth(1).fill('25') // durée
+  await goalNums.nth(4).fill('120') // bpm
+  await page.click("text=Créer l'objectif")
+  await page.waitForSelector('text=À réussir dans une même séance')
+  await page.screenshot({ path: 'screenshots/22-objectif-multi.png' })
+  // Une séance vélo qui remplit les deux cibles déclenche la célébration
+  await page.getByRole('link', { name: "Aujourd'hui" }).click()
+  await page.click('text=Séance libre')
+  await page.click('text=appartement')
+  await page.waitForSelector('text=Puissance')
+  const veloNums = page.locator('input[type="number"]')
+  await veloNums.nth(1).fill('30') // durée
+  await veloNums.nth(4).fill('128') // bpm
+  await page.click('text=Enregistrer ✓')
+  await page.waitForSelector('text=Objectif atteint')
+  await page.click('text=Continuer')
+  await page.click('text=Objectifs')
+  await page.waitForSelector('text=Objectif complet atteint')
+  await page.screenshot({ path: 'screenshots/23-objectif-multi-atteint.png' })
+
   // --- Progrès : régularité + objectif sur le graphique
   await page.click('text=Progrès')
   await page.waitForSelector('text=Régularité')
   await page.waitForSelector("text=d'affilée")
-  await page.selectOption('select', { label: 'Pompes' })
+  await page.selectOption('select:has(option:text-is("Pompes"))', { label: 'Pompes' })
   await page.waitForSelector('text=Objectif 10')
   await page.waitForSelector('text=atteint 🎉')
   await page.screenshot({ path: 'screenshots/18-progres-v4.png' })

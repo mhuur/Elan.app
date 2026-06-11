@@ -74,12 +74,22 @@ export interface Repeat {
   alternateWith?: string
 }
 
-/** Objectif sur une séance, portant sur une de ses mesures */
-export interface SessionObjective {
-  metricKey: string
+/** Cible sur une mesure d'une séance */
+export interface MetricTarget {
+  key: string
   label: string
   unit: string
   value: number
+}
+
+/** Objectif sur une séance : une ou plusieurs mesures à atteindre dans une même séance */
+export interface SessionObjective {
+  targets?: MetricTarget[]
+  /** Hérité : ancien objectif à mesure unique */
+  metricKey?: string
+  label?: string
+  unit?: string
+  value?: number
 }
 
 /** Mesure personnalisée définie sur une séance, saisie à la complétion */
