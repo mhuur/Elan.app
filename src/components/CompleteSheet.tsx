@@ -4,7 +4,7 @@ import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Log, type MetricValue, type Session, type SessionItem } from '../types'
 import { todayStr } from '../lib/dates'
 import { mmss } from '../lib/format'
-import { effectiveMetrics, objectiveTargets } from '../lib/metrics'
+import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { tone } from '../lib/audio'
 import { Field, GhostButton, NumInput, PrimaryButton, Sheet, Stepper, TextArea } from './ui'
 
@@ -97,7 +97,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
   const { addLog, logs, exercises } = useData()
   const navigate = useNavigate()
   const [note, setNote] = useState('')
-  const [celebrate, setCelebrate] = useState<string[] | null>(null)
+  const [celebrate, setCelebrate] = useState<{ text: string; reward?: string }[] | null>(null)
   const logDate = date ?? todayStr()
 
   const metrics = useMemo(() => effectiveMetrics(session), [session])
@@ -154,35 +154,47 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
     const extra: Partial<Omit<Log, 'id'>> = {}
     const mv = buildMetricValues()
     if (mv.length) extra.metrics = mv
-    const achieved: string[] = []
-    // Objectif de séance : toutes les cibles remplies dans cette séance ?
-    const targets = objectiveTargets(session)
-    if (targets.length) {
-      const allMet = targets.every((t) => {
-        const got = mv.find((x) => x.key === t.key)
+    const achieved: { text: string; reward?: string }[] = []
+    // Objectif de séance : paliers nouvellement franchis (toutes les cibles dans cette séance)
+    const meetsLevel = (vals: MetricValue[] | undefined, targets: { key: string; value: number }[]) =>
+      targets.every((t) => {
+        const got = vals?.find((x) => x.key === t.key)
         return !!got && got.value >= t.value
       })
-      if (allMet) {
-        achieved.push(
-          targets
-            .map((t) => {
-              const got = mv.find((x) => x.key === t.key)!
-              return `${t.label} : ${got.value}${t.unit ? ' ' + t.unit : ''} (objectif ${t.value})`
-            })
-            .join(' · '),
-        )
-      }
+    for (const lv of objectiveLevels(session)) {
+      if (!meetsLevel(mv, lv.targets)) continue
+      // Déjà atteint lors d'une séance passée : on ne re-célèbre pas (la récompense est déjà débloquée)
+      if (logs.some((l) => l.sessionId === session.id && meetsLevel(l.metrics, lv.targets))) continue
+      achieved.push({
+        text: lv.targets
+          .map((t) => {
+            const got = mv.find((x) => x.key === t.key)!
+            return `${t.label} : ${got.value}${t.unit ? ' ' + t.unit : ''} (palier ${t.value})`
+          })
+          .join(' · '),
+        reward: lv.reward,
+      })
     }
     if (isMuscu && session.items.length) {
       extra.results = session.items.map((it) => {
         const ex = exOf(it.exerciseId)
         const sets = values[it.exerciseId] ?? []
-        // Objectif atteint ?
+        // Paliers d'objectif nouvellement franchis ?
         if (ex?.goal && sets.length) {
-          const v = ex.goal.metric === 'best' ? Math.max(...sets) : sets.reduce((a, b) => a + b, 0)
-          if (v >= ex.goal.value) {
-            const unit = ex.measure === 'sec' ? 's' : 'reps'
-            achieved.push(`${ex.name} : ${v} ${unit} (objectif ${ex.goal.value})`)
+          const metric = ex.goal.metric
+          const v = metric === 'best' ? Math.max(...sets) : sets.reduce((a, b) => a + b, 0)
+          let prevBest = 0
+          for (const l of logs) {
+            const r = l.results?.find((x) => x.exerciseId === it.exerciseId)
+            if (!r || !r.sets.length) continue
+            const pv = metric === 'best' ? Math.max(...r.sets) : r.sets.reduce((a, b) => a + b, 0)
+            if (pv > prevBest) prevBest = pv
+          }
+          const unit = ex.measure === 'sec' ? 's' : 'reps'
+          for (const lvl of goalLevels(ex.goal)) {
+            if (v >= lvl.value && prevBest < lvl.value) {
+              achieved.push({ text: `${ex.name} : ${v} ${unit} (palier ${lvl.value})`, reward: lvl.reward })
+            }
           }
         }
         return {
@@ -207,15 +219,21 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
   }
 
   if (celebrate) {
+    const rewards = celebrate.filter((a) => a.reward)
     return (
       <div className="flex flex-col items-center gap-4 py-6 text-center">
-        <div className="text-6xl">🎉</div>
-        <h3 className="text-xl font-extrabold">Objectif atteint, bravo !</h3>
-        <div className="space-y-1">
+        <div className="text-6xl">{rewards.length ? '🎁' : '🎉'}</div>
+        <h3 className="text-xl font-extrabold">{rewards.length ? 'Palier franchi, bravo !' : 'Objectif atteint, bravo !'}</h3>
+        <div className="space-y-1.5">
           {celebrate.map((a, i) => (
-            <p key={i} className="text-sm font-bold text-sage-700">
-              🎯 {a}
-            </p>
+            <div key={i}>
+              <p className="text-sm font-bold text-sage-700">🎯 {a.text}</p>
+              {a.reward && (
+                <p className="mt-0.5 rounded-full bg-running/10 px-4 py-1.5 text-sm font-extrabold text-running">
+                  🎁 Récompense débloquée : {a.reward} !
+                </p>
+              )}
+            </div>
           ))}
         </div>
         <div className="w-full">

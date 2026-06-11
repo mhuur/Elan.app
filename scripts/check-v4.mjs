@@ -46,44 +46,51 @@ try {
   await page.waitForSelector('text=Superset — enchaîné sans repos')
   await page.click('text=Enregistrer')
 
-  // --- Onglet Objectifs : créer un objectif Pompes (meilleure série ≥ 10)
+  // --- Onglet Objectifs : objectif Pompes à 2 paliers avec récompenses
   await page.click('text=Objectifs')
   await page.waitForSelector('text=Cap sur la progression')
   await page.click('text=+ Objectif')
   await page.waitForSelector('text=Nouvel objectif')
   await page.locator('select').first().selectOption({ label: '💪 Muscu — Full body' })
   await page.waitForSelector("text=Type d'objectif")
-  await page.locator('input[type="number"]').fill('10')
+  await page.locator('input[type="number"]').first().fill('10')
+  await page.getByPlaceholder('🎁 Récompense (ex. lunettes de soleil)').first().fill('Glace')
+  await page.click('text=+ Ajouter un palier')
+  await page.locator('input[type="number"]').nth(1).fill('20')
+  await page.getByPlaceholder('🎁 Récompense (ex. lunettes de soleil)').nth(1).fill('Lunettes de soleil')
   await page.click("text=Créer l'objectif")
   await page.waitForSelector('text=💪 Pompes')
+  await page.waitForSelector('text=2 paliers')
   await page.waitForSelector('text=0 / 10')
   await page.screenshot({ path: 'screenshots/21-objectifs.png' })
 
-  // --- Compléter Full body : superset + célébration (12 ≥ 10)
+  // --- Compléter Full body : superset + palier 1 franchi (12 ≥ 10) → récompense
   await page.getByRole('link', { name: "Aujourd'hui" }).click()
   await page.click('text=Séance libre')
   await page.click('text=Full body')
   await page.waitForSelector('text=Superset — enchaîner sans repos')
   await page.click('text=Enregistrer ✓')
-  await page.waitForSelector('text=Objectif atteint')
+  await page.waitForSelector('text=Récompense débloquée : Glace')
   await page.screenshot({ path: 'screenshots/17-celebration.png' })
   await page.click('text=Continuer')
   await page.waitForSelector('text=Terminées')
 
-  // --- L'objectif passe « Atteint » dans l'onglet
+  // --- L'onglet montre le palier 1 débloqué et la progression vers le palier 2
   await page.click('text=Objectifs')
-  await page.waitForSelector('text=Atteint — record 12 reps')
+  await page.waitForSelector('text=Glace — débloquée !')
+  await page.waitForSelector('text=12 / 20')
+  await page.waitForSelector('text=Lunettes de soleil')
 
   // --- Objectif multi-mesures sur le vélo : durée ≥ 25 min ET bpm ≥ 120
   await page.click('text=+ Objectif')
   await page.waitForSelector('text=Nouvel objectif')
   await page.locator('select').first().selectOption({ label: '🚴 Vélo d’appartement' })
-  await page.waitForSelector('text=Cibles')
+  await page.waitForSelector('text=remplissez une ou plusieurs mesures')
   const goalNums = page.locator('input[type="number"]')
   await goalNums.nth(1).fill('25') // durée
   await goalNums.nth(4).fill('120') // bpm
   await page.click("text=Créer l'objectif")
-  await page.waitForSelector('text=À réussir dans une même séance')
+  await page.waitForSelector('text=à réussir dans une même séance')
   await page.screenshot({ path: 'screenshots/22-objectif-multi.png' })
   // Une séance vélo qui remplit les deux cibles déclenche la célébration
   await page.getByRole('link', { name: "Aujourd'hui" }).click()
@@ -97,16 +104,16 @@ try {
   await page.waitForSelector('text=Objectif atteint')
   await page.click('text=Continuer')
   await page.click('text=Objectifs')
-  await page.waitForSelector('text=Objectif complet atteint')
+  await page.waitForSelector('text=Tous les paliers atteints !')
   await page.screenshot({ path: 'screenshots/23-objectif-multi-atteint.png' })
 
-  // --- Progrès : régularité + objectif sur le graphique
+  // --- Progrès : régularité + prochain palier (avec récompense) sur le graphique
   await page.click('text=Progrès')
   await page.waitForSelector('text=Régularité')
   await page.waitForSelector("text=d'affilée")
   await page.selectOption('select:has(option:text-is("Pompes"))', { label: 'Pompes' })
-  await page.waitForSelector('text=Objectif 10')
-  await page.waitForSelector('text=atteint 🎉')
+  await page.waitForSelector('text=Palier 20')
+  await page.waitForSelector('text=🎁 Lunettes de soleil')
   await page.screenshot({ path: 'screenshots/18-progres-v4.png' })
 
   // --- Saisie rétroactive : naviguer à hier depuis Aujourd'hui et valider une sortie

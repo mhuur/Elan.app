@@ -1,4 +1,4 @@
-import type { MetricDef, MetricTarget, Session } from '../types'
+import type { Goal, GoalLevel, MetricDef, MetricTarget, ObjectiveLevel, Session } from '../types'
 
 /** Mesures par défaut des séances vélo (clés stables pour les graphiques) */
 export const DEFAULT_VELO_METRICS: MetricDef[] = [
@@ -32,4 +32,19 @@ export function objectiveTargets(s: Session): MetricTarget[] {
     return [{ key: o.metricKey, label: o.label ?? 'Mesure', unit: o.unit ?? '', value: o.value }]
   }
   return []
+}
+
+/** Paliers de l'objectif d'une séance (gère les anciens formats à palier unique) */
+export function objectiveLevels(s: Session): ObjectiveLevel[] {
+  const o = s.objective
+  if (!o) return []
+  if (o.levels && o.levels.length) return o.levels.filter((l) => l.targets.length)
+  const targets = objectiveTargets(s)
+  return targets.length ? [{ targets }] : []
+}
+
+/** Paliers d'un objectif d'exercice, triés par valeur croissante (gère l'ancien palier unique) */
+export function goalLevels(g: Goal): GoalLevel[] {
+  const levels = g.levels && g.levels.length ? g.levels : g.value != null ? [{ value: g.value }] : []
+  return levels.slice().sort((a, b) => a.value - b.value)
 }

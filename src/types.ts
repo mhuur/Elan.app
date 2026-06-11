@@ -2,10 +2,19 @@ export type Category = 'running' | 'velo' | 'muscu' | 'hiit' | 'etirements'
 export type Measure = 'reps' | 'sec'
 export type ColName = 'exercises' | 'sessions' | 'logs'
 
+/** Palier d'objectif : valeur à atteindre et récompense promise (ex. lunettes de soleil 😎) */
+export interface GoalLevel {
+  value: number
+  reward?: string
+}
+
 /** Objectif sur un exercice : meilleure série ou volume total à atteindre */
 export interface Goal {
   metric: 'best' | 'volume'
-  value: number
+  /** Hérité : palier unique (les nouvelles données passent par `levels`) */
+  value?: number
+  /** Paliers successifs (croissants), chacun avec sa récompense éventuelle */
+  levels?: GoalLevel[]
 }
 
 export interface Exercise {
@@ -82,8 +91,18 @@ export interface MetricTarget {
   value: number
 }
 
-/** Objectif sur une séance : une ou plusieurs mesures à atteindre dans une même séance */
+/** Palier d'objectif de séance : toutes les cibles à remplir dans une même séance */
+export interface ObjectiveLevel {
+  targets: MetricTarget[]
+  /** Récompense promise quand le palier est atteint */
+  reward?: string
+}
+
+/** Objectif sur une séance : un ou plusieurs paliers, chacun multi-mesures */
 export interface SessionObjective {
+  /** Paliers successifs, chacun avec sa récompense éventuelle */
+  levels?: ObjectiveLevel[]
+  /** Hérité : palier unique multi-mesures */
   targets?: MetricTarget[]
   /** Hérité : ancien objectif à mesure unique */
   metricKey?: string

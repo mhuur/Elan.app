@@ -15,6 +15,7 @@ import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Log, type MetricValue } from '../types'
 import { addDays, formatDayMonth, formatShortFr, startOfWeek, toDateStr, todayStr } from '../lib/dates'
 import { logSummary } from '../lib/format'
+import { goalLevels } from '../lib/metrics'
 import { Chip, EmptyState, PageHeader } from '../components/ui'
 
 const HEAT_WEEKS = 16
@@ -156,18 +157,22 @@ export default function Progress() {
   }, [logs, selectedEx, muscuMetric])
   const muscuUnit = selectedEx?.measure === 'sec' ? 's' : 'reps'
   const goal = selectedEx?.goal ?? null
-  // Ligne sur le graphique uniquement si la métrique affichée correspond à l'objectif
-  const goalOnChart = goal && goal.metric === muscuMetric ? goal : null
-  const goalReached = useMemo(() => {
-    if (!selectedEx?.goal) return false
+  const levels = goal ? goalLevels(goal) : []
+  // Lignes de paliers sur le graphique uniquement si la métrique affichée correspond à l'objectif
+  const levelsOnChart = goal && goal.metric === muscuMetric ? levels : []
+  const goalBest = useMemo(() => {
+    if (!selectedEx?.goal) return 0
     const g = selectedEx.goal
-    return logs.some((l) => {
+    let best = 0
+    for (const l of logs) {
       const r = l.results?.find((x) => x.exerciseId === selectedEx.id)
-      if (!r || !r.sets.length) return false
+      if (!r || !r.sets.length) continue
       const v = g.metric === 'best' ? Math.max(...r.sets) : r.sets.reduce((a, b) => a + b, 0)
-      return v >= g.value
-    })
+      if (v > best) best = v
+    }
+    return best
   }, [logs, selectedEx])
+  const nextLevel = levels.find((lv) => goalBest < lv.value)
 
   const hasAnyLog = logs.length > 0
 
@@ -299,7 +304,9 @@ export default function Progress() {
                     <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                     <YAxis tick={axisStyle} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
                     <Tooltip formatter={(v) => [`${v} ${muscuUnit}`, '']} />
-                    {goalOnChart && <ReferenceLine y={goalOnChart.value} stroke="#c2773e" strokeWidth={2} strokeDasharray="6 4" />}
+                    {levelsOnChart.map((lv) => (
+                      <ReferenceLine key={lv.value} y={lv.value} stroke="#c2773e" strokeWidth={2} strokeDasharray="6 4" />
+                    ))}
                     <Line type="monotone" dataKey="value" stroke="#8d6ba0" strokeWidth={3} dot={{ r: 4, fill: '#8d6ba0' }} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -313,10 +320,14 @@ export default function Progress() {
               <p className="pt-2 text-center text-xs font-extrabold text-muscu">
                 🏆 Record : {Math.max(...muscuData.map((d) => d.value))} {muscuUnit}
                 {muscuMetric === 'volume' ? ' (volume)' : ' (série)'}
-                {goal && (
-                  <span className={'ml-2 ' + (goalReached ? 'text-sage-600' : 'text-running')}>
-                    🎯 Objectif {goal.value} ({goal.metric === 'best' ? 'série' : 'volume'})
-                    {goalReached ? ' — atteint 🎉' : ''}
+                {goal && levels.length > 0 && (
+                  <span className={'ml-2 ' + (nextLevel ? 'text-running' : 'text-sage-600')}>
+                    🎯{' '}
+                    {nextLevel
+                      ? `Palier ${nextLevel.value} (${goal.metric === 'best' ? 'série' : 'volume'})${
+                          nextLevel.reward ? ' · 🎁 ' + nextLevel.reward : ''
+                        }`
+                      : 'Tous les paliers atteints 🎉'}
                   </span>
                 )}
               </p>

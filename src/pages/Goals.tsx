@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, type Exercise, type Session } from '../types'
-import { effectiveMetrics, objectiveTargets } from '../lib/metrics'
+import { CATEGORY_META, type Exercise, type GoalLevel, type ObjectiveLevel, type Session } from '../types'
+import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { EmptyState, Fab, Field, NumInput, PageHeader, PrimaryButton, Seg, Sheet } from '../components/ui'
+
+const inputSm =
+  'w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
 
 function ProgressBar({ ratio, reached }: { ratio: number; reached: boolean }) {
   return (
@@ -15,11 +18,29 @@ function ProgressBar({ ratio, reached }: { ratio: number; reached: boolean }) {
   )
 }
 
+/** Ligne d'un palier déjà atteint, avec sa récompense débloquée */
+function ReachedLevel({ label, reward }: { label: string; reward?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 rounded-xl bg-sage-50 px-3 py-1.5">
+      <span className="text-xs font-extrabold text-sage-600">✓ {label}</span>
+      {reward && <span className="truncate text-xs font-bold text-sage-700">🎁 {reward} — débloquée !</span>}
+    </div>
+  )
+}
+
+/** Paliers en cours de saisie — muscu : une valeur ; séance : une valeur par mesure */
+type ExDraft = { value?: number; reward: string }
+type SessDraft = { values: Record<string, number | undefined>; reward: string }
+
+const emptyExDraft = (): ExDraft => ({ value: undefined, reward: '' })
+const emptySessDraft = (): SessDraft => ({ values: {}, reward: '' })
+
 export default function Goals() {
   const { sessions, exercises, logs, updateExercise, updateSession } = useData()
   const [addOpen, setAddOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
 
-  // --- Création d'un objectif
+  // --- Création / modification d'un objectif
   const [selSessionId, setSelSessionId] = useState('')
   const selSession = sessions.find((s) => s.id === selSessionId) ?? sessions[0]
   const selMetrics = selSession ? effectiveMetrics(selSession) : []
@@ -32,27 +53,76 @@ export default function Goals() {
   const [selExId, setSelExId] = useState('')
   const selEx = sessionExercises.find((e) => e.id === selExId) ?? sessionExercises[0]
   const [exMetric, setExMetric] = useState<'best' | 'volume'>('best')
-  const [targetValue, setTargetValue] = useState<number | undefined>(undefined)
-  // Multi-mesures : une valeur cible par mesure (vide = ignorée)
-  const [mtargets, setMtargets] = useState<Record<string, number | undefined>>({})
+  const [exDrafts, setExDrafts] = useState<ExDraft[]>([emptyExDraft()])
+  const [sessDrafts, setSessDrafts] = useState<SessDraft[]>([emptySessDraft()])
 
   const isMuscuTarget = selSession?.category === 'muscu' && sessionExercises.length > 0
-  const filledTargets = selMetrics.filter((m) => mtargets[m.key] != null)
-  const canCreate = isMuscuTarget ? !!targetValue && !!selEx : filledTargets.length > 0
+  const level1Keys = selMetrics.filter((m) => sessDrafts[0]?.values[m.key] != null).map((m) => m.key)
+  const canCreate = isMuscuTarget ? exDrafts.some((d) => d.value != null) && !!selEx : level1Keys.length > 0
+
+  const resetDrafts = () => {
+    setExDrafts([emptyExDraft()])
+    setSessDrafts([emptySessDraft()])
+  }
+
+  const openCreate = () => {
+    setEditing(false)
+    setSelSessionId('')
+    setSelExId('')
+    setExMetric('best')
+    resetDrafts()
+    setAddOpen(true)
+  }
+
+  /** Préremplit la feuille pour modifier l'objectif d'un exercice (paliers + récompenses) */
+  const openEditExercise = (e: Exercise) => {
+    const host = sessions.find((s) => s.category === 'muscu' && s.items.some((it) => it.exerciseId === e.id))
+    if (!host || !e.goal) return
+    setEditing(true)
+    setSelSessionId(host.id)
+    setSelExId(e.id)
+    setExMetric(e.goal.metric)
+    setExDrafts(goalLevels(e.goal).map((l) => ({ value: l.value, reward: l.reward ?? '' })))
+    setSessDrafts([emptySessDraft()])
+    setAddOpen(true)
+  }
+
+  /** Préremplit la feuille pour modifier l'objectif d'une séance */
+  const openEditSession = (s: Session) => {
+    setEditing(true)
+    setSelSessionId(s.id)
+    setSelExId('')
+    setExDrafts([emptyExDraft()])
+    setSessDrafts(
+      objectiveLevels(s).map((lv) => ({
+        values: Object.fromEntries(lv.targets.map((t) => [t.key, t.value])),
+        reward: lv.reward ?? '',
+      })),
+    )
+    setAddOpen(true)
+  }
 
   const createGoal = async () => {
     if (!selSession) return
-    if (isMuscuTarget && selEx && targetValue) {
-      await updateExercise(selEx.id, { goal: { metric: exMetric, value: targetValue } })
-    } else if (filledTargets.length) {
-      await updateSession(selSession.id, {
-        objective: {
-          targets: filledTargets.map((m) => ({ key: m.key, label: m.label, unit: m.unit, value: mtargets[m.key]! })),
-        },
+    if (isMuscuTarget && selEx) {
+      const levels: GoalLevel[] = exDrafts
+        .filter((d) => d.value != null)
+        .map((d) => ({ value: d.value!, ...(d.reward.trim() ? { reward: d.reward.trim() } : {}) }))
+        .sort((a, b) => a.value - b.value)
+      if (!levels.length) return
+      await updateExercise(selEx.id, { goal: { metric: exMetric, value: levels[0].value, levels } })
+    } else {
+      const levels: ObjectiveLevel[] = sessDrafts.flatMap((d) => {
+        const targets = selMetrics
+          .filter((m) => level1Keys.includes(m.key) && d.values[m.key] != null)
+          .map((m) => ({ key: m.key, label: m.label, unit: m.unit, value: d.values[m.key]! }))
+        if (!targets.length) return []
+        return [{ targets, ...(d.reward.trim() ? { reward: d.reward.trim() } : {}) }]
       })
+      if (!levels.length) return
+      await updateSession(selSession.id, { objective: { targets: levels[0].targets, levels } })
     }
-    setTargetValue(undefined)
-    setMtargets({})
+    resetDrafts()
     setAddOpen(false)
   }
 
@@ -76,10 +146,23 @@ export default function Goals() {
     }
     return best
   }
+  /** Palier de séance atteint si UNE même séance enregistrée remplit toutes ses cibles */
+  const sessionLevelReached = (s: Session, lv: ObjectiveLevel): boolean =>
+    logs.some(
+      (l) =>
+        l.sessionId === s.id &&
+        lv.targets.every((t) => {
+          const mv = l.metrics?.find((x) => x.key === t.key)
+          return !!mv && mv.value >= t.value
+        }),
+    )
 
-  const exerciseGoals = exercises.filter((e) => e.goal)
-  const sessionGoals = sessions.filter((s) => objectiveTargets(s).length > 0)
+  const exerciseGoals = exercises.filter((e) => e.goal && goalLevels(e.goal).length > 0)
+  const sessionGoals = sessions.filter((s) => objectiveLevels(s).length > 0)
   const total = exerciseGoals.length + sessionGoals.length
+
+  const targetsLabel = (lv: ObjectiveLevel) =>
+    lv.targets.map((t) => `${t.label} ${t.value}${t.unit ? ' ' + t.unit : ''}`).join(' · ')
 
   return (
     <div>
@@ -87,61 +170,80 @@ export default function Goals() {
 
       <div className="space-y-3 px-5">
         {total === 0 && (
-          <EmptyState emoji="🎯" text="Fixez un objectif sur une séance (ex. Pompes : 20 en une série, ou Vélo : 45 min à 130 bpm) et suivez votre progression ici." />
+          <EmptyState
+            emoji="🎯"
+            text="Fixez un objectif par paliers (ex. Pompes : 20 puis 30 en une série) avec une récompense à la clé pour chaque palier — lunettes de soleil, resto… 🎁"
+          />
         )}
 
         {exerciseGoals.map((e) => {
-          const cur = bestForExercise(e)
           const goal = e.goal!
-          const reached = cur >= goal.value
+          const levels = goalLevels(goal)
+          const cur = bestForExercise(e)
           const unit = e.measure === 'sec' ? 's' : 'reps'
+          const next = levels.find((l) => cur < l.value)
           return (
             <div key={e.id} className="rounded-3xl bg-surface p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-extrabold">💪 {e.name}</p>
                   <p className="text-xs font-semibold text-ink-soft">
-                    {goal.metric === 'best' ? 'Meilleure série' : 'Volume sur une séance'} ≥ {goal.value} {unit}
+                    {goal.metric === 'best' ? 'Meilleure série' : 'Volume sur une séance'} ·{' '}
+                    {levels.length > 1 ? `${levels.length} paliers` : `objectif ${levels[0].value} ${unit}`}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  aria-label="Supprimer cet objectif"
-                  onClick={() => {
-                    if (window.confirm(`Supprimer l'objectif sur « ${e.name} » ?`)) void updateExercise(e.id, { goal: null })
-                  }}
-                  className="shrink-0 px-1 text-ink-soft/50 active:text-hiit"
-                >
-                  ✕
-                </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Modifier cet objectif"
+                    onClick={() => openEditExercise(e)}
+                    className="px-1 text-ink-soft/50 active:text-sage-600"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Supprimer cet objectif"
+                    onClick={() => {
+                      if (window.confirm(`Supprimer l'objectif sur « ${e.name} » ?`)) void updateExercise(e.id, { goal: null })
+                    }}
+                    className="px-1 text-ink-soft/50 active:text-hiit"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
-              <div className="mt-2.5">
-                <ProgressBar ratio={goal.value ? cur / goal.value : 0} reached={reached} />
-                <p className="mt-1.5 text-xs font-extrabold">
-                  {reached ? (
-                    <span className="text-sage-600">🎉 Atteint — record {cur} {unit}</span>
-                  ) : (
-                    <span className="text-ink-soft">
-                      {cur} / {goal.value} {unit} — encore {goal.value - cur}
-                    </span>
-                  )}
-                </p>
+              <div className="mt-2.5 space-y-1.5">
+                {levels.filter((l) => cur >= l.value).map((l) => (
+                  <ReachedLevel key={l.value} label={`${l.value} ${unit}`} reward={l.reward} />
+                ))}
+                {next ? (
+                  <div>
+                    <ProgressBar ratio={next.value ? cur / next.value : 0} reached={false} />
+                    <p className="mt-1.5 text-xs font-extrabold text-ink-soft">
+                      {cur} / {next.value} {unit} — encore {next.value - cur}
+                      {next.reward && <span className="text-running"> · 🎁 {next.reward}</span>}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-xs font-extrabold text-sage-600">🎉 Tous les paliers atteints — record {cur} {unit}</p>
+                )}
+                {levels
+                  .filter((l) => cur < l.value && l !== next)
+                  .map((l) => (
+                    <p key={l.value} className="text-[11px] font-semibold text-ink-soft/70">
+                      Puis {l.value} {unit}
+                      {l.reward ? ` · 🎁 ${l.reward}` : ''}
+                    </p>
+                  ))}
               </div>
             </div>
           )
         })}
 
         {sessionGoals.map((s) => {
-          const targets = objectiveTargets(s)
-          // Atteint si une même séance remplit toutes les cibles
-          const reachedAll = logs.some(
-            (l) =>
-              l.sessionId === s.id &&
-              targets.every((t) => {
-                const mv = l.metrics?.find((x) => x.key === t.key)
-                return !!mv && mv.value >= t.value
-              }),
-          )
+          const levels = objectiveLevels(s)
+          const next = levels.find((lv) => !sessionLevelReached(s, lv))
           return (
             <div key={s.id} className="rounded-3xl bg-surface p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
@@ -149,53 +251,78 @@ export default function Goals() {
                   <p className="truncate text-sm font-extrabold">
                     {CATEGORY_META[s.category].emoji} {s.name}
                   </p>
-                  {targets.length > 1 && (
-                    <p className="text-[11px] font-semibold text-ink-soft">À réussir dans une même séance :</p>
-                  )}
+                  <p className="text-[11px] font-semibold text-ink-soft">
+                    {levels.length > 1 ? `${levels.length} paliers — ` : ''}
+                    {(next ?? levels[0]).targets.length > 1 ? 'à réussir dans une même séance' : 'objectif de séance'}
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  aria-label="Supprimer cet objectif"
-                  onClick={() => {
-                    if (window.confirm(`Supprimer l'objectif sur « ${s.name} » ?`)) void updateSession(s.id, { objective: null })
-                  }}
-                  className="shrink-0 px-1 text-ink-soft/50 active:text-hiit"
-                >
-                  ✕
-                </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label="Modifier cet objectif"
+                    onClick={() => openEditSession(s)}
+                    className="px-1 text-ink-soft/50 active:text-sage-600"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Supprimer cet objectif"
+                    onClick={() => {
+                      if (window.confirm(`Supprimer l'objectif sur « ${s.name} » ?`)) void updateSession(s.id, { objective: null })
+                    }}
+                    className="px-1 text-ink-soft/50 active:text-hiit"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
-              <div className="mt-2 space-y-2">
-                {targets.map((t) => {
-                  const cur = bestMetric(s, t.key)
-                  const ok = cur >= t.value
-                  return (
-                    <div key={t.key}>
-                      <div className="mb-1 flex items-baseline justify-between">
-                        <span className="text-xs font-bold text-ink-soft">{t.label}</span>
-                        <span className={'text-xs font-extrabold ' + (ok ? 'text-sage-600' : 'text-ink-soft')}>
-                          {cur} / {t.value} {t.unit} {ok && '✓'}
-                        </span>
-                      </div>
-                      <ProgressBar ratio={t.value ? cur / t.value : 0} reached={ok} />
-                    </div>
-                  )
-                })}
-                <p className="text-xs font-extrabold">
-                  {reachedAll ? (
-                    <span className="text-sage-600">🎉 Objectif complet atteint !</span>
-                  ) : (
-                    <span className="text-ink-soft">En cours…</span>
-                  )}
-                </p>
+              <div className="mt-2 space-y-1.5">
+                {levels
+                  .filter((lv) => sessionLevelReached(s, lv))
+                  .map((lv, i) => (
+                    <ReachedLevel key={i} label={targetsLabel(lv)} reward={lv.reward} />
+                  ))}
+                {next && (
+                  <div className="space-y-2">
+                    {next.targets.map((t) => {
+                      const cur = bestMetric(s, t.key)
+                      const ok = cur >= t.value
+                      return (
+                        <div key={t.key}>
+                          <div className="mb-1 flex items-baseline justify-between">
+                            <span className="text-xs font-bold text-ink-soft">{t.label}</span>
+                            <span className={'text-xs font-extrabold ' + (ok ? 'text-sage-600' : 'text-ink-soft')}>
+                              {cur} / {t.value} {t.unit} {ok && '✓'}
+                            </span>
+                          </div>
+                          <ProgressBar ratio={t.value ? cur / t.value : 0} reached={ok} />
+                        </div>
+                      )
+                    })}
+                    {next.reward && (
+                      <p className="text-xs font-extrabold text-running">🎁 À la clé : {next.reward}</p>
+                    )}
+                  </div>
+                )}
+                {levels
+                  .filter((lv) => !sessionLevelReached(s, lv) && lv !== next)
+                  .map((lv, i) => (
+                    <p key={i} className="text-[11px] font-semibold text-ink-soft/70">
+                      Puis {targetsLabel(lv)}
+                      {lv.reward ? ` · 🎁 ${lv.reward}` : ''}
+                    </p>
+                  ))}
+                {!next && <p className="text-xs font-extrabold text-sage-600">🎉 Tous les paliers atteints !</p>}
               </div>
             </div>
           )
         })}
       </div>
 
-      <Fab label="+ Objectif" onClick={() => setAddOpen(true)} />
+      <Fab label="+ Objectif" onClick={openCreate} />
 
-      <Sheet open={addOpen} onClose={() => setAddOpen(false)} title="🎯 Nouvel objectif">
+      <Sheet open={addOpen} onClose={() => setAddOpen(false)} title={editing ? '🎯 Modifier l’objectif' : '🎯 Nouvel objectif'}>
         <div className="space-y-4">
           <Field label="Séance">
             <select
@@ -203,7 +330,7 @@ export default function Goals() {
               onChange={(e) => {
                 setSelSessionId(e.target.value)
                 setSelExId('')
-                setMtargets({})
+                resetDrafts()
               }}
               className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
             >
@@ -240,31 +367,118 @@ export default function Goals() {
                   onChange={setExMetric}
                 />
               </Field>
-              <Field label="Valeur à atteindre">
-                <NumInput value={targetValue} onChange={setTargetValue} suffix={selEx?.measure === 'sec' ? 's' : 'reps'} placeholder="Ex. 20" />
+              <Field label="Paliers à atteindre">
+                <div className="space-y-2">
+                  {exDrafts.map((d, i) => (
+                    <div key={i} className="space-y-2 rounded-2xl bg-sage-50 p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">
+                          Palier {i + 1}
+                        </p>
+                        {exDrafts.length > 1 && (
+                          <button
+                            type="button"
+                            aria-label="Retirer ce palier"
+                            onClick={() => setExDrafts((p) => p.filter((_, j) => j !== i))}
+                            className="px-1 text-ink-soft/50"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                      <NumInput
+                        value={d.value}
+                        onChange={(v) => setExDrafts((p) => p.map((x, j) => (j === i ? { ...x, value: v } : x)))}
+                        suffix={selEx?.measure === 'sec' ? 's' : 'reps'}
+                        placeholder="Ex. 20"
+                      />
+                      <input
+                        type="text"
+                        value={d.reward}
+                        onChange={(e) => setExDrafts((p) => p.map((x, j) => (j === i ? { ...x, reward: e.target.value } : x)))}
+                        placeholder="🎁 Récompense (ex. lunettes de soleil)"
+                        className={inputSm}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setExDrafts((p) => [...p, emptyExDraft()])}
+                    className="rounded-full bg-sage-100 px-4 py-2 text-xs font-extrabold text-sage-700 active:bg-sage-200"
+                  >
+                    + Ajouter un palier
+                  </button>
+                </div>
               </Field>
             </>
           )}
 
           {!isMuscuTarget && selMetrics.length > 0 && (
-            <Field label="Cibles (remplissez une ou plusieurs mesures)">
+            <Field label="Paliers (remplissez une ou plusieurs mesures)">
               <div className="space-y-2">
-                {selMetrics.map((m) => (
-                  <div key={m.key} className="flex items-center gap-3">
-                    <span className="w-28 shrink-0 truncate text-sm font-bold">{m.label}</span>
-                    <div className="min-w-0 flex-1">
-                      <NumInput
-                        value={mtargets[m.key]}
-                        onChange={(v) => setMtargets((p) => ({ ...p, [m.key]: v }))}
-                        suffix={m.unit || undefined}
-                        placeholder="—"
+                {sessDrafts.map((d, i) => {
+                  const visible = i === 0 ? selMetrics : selMetrics.filter((m) => level1Keys.includes(m.key))
+                  return (
+                    <div key={i} className="space-y-2 rounded-2xl bg-sage-50 p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">
+                          Palier {i + 1}
+                        </p>
+                        {sessDrafts.length > 1 && (
+                          <button
+                            type="button"
+                            aria-label="Retirer ce palier"
+                            onClick={() => setSessDrafts((p) => p.filter((_, j) => j !== i))}
+                            className="px-1 text-ink-soft/50"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                      {visible.length === 0 && (
+                        <p className="text-xs font-semibold text-ink-soft">
+                          Remplissez d'abord une mesure au palier 1.
+                        </p>
+                      )}
+                      {visible.map((m) => (
+                        <div key={m.key} className="flex items-center gap-3">
+                          <span className="w-28 shrink-0 truncate text-sm font-bold">{m.label}</span>
+                          <div className="min-w-0 flex-1">
+                            <NumInput
+                              value={d.values[m.key]}
+                              onChange={(v) =>
+                                setSessDrafts((p) =>
+                                  p.map((x, j) => (j === i ? { ...x, values: { ...x.values, [m.key]: v } } : x)),
+                                )
+                              }
+                              suffix={m.unit || undefined}
+                              placeholder="—"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <input
+                        type="text"
+                        value={d.reward}
+                        onChange={(e) =>
+                          setSessDrafts((p) => p.map((x, j) => (j === i ? { ...x, reward: e.target.value } : x)))
+                        }
+                        placeholder="🎁 Récompense (ex. lunettes de soleil)"
+                        className={inputSm}
                       />
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
+                <button
+                  type="button"
+                  onClick={() => setSessDrafts((p) => [...p, emptySessDraft()])}
+                  className="rounded-full bg-sage-100 px-4 py-2 text-xs font-extrabold text-sage-700 active:bg-sage-200"
+                >
+                  + Ajouter un palier
+                </button>
                 <p className="text-xs font-semibold text-ink-soft">
-                  Avec plusieurs cibles, l'objectif est atteint quand une même séance les remplit toutes (ex. 45 min ET
-                  130 bpm ET 15 W).
+                  Un palier avec plusieurs cibles est atteint quand une même séance les remplit toutes (ex. 45 min ET
+                  130 bpm). Chaque palier peut avoir sa récompense 🎁.
                 </p>
               </div>
             </Field>
@@ -278,7 +492,7 @@ export default function Goals() {
           )}
 
           <PrimaryButton onClick={() => void createGoal()} disabled={!canCreate}>
-            Créer l'objectif
+            {editing ? 'Enregistrer les paliers' : "Créer l'objectif"}
           </PrimaryButton>
         </div>
       </Sheet>

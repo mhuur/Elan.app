@@ -14,7 +14,7 @@ import {
 } from '../types'
 import { DAY_LETTER, DAY_NAMES, todayStr } from '../lib/dates'
 import { DEFAULT_VELO_METRICS, effectiveMetrics, newMetric } from '../lib/metrics'
-import { cycleIdsOf, ownerOf } from '../lib/schedule'
+import { canonicalCycles, ownerOf } from '../lib/schedule'
 import { Chip, Field, GhostButton, PrimaryButton, Seg, Stepper, TextArea, TextInput } from '../components/ui'
 
 const smallInput =
@@ -45,7 +45,8 @@ export default function SessionForm() {
 
   // Cycle d'alternance : la séance « propriétaire » porte la planification, les
   // autres membres la voient et la modifient depuis leur propre fiche.
-  const cycleOwner = existing ? (existing.repeat ? existing : ownerOf(existing.id, sessions)) : undefined
+  const cycleOwner = existing ? ownerOf(existing.id, sessions) : undefined
+  const ownerCycle = cycleOwner ? (canonicalCycles(sessions).get(cycleOwner.id) ?? []) : []
 
   const [name, setName] = useState(existing?.name ?? '')
   const [category, setCategory] = useState<Category>(existing?.category ?? 'muscu')
@@ -54,7 +55,7 @@ export default function SessionForm() {
   const [everyDays, setEveryDays] = useState(cycleOwner?.repeat?.everyDays ?? 2)
   const [startDate, setStartDate] = useState(cycleOwner?.repeat?.startDate ?? todayStr())
   const [altIds, setAltIds] = useState<string[]>(() =>
-    cycleOwner && existing ? cycleIdsOf(cycleOwner).filter((x) => x !== existing.id) : [],
+    existing ? ownerCycle.filter((x) => x !== existing.id) : [],
   )
   const [items, setItems] = useState<SessionItem[]>(existing?.items ?? [])
   const [metrics, setMetrics] = useState<MetricDef[]>(existing ? effectiveMetrics(existing) : [])
@@ -71,8 +72,7 @@ export default function SessionForm() {
   const previewRotation = (): string[] => {
     const selfId = existing?.id ?? '__self__'
     const wanted = [selfId, ...altIds]
-    const prev = cycleOwner ? cycleIdsOf(cycleOwner) : []
-    const cycle = [...prev.filter((x) => wanted.includes(x)), ...wanted.filter((x) => !prev.includes(x))].filter(
+    const cycle = [...ownerCycle.filter((x) => wanted.includes(x)), ...wanted.filter((x) => !ownerCycle.includes(x))].filter(
       (x, i, a) => a.indexOf(x) === i,
     )
     return cycle.map((cid) =>
@@ -156,38 +156,58 @@ export default function SessionForm() {
 
   /**
    * Applique la planification du cycle d'alternance : le premier de la liste
-   * devient propriétaire du `repeat`, les autres membres sont nettoyés.
+   * devient propriétaire du `repeat`, les autres membres sont nettoyés
+   * (plus de `repeat` propre ni de jours fixes résiduels), et les anciens
+   * cycles « bidirectionnels » qui revendiquent une séance du nôtre sont réparés.
    */
   const applySchedule = async (selfId: string) => {
     const byId = (sid: string) => sessions.find((x) => x.id === sid)
+
     if (scheduleMode === 'weekly') {
-      if (!cycleOwner) return
-      if (cycleOwner.id === selfId) {
-        // J'étais propriétaire : la première alternance restante reprend le cycle
-        const rest = cycleIdsOf(cycleOwner).filter((x) => x !== selfId && !!byId(x))
-        if (rest.length) {
-          await updateSession(rest[0], { repeat: { everyDays, startDate, alternates: rest.slice(1) } })
+      // Je quitte le cycle éventuel ; il continue sans moi
+      const rest = ownerCycle.filter((x) => x !== selfId && !!byId(x))
+      if (cycleOwner?.repeat && rest.length) {
+        await updateSession(rest[0], {
+          repeat: {
+            everyDays: cycleOwner.repeat.everyDays,
+            startDate: cycleOwner.repeat.startDate,
+            alternates: rest.slice(1),
+          },
+        })
+        for (const mid of rest.slice(1)) {
+          if (byId(mid)?.repeat) await updateSession(mid, { repeat: null })
         }
-      } else {
-        // Je quitte le cycle du propriétaire
-        const rest = cycleIdsOf(cycleOwner).filter((x) => x !== selfId && x !== cycleOwner.id)
-        await updateSession(cycleOwner.id, { repeat: { everyDays, startDate, alternates: rest } })
       }
       return
     }
+
     // Mode intervalle : reconstruire le cycle en conservant l'ordre précédent
     const wanted = [selfId, ...altIds]
-    const prev = cycleOwner ? cycleIdsOf(cycleOwner) : []
-    const cycle = [...prev.filter((x) => wanted.includes(x)), ...wanted.filter((x) => !prev.includes(x))].filter(
+    const cycle = [...ownerCycle.filter((x) => wanted.includes(x)), ...wanted.filter((x) => !ownerCycle.includes(x))].filter(
       (x, i, arr) => arr.indexOf(x) === i && (x === selfId || !!byId(x)),
     )
     const ownerId = cycle[0]
     await updateSession(ownerId, { repeat: { everyDays, startDate, alternates: cycle.slice(1) } })
+    // Les membres sont pilotés par la rotation : ni repeat propre, ni jours fixes
     for (const mid of cycle.slice(1)) {
-      if (byId(mid)?.repeat) await updateSession(mid, { repeat: null })
+      if (mid === selfId) continue // la sauvegarde du formulaire vient de le nettoyer
+      const m = byId(mid)
+      if (!m) continue
+      const patch: { repeat?: null; days?: number[] } = {}
+      if (m.repeat) patch.repeat = null
+      if (m.days.length) patch.days = []
+      if (Object.keys(patch).length) await updateSession(mid, patch)
     }
-    if (cycleOwner && cycleOwner.id !== selfId && !cycle.includes(cycleOwner.id)) {
-      await updateSession(cycleOwner.id, { repeat: null })
+    // Répare les autres cycles qui revendiquent encore une séance du nôtre
+    for (const s of sessions) {
+      if (!s.repeat || s.id === ownerId || cycle.includes(s.id)) continue
+      const alts = s.repeat.alternates ?? (s.repeat.alternateWith ? [s.repeat.alternateWith] : [])
+      const kept = alts.filter((x) => !cycle.includes(x))
+      if (kept.length !== alts.length) {
+        await updateSession(s.id, {
+          repeat: { everyDays: s.repeat.everyDays, startDate: s.repeat.startDate, alternates: kept },
+        })
+      }
     }
   }
 

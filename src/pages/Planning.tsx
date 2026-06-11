@@ -24,6 +24,7 @@ function Row({
   session,
   todayIdx,
   autoDays,
+  inCycle,
   sublabel,
   onToggle,
   onEdit,
@@ -32,13 +33,14 @@ function Row({
   todayIdx: number
   /** Occurrences calculées (intervalle / alternance) pour la semaine en cours */
   autoDays: boolean[]
+  /** Membre ou propriétaire d'un cycle : la rotation pilote, pas les jours fixes */
+  inCycle: boolean
   sublabel?: string
   onToggle: (day: number) => void
   onEdit: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: session.id })
   const meta = CATEGORY_META[session.category]
-  const isRepeat = !!session.repeat
   return (
     <div
       ref={setNodeRef}
@@ -72,7 +74,7 @@ function Row({
         {sublabel && <span className="block truncate text-[10px] font-bold text-ink-soft/70">↻ {sublabel}</span>}
       </button>
       {Array.from({ length: 7 }, (_, d) => {
-        const solid = !isRepeat && session.days.includes(d)
+        const solid = !inCycle && session.days.includes(d)
         const auto = !solid && autoDays[d]
         return (
           <button
@@ -80,7 +82,7 @@ function Row({
             type="button"
             aria-label={`${session.name} — ${DAY_NAMES[d]}`}
             aria-pressed={solid || auto}
-            onClick={() => (isRepeat ? onEdit() : onToggle(d))}
+            onClick={() => (inCycle ? onEdit() : onToggle(d))}
             className={
               'flex h-10 items-center justify-center rounded-lg transition-colors ' +
               (d === todayIdx ? 'bg-sage-50' : '')
@@ -183,17 +185,21 @@ export default function Planning() {
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={orderIds} strategy={verticalListSortingStrategy}>
               <div className="space-y-1.5">
-                {ordered.map((s) => (
-                  <Row
-                    key={s.id}
-                    session={s}
-                    todayIdx={todayIdx}
-                    autoDays={autoByDay.map((ids) => ids.has(s.id))}
-                    sublabel={s.repeat || ownerOf(s.id, sessions) ? describeSchedule(s, sessions) : undefined}
-                    onToggle={(d) => toggle(s, d)}
-                    onEdit={() => navigate(`/session/${s.id}`)}
-                  />
-                ))}
+                {ordered.map((s) => {
+                  const inCycle = !!ownerOf(s.id, sessions)
+                  return (
+                    <Row
+                      key={s.id}
+                      session={s}
+                      todayIdx={todayIdx}
+                      autoDays={autoByDay.map((ids) => ids.has(s.id))}
+                      inCycle={inCycle}
+                      sublabel={inCycle ? describeSchedule(s, sessions) : undefined}
+                      onToggle={(d) => toggle(s, d)}
+                      onEdit={() => navigate(`/session/${s.id}`)}
+                    />
+                  )
+                })}
               </div>
             </SortableContext>
           </DndContext>
