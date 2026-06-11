@@ -14,6 +14,7 @@ import {
 } from '../types'
 import { DAY_LETTER, DAY_NAMES, todayStr } from '../lib/dates'
 import { DEFAULT_VELO_METRICS, effectiveMetrics, newMetric } from '../lib/metrics'
+import { cycleIdsOf, ownerOf } from '../lib/schedule'
 import { Chip, Field, GhostButton, PrimaryButton, Seg, Stepper, TextArea, TextInput } from '../components/ui'
 
 const smallInput =
@@ -42,13 +43,19 @@ export default function SessionForm() {
   const { sessions, exercises, addSession, updateSession, removeSession, updateExercise } = useData()
   const existing = sessions.find((s) => s.id === id)
 
+  // Cycle d'alternance : la séance « propriétaire » porte la planification, les
+  // autres membres la voient et la modifient depuis leur propre fiche.
+  const cycleOwner = existing ? (existing.repeat ? existing : ownerOf(existing.id, sessions)) : undefined
+
   const [name, setName] = useState(existing?.name ?? '')
   const [category, setCategory] = useState<Category>(existing?.category ?? 'muscu')
   const [days, setDays] = useState<number[]>(existing?.days ?? [])
-  const [scheduleMode, setScheduleMode] = useState<'weekly' | 'interval'>(existing?.repeat ? 'interval' : 'weekly')
-  const [everyDays, setEveryDays] = useState(existing?.repeat?.everyDays ?? 2)
-  const [startDate, setStartDate] = useState(existing?.repeat?.startDate ?? todayStr())
-  const [alternateWith, setAlternateWith] = useState(existing?.repeat?.alternateWith ?? '')
+  const [scheduleMode, setScheduleMode] = useState<'weekly' | 'interval'>(cycleOwner ? 'interval' : 'weekly')
+  const [everyDays, setEveryDays] = useState(cycleOwner?.repeat?.everyDays ?? 2)
+  const [startDate, setStartDate] = useState(cycleOwner?.repeat?.startDate ?? todayStr())
+  const [altIds, setAltIds] = useState<string[]>(() =>
+    cycleOwner && existing ? cycleIdsOf(cycleOwner).filter((x) => x !== existing.id) : [],
+  )
   const [items, setItems] = useState<SessionItem[]>(existing?.items ?? [])
   const [metrics, setMetrics] = useState<MetricDef[]>(existing ? effectiveMetrics(existing) : [])
   const [links, setLinks] = useState<LinkDef[]>(existing?.links ?? [])
@@ -107,6 +114,43 @@ export default function SessionForm() {
   const setLink = (idx: number, patch: Partial<LinkDef>) =>
     setLinks((p) => p.map((l, i) => (i === idx ? { ...l, ...patch } : l)))
 
+  /**
+   * Applique la planification du cycle d'alternance : le premier de la liste
+   * devient propriétaire du `repeat`, les autres membres sont nettoyés.
+   */
+  const applySchedule = async (selfId: string) => {
+    const byId = (sid: string) => sessions.find((x) => x.id === sid)
+    if (scheduleMode === 'weekly') {
+      if (!cycleOwner) return
+      if (cycleOwner.id === selfId) {
+        // J'étais propriétaire : la première alternance restante reprend le cycle
+        const rest = cycleIdsOf(cycleOwner).filter((x) => x !== selfId && !!byId(x))
+        if (rest.length) {
+          await updateSession(rest[0], { repeat: { everyDays, startDate, alternates: rest.slice(1) } })
+        }
+      } else {
+        // Je quitte le cycle du propriétaire
+        const rest = cycleIdsOf(cycleOwner).filter((x) => x !== selfId && x !== cycleOwner.id)
+        await updateSession(cycleOwner.id, { repeat: { everyDays, startDate, alternates: rest } })
+      }
+      return
+    }
+    // Mode intervalle : reconstruire le cycle en conservant l'ordre précédent
+    const wanted = [selfId, ...altIds]
+    const prev = cycleOwner ? cycleIdsOf(cycleOwner) : []
+    const cycle = [...prev.filter((x) => wanted.includes(x)), ...wanted.filter((x) => !prev.includes(x))].filter(
+      (x, i, arr) => arr.indexOf(x) === i && (x === selfId || !!byId(x)),
+    )
+    const ownerId = cycle[0]
+    await updateSession(ownerId, { repeat: { everyDays, startDate, alternates: cycle.slice(1) } })
+    for (const mid of cycle.slice(1)) {
+      if (byId(mid)?.repeat) await updateSession(mid, { repeat: null })
+    }
+    if (cycleOwner && cycleOwner.id !== selfId && !cycle.includes(cycleOwner.id)) {
+      await updateSession(cycleOwner.id, { repeat: null })
+    }
+  }
+
   const save = async () => {
     const cleanMetrics = metrics
       .filter((m) => m.label.trim())
@@ -119,10 +163,8 @@ export default function SessionForm() {
       name: name.trim() || 'Séance',
       category,
       days: scheduleMode === 'weekly' ? days : [],
-      repeat:
-        scheduleMode === 'interval'
-          ? { everyDays, startDate, ...(alternateWith ? { alternateWith } : {}) }
-          : null,
+      // La planification par cycle est réécrite par applySchedule ci-dessous
+      repeat: null,
       items: hasItems ? items : [],
       metrics: cleanMetrics,
       links: cleanLinks,
@@ -133,8 +175,14 @@ export default function SessionForm() {
       ...(category === 'etirements' ? { restSec: stretchRest } : {}),
       ...(category === 'muscu' ? { rounds: muscuRounds } : {}),
     }
-    if (existing) await updateSession(existing.id, data)
-    else await addSession(data)
+    let selfId: string
+    if (existing) {
+      await updateSession(existing.id, data)
+      selfId = existing.id
+    } else {
+      selfId = await addSession(data)
+    }
+    await applySchedule(selfId)
     navigate(-1)
   }
 
@@ -232,24 +280,46 @@ export default function SessionForm() {
               </label>
               <div>
                 <p className="mb-1 text-sm font-bold">En alternance avec (optionnel)</p>
+                {altIds.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {altIds.map((aid) => {
+                      const s = sessions.find((x) => x.id === aid)
+                      if (!s) return null
+                      const meta = CATEGORY_META[s.category]
+                      return (
+                        <button
+                          key={aid}
+                          type="button"
+                          title="Retirer de l'alternance"
+                          onClick={() => setAltIds((p) => p.filter((x) => x !== aid))}
+                          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-extrabold ${meta.soft} ${meta.text}`}
+                        >
+                          {meta.emoji} {s.name} <span className="opacity-50">✕</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
                 <select
-                  value={alternateWith}
-                  onChange={(e) => setAlternateWith(e.target.value)}
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) setAltIds((p) => [...p, e.target.value])
+                  }}
                   className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
                 >
-                  <option value="">— Aucune alternance —</option>
+                  <option value="">+ Ajouter une séance à l'alternance…</option>
                   {sessions
-                    .filter((s) => s.id !== existing?.id)
+                    .filter((s) => s.id !== existing?.id && !altIds.includes(s.id))
                     .map((s) => (
                       <option key={s.id} value={s.id}>
                         {CATEGORY_META[s.category].emoji} {s.name}
                       </option>
                     ))}
                 </select>
-                {alternateWith && (
+                {altIds.length > 0 && (
                   <p className="mt-1.5 text-xs font-semibold text-ink-soft">
-                    Une fois sur deux, c'est la séance choisie qui sera proposée à la place. Inutile de la planifier
-                    elle-même.
+                    Les séances tournent dans l'ordre : celle-ci, puis {altIds.length > 1 ? 'chacune des séances ci-dessus' : 'la séance ci-dessus'}.
+                    L'alternance est partagée — elle apparaît aussi dans la fiche des autres séances.
                   </p>
                 )}
               </div>

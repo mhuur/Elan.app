@@ -108,16 +108,36 @@ export default function Library() {
             const meta = CATEGORY_META[cat]
             return (
               <section key={cat}>
-                <h2 className={`mb-2 text-[11px] font-extrabold uppercase tracking-wider ${meta.text}`}>
-                  {meta.emoji} {meta.label}
-                </h2>
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className={`text-[11px] font-extrabold uppercase tracking-wider ${meta.text}`}>
+                    {meta.emoji} {meta.label}
+                  </h2>
+                  <button
+                    type="button"
+                    aria-label={`Nouvel exercice ${meta.label}`}
+                    onClick={() => navigate(`/exercise/new?cat=${cat}`)}
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-sage-100 text-sm font-extrabold text-sage-700 active:bg-sage-200"
+                  >
+                    +
+                  </button>
+                </div>
                 <div className="space-y-2.5">
                   {subtypeGroups(list).map(([subtype, exos]) => (
                     <div key={subtype || '—'}>
                       {subtype && (
-                        <p className="mb-1 px-1 text-[10px] font-extrabold uppercase tracking-wider text-ink-soft/70">
-                          {subtype}
-                        </p>
+                        <div className="mb-1 flex items-center justify-between px-1">
+                          <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft/70">
+                            {subtype}
+                          </p>
+                          <button
+                            type="button"
+                            aria-label={`Nouvel exercice ${subtype}`}
+                            onClick={() => navigate(`/exercise/new?cat=${cat}&st=${encodeURIComponent(subtype)}`)}
+                            className="flex h-5 w-5 items-center justify-center rounded-full bg-sage-50 text-xs font-extrabold text-sage-600 active:bg-sage-100"
+                          >
+                            +
+                          </button>
+                        </div>
                       )}
                       <div className="overflow-hidden rounded-3xl bg-surface shadow-sm">
                         {exos.map((e, i) => (

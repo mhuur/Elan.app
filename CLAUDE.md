@@ -26,7 +26,9 @@ Ne jamais lancer d'installation nécessitant une élévation UAC (winget MSI, et
 - `src/data/DataContext.tsx` : provider unique (auth Google + abonnements aux 3 collections + CRUD + seed au premier lancement via `src/data/seed.ts`, gardé par un flag localStorage `elan-seeded-*`).
 - Types et métadonnées de catégories (couleurs/emoji/classes Tailwind) : `src/types.ts`.
 - Jours de semaine indexés **0 = lundi … 6 = dimanche** (`src/lib/dates.ts`), dates de logs en `YYYY-MM-DD` local.
-- Planification : jours fixes (`Session.days`) OU intervalle (`Session.repeat` = tous les X jours + date de départ + alternance optionnelle avec une autre séance). Logique centralisée dans `src/lib/schedule.ts` (`plannedSessionIdsOn`). `repeat: null` (et non undefined) pour désactiver — Firestore ne supprime pas les champs absents d'un update.
+- Planification : jours fixes (`Session.days`) OU intervalle (`Session.repeat` = tous les X jours + date de départ + cycle d'alternance multiple). Le cycle est porté par UNE séance « propriétaire » (`repeat.alternates: string[]`, rotation `occurrence % cycle.length`) ; les membres se détectent via `ownerOf()` et l'éditent depuis leur fiche (réécriture du propriétaire dans `SessionForm.applySchedule`). Logique centralisée dans `src/lib/schedule.ts`. `repeat: null` / `objective: null` / `goal: null` (et non undefined) pour désactiver — Firestore ne supprime pas les champs absents d'un update.
+- Objectifs : `Exercise.goal` (meilleure série/volume muscu) et `Session.objective` (sur une mesure), gérés dans l'onglet `/goals`, célébrés à la complétion (CompleteSheet).
+- L'écran Aujourd'hui navigue dans les dates passées (saisie rétroactive) : `CompleteSheet` accepte une prop `date`.
 - Sémantique par sport : running = simple coche ; vélo = formulaire perfs (préremplies depuis le dernier log) ; muscu = séries×reps (exercices `measure: 'sec'` pour le gainage) ; HIIT/étirements = minuteur guidé `src/pages/Player.tsx` (WebAudio + vibration + wake lock, log auto en fin).
 - Tailwind v4 : thème en CSS-first dans `src/index.css` (`@theme`), pas de tailwind.config.
 

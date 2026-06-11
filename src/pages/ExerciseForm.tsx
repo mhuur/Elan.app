@@ -1,23 +1,30 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useData } from '../data/DataContext'
 import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, subtypesOf, type Category, type Measure } from '../types'
 import { youtubeSearch } from '../lib/format'
-import { Chip, Field, GhostButton, NumInput, PrimaryButton, Seg, TextArea, TextInput } from '../components/ui'
+import { Chip, Field, GhostButton, PrimaryButton, Seg, TextArea, TextInput } from '../components/ui'
 
 export default function ExerciseForm() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
   const { exercises, addExercise, updateExercise, removeExercise } = useData()
   const existing = exercises.find((e) => e.id === id)
 
+  // Préremplissage depuis les « + » de la banque (?cat=…&st=…)
+  const presetCat = params.get('cat') as Category | null
+  const presetSubtype = params.get('st')
+
   const [name, setName] = useState(existing?.name ?? '')
-  const [category, setCategory] = useState<Category>(existing?.category ?? 'muscu')
-  const [subtypes, setSubtypes] = useState<string[]>(() => (existing ? subtypesOf(existing) : []))
+  const [category, setCategory] = useState<Category>(
+    existing?.category ?? (presetCat && CATEGORIES.includes(presetCat) ? presetCat : 'muscu'),
+  )
+  const [subtypes, setSubtypes] = useState<string[]>(() =>
+    existing ? subtypesOf(existing) : presetSubtype ? [presetSubtype] : [],
+  )
   const [customInput, setCustomInput] = useState('')
   const [measure, setMeasure] = useState<Measure>(existing?.measure ?? 'reps')
-  const [goalMetric, setGoalMetric] = useState<'best' | 'volume'>(existing?.goal?.metric ?? 'best')
-  const [goalValue, setGoalValue] = useState<number | undefined>(existing?.goal?.value)
   const [description, setDescription] = useState(existing?.description ?? '')
   const [videoUrl, setVideoUrl] = useState(existing?.videoUrl ?? '')
 
@@ -45,7 +52,6 @@ export default function ExerciseForm() {
       subtypes,
       subtype: '',
       measure,
-      goal: category === 'muscu' && goalValue ? { metric: goalMetric, value: goalValue } : null,
       description: description.trim(),
       videoUrl: videoUrl.trim(),
       createdAt: existing?.createdAt ?? Date.now(),
@@ -122,30 +128,6 @@ export default function ExerciseForm() {
             onChange={setMeasure}
           />
         </Field>
-
-        {category === 'muscu' && (
-          <Field label="🎯 Objectif (optionnel)">
-            <div className="space-y-2 rounded-2xl bg-sage-50 p-3">
-              <Seg
-                options={[
-                  { value: 'best' as const, label: 'Meilleure série' },
-                  { value: 'volume' as const, label: 'Volume total' },
-                ]}
-                value={goalMetric}
-                onChange={setGoalMetric}
-              />
-              <NumInput
-                value={goalValue}
-                onChange={setGoalValue}
-                suffix={measure === 'sec' ? 's' : 'reps'}
-                placeholder="Ex. 20 — vide = aucun objectif"
-              />
-              <p className="text-xs font-semibold text-ink-soft">
-                Suivi dans Progrès, avec une petite célébration quand vous l'atteignez 🎉
-              </p>
-            </div>
-          </Field>
-        )}
 
         <Field label="Description (optionnel)">
           <TextArea value={description} onChange={setDescription} placeholder="Consignes, posture, respiration…" />

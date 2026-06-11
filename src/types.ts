@@ -68,8 +68,18 @@ export interface Repeat {
   everyDays: number
   /** Date de départ YYYY-MM-DD */
   startDate: string
-  /** Alternance : une occurrence sur deux est remplacée par cette séance */
+  /** Alternance : les occurrences tournent entre cette séance puis celles-ci, dans l'ordre */
+  alternates?: string[]
+  /** Hérité : ancienne alternance simple */
   alternateWith?: string
+}
+
+/** Objectif sur une séance, portant sur une de ses mesures */
+export interface SessionObjective {
+  metricKey: string
+  label: string
+  unit: string
+  value: number
 }
 
 /** Mesure personnalisée définie sur une séance, saisie à la complétion */
@@ -114,6 +124,8 @@ export interface Session {
   links?: LinkDef[]
   /** Ordre d'affichage dans le planning et la journée */
   sortOrder?: number
+  /** Objectif à atteindre sur une mesure (null = aucun) */
+  objective?: SessionObjective | null
   /** Vélo (hérité) : puissance cible en watts */
   targetPowerW?: number
   /** Vélo (hérité) : durée cible en minutes */

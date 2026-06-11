@@ -14,7 +14,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Session } from '../types'
 import { DAY_LETTER, DAY_NAMES, addDays, mondayIndex, startOfWeek } from '../lib/dates'
-import { describeSchedule, plannedSessionIdsOn } from '../lib/schedule'
+import { describeSchedule, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
 import { EmptyState, PageHeader } from '../components/ui'
 
 /** Grille commune : poignée · nom · 7 jours */
@@ -189,7 +189,7 @@ export default function Planning() {
                     session={s}
                     todayIdx={todayIdx}
                     autoDays={autoByDay.map((ids) => ids.has(s.id))}
-                    sublabel={s.repeat ? describeSchedule(s, sessions) : undefined}
+                    sublabel={s.repeat || ownerOf(s.id, sessions) ? describeSchedule(s, sessions) : undefined}
                     onToggle={(d) => toggle(s, d)}
                     onEdit={() => navigate(`/session/${s.id}`)}
                   />

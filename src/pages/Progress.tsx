@@ -12,11 +12,10 @@ import {
   YAxis,
 } from 'recharts'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, type Log, type MetricValue, type Session } from '../types'
+import { CATEGORY_META, type Log, type MetricValue } from '../types'
 import { addDays, formatDayMonth, formatShortFr, startOfWeek, toDateStr, todayStr } from '../lib/dates'
 import { logSummary } from '../lib/format'
-import { Chip, EmptyState, Field, PageHeader, PrimaryButton, Sheet } from '../components/ui'
-import CompleteSheet from '../components/CompleteSheet'
+import { Chip, EmptyState, PageHeader } from '../components/ui'
 
 const HEAT_WEEKS = 16
 
@@ -71,13 +70,6 @@ export default function Progress() {
   const deleteLog = (l: Log) => {
     if (window.confirm(`Supprimer « ${l.sessionName} » du ${formatShortFr(l.date)} ?`)) void removeLog(l.id)
   }
-
-  // Saisie rétroactive : séance + date passée
-  const [retroOpen, setRetroOpen] = useState(false)
-  const [retroSessionId, setRetroSessionId] = useState('')
-  const [retroDate, setRetroDate] = useState(todayStr())
-  const [retroCompleting, setRetroCompleting] = useState<Session | null>(null)
-  const retroSession = sessions.find((s) => s.id === retroSessionId) ?? sessions[0]
 
   // Streak : semaines consécutives avec au moins une séance (semaine en cours tolérée)
   const streak = useMemo(() => {
@@ -332,15 +324,11 @@ export default function Progress() {
           </ChartCard>
         )}
 
-        {(logs.length > 0 || sessions.length > 0) && (
+        {logs.length > 0 && (
           <ChartCard title="🗓️ Historique">
-            <button
-              type="button"
-              onClick={() => setRetroOpen(true)}
-              className="mb-2 w-full rounded-2xl border-2 border-dashed border-sage-300 px-4 py-2.5 text-xs font-extrabold text-sage-600 active:bg-sage-100"
-            >
-              + Saisir une séance passée (oubli)
-            </button>
+            <p className="mb-2 text-xs font-semibold text-ink-soft">
+              Une séance oubliée ? Naviguez vers une date passée depuis l'écran Aujourd'hui (flèche ‹).
+            </p>
             <div>
               {logs.slice(0, 15).map((l) => (
                 <div key={l.id} className="flex items-center gap-2 border-b border-cream py-2 last:border-0">
@@ -370,44 +358,6 @@ export default function Progress() {
           </ChartCard>
         )}
       </div>
-
-      <Sheet open={retroOpen} onClose={() => setRetroOpen(false)} title="Saisir une séance passée">
-        <div className="space-y-4">
-          <Field label="Séance">
-            <select
-              value={retroSession?.id ?? ''}
-              onChange={(e) => setRetroSessionId(e.target.value)}
-              className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
-            >
-              {sessions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {CATEGORY_META[s.category].emoji} {s.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Date de la séance">
-            <input
-              type="date"
-              value={retroDate}
-              max={todayStr()}
-              onChange={(e) => setRetroDate(e.target.value || todayStr())}
-              className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
-            />
-          </Field>
-          <PrimaryButton
-            onClick={() => {
-              setRetroOpen(false)
-              if (retroSession) setRetroCompleting(retroSession)
-            }}
-            disabled={!retroSession}
-          >
-            Saisir les détails →
-          </PrimaryButton>
-        </div>
-      </Sheet>
-
-      <CompleteSheet session={retroCompleting} date={retroDate} onClose={() => setRetroCompleting(null)} />
     </div>
   )
 }

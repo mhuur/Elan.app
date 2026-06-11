@@ -103,7 +103,11 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
   const metrics = useMemo(() => effectiveMetrics(session), [session])
   const links = session.links ?? []
   const isMuscu = session.category === 'muscu'
-  const hasTimer = (session.category === 'hiit' || session.category === 'etirements') && session.items.length > 0
+  // Le minuteur guidé n'a de sens que pour la journée en cours
+  const hasTimer =
+    (session.category === 'hiit' || session.category === 'etirements') &&
+    session.items.length > 0 &&
+    logDate === todayStr()
   const hasForm = metrics.length > 0 || (isMuscu && session.items.length > 0)
 
   // Dernière séance identique, pour préremplir (logs triés du plus récent au plus ancien)
@@ -151,6 +155,14 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
     const mv = buildMetricValues()
     if (mv.length) extra.metrics = mv
     const achieved: string[] = []
+    // Objectif de séance (sur une mesure) atteint ?
+    if (session.objective) {
+      const o = session.objective
+      const got = mv.find((x) => x.key === o.metricKey)
+      if (got && got.value >= o.value) {
+        achieved.push(`${o.label} : ${got.value}${o.unit ? ' ' + o.unit : ''} (objectif ${o.value})`)
+      }
+    }
     if (isMuscu && session.items.length) {
       extra.results = session.items.map((it) => {
         const ex = exOf(it.exerciseId)

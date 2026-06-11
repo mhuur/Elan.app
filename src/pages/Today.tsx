@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useData } from '../data/DataContext'
 import { CATEGORIES, CATEGORY_META, type Log, type Session } from '../types'
-import { formatLongFr, todayStr } from '../lib/dates'
+import { addDays, formatLongFr, toDateStr, todayStr } from '../lib/dates'
 import { logSummary, summarizeSession } from '../lib/format'
 import { plannedSessionIdsOn } from '../lib/schedule'
-import { EmptyState, PageHeader, Sheet } from '../components/ui'
+import { EmptyState, Sheet } from '../components/ui'
 import CompleteSheet from '../components/CompleteSheet'
 import SettingsSheet from '../components/SettingsSheet'
 
@@ -13,11 +13,14 @@ export default function Today() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [completing, setCompleting] = useState<Session | null>(null)
+  // Date affichée : on peut revenir en arrière pour valider des séances oubliées
+  const [viewDate, setViewDate] = useState(() => new Date())
 
-  const today = new Date()
-  const dStr = todayStr()
+  const dStr = toDateStr(viewDate)
+  const isToday = dStr === todayStr()
+  const shiftDay = (n: number) => setViewDate((d) => addDays(d, n))
 
-  const plannedIds = plannedSessionIdsOn(today, sessions)
+  const plannedIds = plannedSessionIdsOn(viewDate, sessions)
   const planned = sessions.filter((s) => plannedIds.has(s.id))
   const todayLogs = logs.filter((l) => l.date === dStr)
   const doneIds = new Set(todayLogs.map((l) => l.sessionId))
@@ -29,10 +32,11 @@ export default function Today() {
 
   return (
     <div>
-      <PageHeader
-        kicker="Aujourd'hui"
-        title={formatLongFr(today)}
-        right={
+      <header className="px-5 pt-8 pb-4">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-bold uppercase tracking-widest text-sage-500">
+            {isToday ? "Aujourd'hui" : 'Saisie passée'}
+          </p>
           <button
             type="button"
             aria-label="Réglages"
@@ -44,8 +48,45 @@ export default function Today() {
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.66.28 1.51.55 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
           </button>
-        }
-      />
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            aria-label="Jour précédent"
+            onClick={() => shiftDay(-1)}
+            className="rounded-full bg-surface p-2 text-ink-soft shadow-sm active:bg-sand"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+          <h1 className="min-w-0 flex-1 truncate text-center text-xl font-extrabold first-letter:uppercase">
+            {formatLongFr(viewDate)}
+          </h1>
+          <button
+            type="button"
+            aria-label="Jour suivant"
+            disabled={isToday}
+            onClick={() => shiftDay(1)}
+            className="rounded-full bg-surface p-2 text-ink-soft shadow-sm active:bg-sand disabled:opacity-30"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
+        </div>
+        {!isToday && (
+          <div className="mt-2 text-center">
+            <button
+              type="button"
+              onClick={() => setViewDate(new Date())}
+              className="rounded-full bg-sage-100 px-3.5 py-1.5 text-xs font-extrabold text-sage-700 active:bg-sage-200"
+            >
+              ↩ Revenir à aujourd'hui
+            </button>
+          </div>
+        )}
+      </header>
 
       <div className="space-y-3 px-5">
         {toDo.map((s) => {
@@ -73,9 +114,16 @@ export default function Today() {
         })}
 
         {toDo.length === 0 && todayLogs.length === 0 && (
-          <EmptyState emoji="🌿" text="Rien de prévu aujourd'hui. Journée repos — ou lancez une séance libre ci-dessous." />
+          <EmptyState
+            emoji="🌿"
+            text={
+              isToday
+                ? "Rien de prévu aujourd'hui. Journée repos — ou lancez une séance libre ci-dessous."
+                : "Rien n'était prévu ce jour-là. Utilisez « Séance libre » pour saisir une séance oubliée."
+            }
+          />
         )}
-        {toDo.length === 0 && todayLogs.length > 0 && (
+        {toDo.length === 0 && todayLogs.length > 0 && isToday && (
           <div className="rounded-3xl bg-sage-100 px-6 py-5 text-center">
             <p className="text-sm font-extrabold text-sage-700">Tout est fait pour aujourd'hui, bravo ! 🎉</p>
           </div>
@@ -118,7 +166,7 @@ export default function Today() {
       )}
 
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <CompleteSheet session={completing} onClose={() => setCompleting(null)} />
+      <CompleteSheet session={completing} date={dStr} onClose={() => setCompleting(null)} />
 
       <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="Choisir une séance">
         <div className="space-y-4">
