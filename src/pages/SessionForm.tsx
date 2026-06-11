@@ -14,8 +14,8 @@ import {
 } from '../types'
 import { DAY_LETTER, DAY_NAMES, todayStr } from '../lib/dates'
 import { DEFAULT_VELO_METRICS, effectiveMetrics, newMetric } from '../lib/metrics'
-import { canonicalCycles, ownerOf } from '../lib/schedule'
-import { Chip, Field, GhostButton, PrimaryButton, Seg, Stepper, TextArea, TextInput } from '../components/ui'
+import { canonicalCycles, cycleStepsOf, ownerOf } from '../lib/schedule'
+import { Chip, Field, GhostButton, PageHeader, PrimaryButton, Seg, Select, Stepper, TextArea, TextInput } from '../components/ui'
 
 const smallInput =
   'rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
@@ -46,7 +46,9 @@ export default function SessionForm() {
   // Cycle d'alternance : la séance « propriétaire » porte la planification, les
   // autres membres la voient et la modifient depuis leur propre fiche.
   const cycleOwner = existing ? ownerOf(existing.id, sessions) : undefined
-  const ownerCycle = cycleOwner ? (canonicalCycles(sessions).get(cycleOwner.id) ?? []) : []
+  const ownerSteps = cycleOwner ? (canonicalCycles(sessions).get(cycleOwner.id) ?? []) : []
+  // Identifiant de « cette séance » dans la rotation (placeholder tant qu'elle n'existe pas)
+  const selfKey = existing?.id ?? '__self__'
 
   const [name, setName] = useState(existing?.name ?? '')
   const [category, setCategory] = useState<Category>(existing?.category ?? 'muscu')
@@ -54,9 +56,9 @@ export default function SessionForm() {
   const [scheduleMode, setScheduleMode] = useState<'weekly' | 'interval'>(cycleOwner ? 'interval' : 'weekly')
   const [everyDays, setEveryDays] = useState(cycleOwner?.repeat?.everyDays ?? 2)
   const [startDate, setStartDate] = useState(cycleOwner?.repeat?.startDate ?? todayStr())
-  const [altIds, setAltIds] = useState<string[]>(() =>
-    existing ? ownerCycle.filter((x) => x !== existing.id) : [],
-  )
+  // Rotation en cours d'édition : un tableau de « jours », chacun regroupant
+  // les séances faites ensemble ce jour-là (selfKey = cette séance).
+  const [steps, setSteps] = useState<string[][]>(() => (ownerSteps.length ? ownerSteps : [[selfKey]]))
   const [items, setItems] = useState<SessionItem[]>(existing?.items ?? [])
   const [metrics, setMetrics] = useState<MetricDef[]>(existing ? effectiveMetrics(existing) : [])
   const [links, setLinks] = useState<LinkDef[]>(existing?.links ?? [])
@@ -68,17 +70,16 @@ export default function SessionForm() {
   const [notes, setNotes] = useState(existing?.notes ?? '')
   const [quickName, setQuickName] = useState('')
 
-  /** Ordre de rotation prévisualisé (même logique que la sauvegarde) */
-  const previewRotation = (): string[] => {
-    const selfId = existing?.id ?? '__self__'
-    const wanted = [selfId, ...altIds]
-    const cycle = [...ownerCycle.filter((x) => wanted.includes(x)), ...wanted.filter((x) => !ownerCycle.includes(x))].filter(
-      (x, i, a) => a.indexOf(x) === i,
-    )
-    return cycle.map((cid) =>
-      cid === selfId ? `${name.trim() || 'Cette séance'} ★` : (sessions.find((x) => x.id === cid)?.name ?? '?'),
-    )
-  }
+  // --- Édition de la rotation
+  const usedIds = new Set(steps.flat())
+  const hasRotation = steps.flat().some((id) => id !== selfKey)
+  const stepName = (id: string) =>
+    id === selfKey ? `${name.trim() || 'Cette séance'} ★` : (sessions.find((x) => x.id === id)?.name ?? '?')
+  const addToStep = (si: number, id: string) => setSteps((p) => p.map((st, i) => (i === si ? [...st, id] : st)))
+  const removeFromStep = (si: number, id: string) =>
+    setSteps((p) => p.map((st, i) => (i === si ? st.filter((x) => x !== id) : st)).filter((st, i) => st.length > 0 || i !== si))
+  const addStep = () => setSteps((p) => [...p, []])
+  const removeStep = (si: number) => setSteps((p) => p.filter((_, i) => i !== si))
 
   const catExercises = exercises.filter((e) => e.category === category)
   const exOf = (exId: string) => exercises.find((e) => e.id === exId)
@@ -155,42 +156,53 @@ export default function SessionForm() {
     setLinks((p) => p.map((l, i) => (i === idx ? { ...l, ...patch } : l)))
 
   /**
-   * Applique la planification du cycle d'alternance : le premier de la liste
-   * devient propriétaire du `repeat`, les autres membres sont nettoyés
-   * (plus de `repeat` propre ni de jours fixes résiduels), et les anciens
-   * cycles « bidirectionnels » qui revendiquent une séance du nôtre sont réparés.
+   * Applique la planification du cycle : la première séance du premier jour
+   * devient propriétaire du `repeat` (rotation par jours, plusieurs séances
+   * possibles le même jour) ; les autres membres sont nettoyés (plus de
+   * `repeat` propre ni de jours fixes résiduels), et les anciens cycles qui
+   * revendiquent une séance du nôtre sont réparés.
    */
   const applySchedule = async (selfId: string) => {
     const byId = (sid: string) => sessions.find((x) => x.id === sid)
 
     if (scheduleMode === 'weekly') {
       // Je quitte le cycle éventuel ; il continue sans moi
-      const rest = ownerCycle.filter((x) => x !== selfId && !!byId(x))
-      if (cycleOwner?.repeat && rest.length) {
-        await updateSession(rest[0], {
+      const rest = ownerSteps.map((st) => st.filter((x) => x !== selfId && !!byId(x))).filter((st) => st.length)
+      const restIds = rest.flat()
+      if (cycleOwner?.repeat && restIds.length) {
+        await updateSession(rest[0][0], {
           repeat: {
             everyDays: cycleOwner.repeat.everyDays,
             startDate: cycleOwner.repeat.startDate,
-            alternates: rest.slice(1),
+            steps: rest.map((ids) => ({ ids })),
           },
         })
-        for (const mid of rest.slice(1)) {
+        for (const mid of restIds.slice(1)) {
           if (byId(mid)?.repeat) await updateSession(mid, { repeat: null })
         }
       }
       return
     }
 
-    // Mode intervalle : reconstruire le cycle en conservant l'ordre précédent
-    const wanted = [selfId, ...altIds]
-    const cycle = [...ownerCycle.filter((x) => wanted.includes(x)), ...wanted.filter((x) => !ownerCycle.includes(x))].filter(
-      (x, i, arr) => arr.indexOf(x) === i && (x === selfId || !!byId(x)),
-    )
-    const ownerId = cycle[0]
-    await updateSession(ownerId, { repeat: { everyDays, startDate, alternates: cycle.slice(1) } })
+    // Mode intervalle : nettoyer la rotation saisie (doublons, séances disparues)
+    const seen = new Set<string>()
+    const cleanSteps = steps
+      .map((st) =>
+        st
+          .map((id) => (id === '__self__' ? selfId : id))
+          .filter((id) => {
+            if (seen.has(id) || (id !== selfId && !byId(id))) return false
+            seen.add(id)
+            return true
+          }),
+      )
+      .filter((st) => st.length)
+    const allIds = cleanSteps.flat()
+    const ownerId = cleanSteps[0][0]
+    await updateSession(ownerId, { repeat: { everyDays, startDate, steps: cleanSteps.map((ids) => ({ ids })) } })
     // Les membres sont pilotés par la rotation : ni repeat propre, ni jours fixes
-    for (const mid of cycle.slice(1)) {
-      if (mid === selfId) continue // la sauvegarde du formulaire vient de le nettoyer
+    for (const mid of allIds) {
+      if (mid === ownerId || mid === selfId) continue // la sauvegarde du formulaire nettoie déjà selfId
       const m = byId(mid)
       if (!m) continue
       const patch: { repeat?: null; days?: number[] } = {}
@@ -200,12 +212,12 @@ export default function SessionForm() {
     }
     // Répare les autres cycles qui revendiquent encore une séance du nôtre
     for (const s of sessions) {
-      if (!s.repeat || s.id === ownerId || cycle.includes(s.id)) continue
-      const alts = s.repeat.alternates ?? (s.repeat.alternateWith ? [s.repeat.alternateWith] : [])
-      const kept = alts.filter((x) => !cycle.includes(x))
-      if (kept.length !== alts.length) {
+      if (!s.repeat || s.id === ownerId || allIds.includes(s.id)) continue
+      const oSteps = cycleStepsOf(s)
+      const kept = oSteps.map((st) => st.filter((x) => !allIds.includes(x))).filter((st) => st.length)
+      if (kept.flat().length !== oSteps.flat().length) {
         await updateSession(s.id, {
-          repeat: { everyDays: s.repeat.everyDays, startDate: s.repeat.startDate, alternates: kept },
+          repeat: { everyDays: s.repeat.everyDays, startDate: s.repeat.startDate, steps: kept.map((ids) => ({ ids })) },
         })
       }
     }
@@ -270,14 +282,7 @@ export default function SessionForm() {
 
   return (
     <div>
-      <header className="flex items-center gap-3 px-5 pt-8 pb-4">
-        <button type="button" aria-label="Retour" onClick={() => navigate(-1)} className="rounded-full bg-surface p-2.5 shadow-sm">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-        </button>
-        <h1 className="text-xl font-extrabold">{existing ? 'Modifier la séance' : 'Nouvelle séance'}</h1>
-      </header>
+      <PageHeader title={existing ? 'Modifier la séance' : 'Nouvelle séance'} onBack={() => navigate(-1)} />
 
       <div className="space-y-4 px-5">
         <Field label="Nom">
@@ -323,14 +328,14 @@ export default function SessionForm() {
           ) : (
             <div className="mt-2 space-y-3 rounded-2xl bg-sage-50 p-3.5">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-bold">Tous les</p>
+                <p className="text-sm font-semibold">Tous les</p>
                 <div className="flex items-center gap-1.5">
                   <Stepper value={everyDays} onChange={setEveryDays} min={1} max={30} />
-                  <span className="text-sm font-bold">jour{everyDays > 1 ? 's' : ''}</span>
+                  <span className="text-sm font-semibold">jour{everyDays > 1 ? 's' : ''}</span>
                 </div>
               </div>
               <label className="flex items-center justify-between gap-2">
-                <span className="text-sm font-bold">À partir du</span>
+                <span className="text-sm font-semibold">À partir du</span>
                 <input
                   type="date"
                   value={startDate}
@@ -339,57 +344,91 @@ export default function SessionForm() {
                 />
               </label>
               <div>
-                <p className="mb-1 text-sm font-bold">En alternance avec (optionnel)</p>
-                {altIds.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-1.5">
-                    {altIds.map((aid) => {
-                      const s = sessions.find((x) => x.id === aid)
-                      if (!s) return null
-                      const meta = CATEGORY_META[s.category]
-                      return (
-                        <button
-                          key={aid}
-                          type="button"
-                          title="Retirer de l'alternance"
-                          onClick={() => setAltIds((p) => p.filter((x) => x !== aid))}
-                          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-extrabold ${meta.soft} ${meta.text}`}
-                        >
-                          {meta.emoji} {s.name} <span className="opacity-50">✕</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-                <select
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) setAltIds((p) => [...p, e.target.value])
-                  }}
-                  className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
-                >
-                  <option value="">+ Ajouter une séance à l'alternance…</option>
-                  {sessions
-                    .filter((s) => s.id !== existing?.id && !altIds.includes(s.id))
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {CATEGORY_META[s.category].emoji} {s.name}
-                      </option>
-                    ))}
-                </select>
-                {altIds.length > 0 && (
-                  <div className="mt-2 rounded-xl bg-surface px-3 py-2.5">
-                    <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">
-                      🔁 Rotation ({everyDays === 1 ? 'chaque jour' : `tous les ${everyDays} jours`})
-                    </p>
-                    <p className="text-xs font-extrabold leading-relaxed">
-                      {previewRotation().join('  →  ')} <span className="text-ink-soft">→ on recommence</span>
-                    </p>
-                    <p className="mt-1 text-[11px] font-semibold text-ink-soft">
-                      ★ = cette séance. Les séances tournent dans l'ordre ; l'alternance est partagée et modifiable
-                      depuis la fiche de chacune.
-                    </p>
-                  </div>
-                )}
+                <p className="mb-1 text-sm font-semibold">Rotation (optionnel) — composez vos jours</p>
+                <div className="space-y-2">
+                  {steps.map((st, si) => (
+                    <div key={si} className="rounded-xl bg-surface p-2.5">
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+                          Jour {si + 1}
+                        </p>
+                        {!st.includes(selfKey) && steps.length > 1 && (
+                          <button
+                            type="button"
+                            aria-label={`Retirer le jour ${si + 1}`}
+                            onClick={() => removeStep(si)}
+                            className="px-1 text-ink-soft/50"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                      {st.length > 0 && (
+                        <div className="mb-1.5 flex flex-wrap gap-1.5">
+                          {st.map((id) => {
+                            if (id === selfKey) {
+                              return (
+                                <span key={id} className="rounded-full bg-sage-500 px-3 py-1.5 text-xs font-extrabold text-white">
+                                  ★ {name.trim() || 'Cette séance'}
+                                </span>
+                              )
+                            }
+                            const x = sessions.find((q) => q.id === id)
+                            if (!x) return null
+                            const meta = CATEGORY_META[x.category]
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                title="Retirer de ce jour"
+                                onClick={() => removeFromStep(si, id)}
+                                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-extrabold ${meta.soft} ${meta.text}`}
+                              >
+                                {meta.emoji} {x.name} <span className="opacity-50">✕</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                      <Select value="" onChange={(v) => v && addToStep(si, v)}>
+                        <option value="">+ Ajouter une séance ce jour-là…</option>
+                        {sessions
+                          .filter((s) => s.id !== existing?.id && !usedIds.has(s.id))
+                          .map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {CATEGORY_META[s.category].emoji} {s.name}
+                            </option>
+                          ))}
+                      </Select>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addStep}
+                    className="w-full rounded-xl border-2 border-dashed border-sage-300 px-3 py-2 text-xs font-extrabold text-sage-600 active:bg-sage-100"
+                  >
+                    + Ajouter un jour d'alternance
+                  </button>
+                  {hasRotation && (
+                    <div className="rounded-xl bg-surface px-3 py-2.5">
+                      <p className="mb-1 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+                        🔁 Rotation ({everyDays === 1 ? 'chaque jour' : `tous les ${everyDays} jours`})
+                      </p>
+                      <p className="text-xs font-extrabold leading-relaxed">
+                        {steps
+                          .filter((st) => st.length)
+                          .map((st) => st.map(stepName).join(' + '))
+                          .join('  →  ')}{' '}
+                        <span className="text-ink-soft">→ on recommence</span>
+                      </p>
+                      <p className="mt-1 text-[11px] font-semibold text-ink-soft">
+                        ★ = cette séance. Les séances tournent dans l'ordre des jours ; mettez plusieurs séances sur un
+                        même jour pour les faire ensemble. L'alternance est partagée et modifiable depuis la fiche de
+                        chacune.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -399,15 +438,15 @@ export default function SessionForm() {
           <div className="rounded-2xl bg-sage-50 p-3">
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
-                <p className="mb-1 text-xs font-bold text-ink-soft">Effort</p>
+                <p className="mb-1 text-xs font-semibold text-ink-soft">Effort</p>
                 <Stepper value={workSec} onChange={setWorkSec} min={5} step={5} suffix="s" />
               </div>
               <div>
-                <p className="mb-1 text-xs font-bold text-ink-soft">Repos</p>
+                <p className="mb-1 text-xs font-semibold text-ink-soft">Repos</p>
                 <Stepper value={restSec} onChange={setRestSec} min={0} step={5} suffix="s" />
               </div>
               <div>
-                <p className="mb-1 text-xs font-bold text-ink-soft">Tours</p>
+                <p className="mb-1 text-xs font-semibold text-ink-soft">Tours</p>
                 <Stepper value={rounds} onChange={setRounds} min={1} />
               </div>
             </div>
@@ -417,7 +456,7 @@ export default function SessionForm() {
         {category === 'etirements' && (
           <div className="rounded-2xl bg-sage-50 p-3.5">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-bold text-ink-soft">Transition entre postures</p>
+              <p className="text-xs font-semibold text-ink-soft">Transition entre postures</p>
               <Stepper value={stretchRest} onChange={setStretchRest} min={0} step={5} suffix="s" />
             </div>
           </div>
@@ -427,8 +466,8 @@ export default function SessionForm() {
           <div className="rounded-2xl bg-sage-50 p-3.5">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-xs font-bold text-ink-soft">Tours du circuit</p>
-                <p className="text-[10px] font-semibold text-ink-soft/70">Refaire toute la série d'exercices</p>
+                <p className="text-xs font-semibold text-ink-soft">Tours du circuit</p>
+                <p className="text-[11px] font-semibold text-ink-soft">Refaire toute la série d'exercices</p>
               </div>
               <Stepper value={muscuRounds} onChange={setMuscuRounds} min={1} max={10} small />
             </div>
@@ -453,10 +492,10 @@ export default function SessionForm() {
                             ▼
                           </button>
                         </div>
-                        <select
+                        <Select
                           value={it.exerciseId}
-                          onChange={(e) => setItem(idx, { exerciseId: e.target.value })}
-                          className="min-w-0 flex-1 rounded-xl border border-sand bg-surface px-3 py-2 text-sm font-bold outline-none focus:border-sage-400"
+                          onChange={(v) => setItem(idx, { exerciseId: v })}
+                          className="min-w-0 flex-1"
                         >
                           {groupedOptions(catExercises).map(([st, exos]) => {
                             const opts = exos.map((e) => (
@@ -475,7 +514,7 @@ export default function SessionForm() {
                             )
                           })}
                           {ex && ex.category !== category && <option value={ex.id}>{ex.name}</option>}
-                        </select>
+                        </Select>
                         {it.comment === undefined && (
                           <button
                             type="button"
@@ -494,7 +533,7 @@ export default function SessionForm() {
                       {category === 'muscu' && (
                         <div className="mt-1.5 space-y-1.5">
                           <div className="flex items-center justify-between gap-1">
-                            <span className="text-[11px] font-bold text-ink-soft">Séries</span>
+                            <span className="text-[11px] font-semibold text-ink-soft">Séries</span>
                             <Stepper small value={it.sets ?? 3} onChange={(v) => setItem(idx, { sets: v })} min={1} />
                             <span className="text-xs font-extrabold text-ink-soft/60">×</span>
                             <Stepper
@@ -504,7 +543,7 @@ export default function SessionForm() {
                               min={1}
                               step={isSec ? 5 : 1}
                             />
-                            <div className="flex overflow-hidden rounded-lg border border-sand text-[10px] font-extrabold">
+                            <div className="flex overflow-hidden rounded-lg border border-sand text-[11px] font-extrabold">
                               <button
                                 type="button"
                                 onClick={() => ex && void updateExercise(ex.id, { measure: 'reps' })}
@@ -522,7 +561,7 @@ export default function SessionForm() {
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold text-ink-soft">Repos entre séries</span>
+                            <span className="text-[11px] font-semibold text-ink-soft">Repos entre séries</span>
                             <Stepper small value={it.restSec ?? 60} onChange={(v) => setItem(idx, { restSec: v })} min={0} max={600} step={15} suffix="s" />
                           </div>
                         </div>
@@ -552,8 +591,8 @@ export default function SessionForm() {
                           type="button"
                           onClick={() => setItem(idx, { linkNext: !it.linkNext })}
                           className={
-                            'relative z-10 rounded-full px-3 py-1 text-[10px] font-extrabold transition-colors ' +
-                            (it.linkNext ? 'bg-muscu text-white shadow-sm' : 'bg-sage-100 text-ink-soft/70')
+                            'relative z-10 rounded-full px-3 py-1 text-[11px] font-extrabold transition-colors ' +
+                            (it.linkNext ? 'bg-muscu text-white shadow-sm' : 'bg-sage-100 text-ink-soft')
                           }
                         >
                           {it.linkNext ? '🔗 Superset — enchaîné sans repos' : '+ lier en superset'}
@@ -629,7 +668,7 @@ export default function SessionForm() {
               + Ajouter une mesure
             </button>
             {metrics.length === 0 && (
-              <p className="text-xs font-semibold text-ink-soft/70">
+              <p className="text-xs font-semibold text-ink-soft">
                 Optionnel — ex. durée, calories, niveau de résistance… Saisies à chaque séance et suivies dans Progrès.
               </p>
             )}

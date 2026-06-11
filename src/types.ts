@@ -77,9 +77,15 @@ export interface Repeat {
   everyDays: number
   /** Date de départ YYYY-MM-DD */
   startDate: string
-  /** Alternance : les occurrences tournent entre cette séance puis celles-ci, dans l'ordre */
+  /**
+   * Rotation par jours : chaque étape regroupe les séances faites le même jour
+   * (ex. [[Pompes, Abdos], [Jambes, Dos]] = jour A puis jour B, et on recommence).
+   * Pas de tableaux imbriqués dans Firestore → tableau d'objets `{ ids }`.
+   */
+  steps?: { ids: string[] }[]
+  /** Hérité : alternance simple, une séance par occurrence */
   alternates?: string[]
-  /** Hérité : ancienne alternance simple */
+  /** Hérité : ancienne alternance à deux */
   alternateWith?: string
 }
 

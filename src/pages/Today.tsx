@@ -34,7 +34,7 @@ export default function Today() {
     <div>
       <header className="px-5 pt-8 pb-4">
         <div className="flex items-center justify-between">
-          <p className="text-xs font-bold uppercase tracking-widest text-sage-500">
+          <p className="text-[11px] font-extrabold uppercase tracking-widest text-sage-500">
             {isToday ? "Aujourd'hui" : 'Saisie passée'}
           </p>
           <button
@@ -140,12 +140,12 @@ export default function Today() {
 
       {todayLogs.length > 0 && (
         <section className="mt-7 px-5">
-          <h2 className="mb-2 text-xs font-extrabold uppercase tracking-widest text-ink-soft">Terminées</h2>
+          <h2 className="mb-2 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">Terminées</h2>
           <div className="space-y-2">
             {todayLogs.map((l) => {
               const meta = CATEGORY_META[l.category]
               return (
-                <div key={l.id} className="flex items-center gap-3 rounded-3xl bg-surface/70 p-3.5 shadow-sm">
+                <div key={l.id} className="flex items-center gap-3 rounded-3xl bg-surface/70 p-4 shadow-sm">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage-500 text-sm font-extrabold text-white">
                     ✓
                   </div>
@@ -155,7 +155,7 @@ export default function Today() {
                     </p>
                     <p className="truncate text-xs font-semibold text-ink-soft">{logSummary(l)}</p>
                   </div>
-                  <button type="button" onClick={() => cancelLog(l)} className="shrink-0 text-xs font-bold text-ink-soft/60 active:text-hiit">
+                  <button type="button" onClick={() => cancelLog(l)} className="shrink-0 text-xs font-bold text-ink-soft active:text-hiit">
                     annuler
                   </button>
                 </div>

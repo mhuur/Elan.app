@@ -8,11 +8,16 @@ export function diffDays(fromStr: string, toStr: string): number {
   return Math.round((b - a) / 86400000)
 }
 
-/** Cycle d'alternance d'une séance propriétaire : elle-même puis ses alternances */
-export function cycleIdsOf(s: Session): string[] {
+/**
+ * Étapes de rotation d'une séance propriétaire : chaque étape = les séances
+ * d'un même jour. Gère les anciens formats (`alternates` / `alternateWith`),
+ * où chaque séance constituait sa propre étape.
+ */
+export function cycleStepsOf(s: Session): string[][] {
   if (!s.repeat) return []
+  if (s.repeat.steps && s.repeat.steps.length) return s.repeat.steps.map((st) => st.ids)
   const alts = s.repeat.alternates ?? (s.repeat.alternateWith ? [s.repeat.alternateWith] : [])
-  return [s.id, ...alts]
+  return [[s.id], ...alts.map((a) => [a])]
 }
 
 /**
@@ -22,48 +27,55 @@ export function cycleIdsOf(s: Session): string[] {
  * ici le premier propriétaire rencontré (ordre d'affichage) gagne, les autres
  * cycles qui revendiquent les mêmes séances sont ignorés à la lecture.
  */
-export function canonicalCycles(sessions: Session[]): Map<string, string[]> {
-  const cycles = new Map<string, string[]>()
+export function canonicalCycles(sessions: Session[]): Map<string, string[][]> {
+  const cycles = new Map<string, string[][]>()
   const claimed = new Set<string>()
   for (const s of sessions) {
     if (!s.repeat || claimed.has(s.id)) continue
-    const cycle = cycleIdsOf(s).filter(
-      (id, i, arr) => arr.indexOf(id) === i && !claimed.has(id) && sessions.some((x) => x.id === id),
-    )
-    if (!cycle.length) continue
-    cycles.set(s.id, cycle)
-    for (const id of cycle) claimed.add(id)
+    const seen = new Set<string>()
+    const steps = cycleStepsOf(s)
+      .map((st) =>
+        st.filter((id) => {
+          if (seen.has(id) || claimed.has(id) || !sessions.some((x) => x.id === id)) return false
+          seen.add(id)
+          return true
+        }),
+      )
+      .filter((st) => st.length)
+    if (!steps.length) continue
+    cycles.set(s.id, steps)
+    for (const id of seen) claimed.add(id)
   }
   return cycles
 }
 
 /** Séance propriétaire du cycle canonique dont fait partie sessionId (elle-même si propriétaire) */
 export function ownerOf(sessionId: string, sessions: Session[]): Session | undefined {
-  for (const [ownerId, cycle] of canonicalCycles(sessions)) {
-    if (cycle.includes(sessionId)) return sessions.find((s) => s.id === ownerId)
+  for (const [ownerId, steps] of canonicalCycles(sessions)) {
+    if (steps.some((st) => st.includes(sessionId))) return sessions.find((s) => s.id === ownerId)
   }
   return undefined
 }
 
 /**
  * Séances planifiées à une date donnée : jours fixes hebdomadaires,
- * intervalles (« tous les X jours ») et cycles d'alternance.
- * Les membres d'un cycle sont pilotés par la rotation : leurs éventuels
- * jours fixes résiduels sont ignorés.
+ * intervalles (« tous les X jours ») et cycles d'alternance (toutes les
+ * séances de l'étape du jour). Les membres d'un cycle sont pilotés par la
+ * rotation : leurs éventuels jours fixes résiduels sont ignorés.
  */
 export function plannedSessionIdsOn(date: Date, sessions: Session[]): Set<string> {
   const ids = new Set<string>()
   const dStr = toDateStr(date)
   const dayIdx = mondayIndex(date)
   const cycles = canonicalCycles(sessions)
-  const inCycle = new Set([...cycles.values()].flat())
-  for (const [ownerId, cycle] of cycles) {
+  const inCycle = new Set([...cycles.values()].flat(2))
+  for (const [ownerId, steps] of cycles) {
     const owner = sessions.find((x) => x.id === ownerId)
     if (!owner?.repeat) continue
     const diff = diffDays(owner.repeat.startDate, dStr)
     if (diff < 0 || diff % owner.repeat.everyDays !== 0) continue
     const occurrence = diff / owner.repeat.everyDays
-    ids.add(cycle[occurrence % cycle.length])
+    for (const id of steps[occurrence % steps.length]) ids.add(id)
   }
   for (const s of sessions) {
     if (!inCycle.has(s.id) && s.days.includes(dayIdx)) ids.add(s.id)
@@ -73,14 +85,18 @@ export function plannedSessionIdsOn(date: Date, sessions: Session[]): Set<string
 
 /** Description courte de la planification d'une séance (y compris membre d'un cycle) */
 export function describeSchedule(s: Session, all: Session[]): string {
+  const nameOf = (id: string) => all.find((x) => x.id === id)?.name ?? '?'
   const owner = ownerOf(s.id, all)
   if (owner?.repeat) {
+    const steps = canonicalCycles(all).get(owner.id) ?? []
     const base = owner.repeat.everyDays === 1 ? 'Tous les jours' : `Tous les ${owner.repeat.everyDays} jours`
-    const others = (canonicalCycles(all).get(owner.id) ?? [])
-      .filter((id) => id !== s.id)
-      .map((id) => all.find((x) => x.id === id)?.name)
-      .filter((n): n is string => !!n)
-    return others.length ? `${base}, en alternance avec ${others.join(', ')}` : base
+    const myStep = steps.find((st) => st.includes(s.id)) ?? []
+    const sameDay = myStep.filter((id) => id !== s.id).map(nameOf)
+    const others = steps.filter((st) => st !== myStep).map((st) => st.map(nameOf).join(' + '))
+    let txt = base
+    if (sameDay.length) txt += `, avec ${sameDay.join(' + ')}`
+    if (others.length) txt += `, en alternance avec ${others.join(', ')}`
+    return txt
   }
   if (s.days.length === 7) return 'Tous les jours'
   if (s.days.length) return s.days.map((d) => DAY_SHORT[d]).join(' · ')

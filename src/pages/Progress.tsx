@@ -16,7 +16,7 @@ import { CATEGORY_META, type Log, type MetricValue } from '../types'
 import { addDays, formatDayMonth, formatShortFr, startOfWeek, toDateStr, todayStr } from '../lib/dates'
 import { logSummary } from '../lib/format'
 import { goalLevels } from '../lib/metrics'
-import { Chip, EmptyState, PageHeader } from '../components/ui'
+import { Chip, EmptyState, PageHeader, Select } from '../components/ui'
 
 const HEAT_WEEKS = 16
 
@@ -59,7 +59,7 @@ const axisStyle = { fontSize: 11, fontFamily: 'Nunito', fill: '#717d72' }
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-3xl bg-surface p-4 shadow-sm">
-      <h2 className="mb-3 text-sm font-extrabold">{title}</h2>
+      <h2 className="mb-3 text-base font-extrabold">{title}</h2>
       {children}
     </section>
   )
@@ -186,15 +186,15 @@ export default function Progress() {
         {hasAnyLog && (
           <>
             <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-3xl bg-surface p-3 text-center shadow-sm">
+              <div className="rounded-3xl bg-surface p-4 text-center shadow-sm">
                 <p className="text-2xl font-extrabold text-sage-600">{thisWeekCount}</p>
                 <p className="text-[11px] font-bold text-ink-soft">cette semaine</p>
               </div>
-              <div className="rounded-3xl bg-surface p-3 text-center shadow-sm">
+              <div className="rounded-3xl bg-surface p-4 text-center shadow-sm">
                 <p className="text-2xl font-extrabold text-sage-600">{weekly.reduce((a, w) => a + w.count, 0)}</p>
                 <p className="text-[11px] font-bold text-ink-soft">sur 8 semaines</p>
               </div>
-              <div className="rounded-3xl bg-surface p-3 text-center shadow-sm">
+              <div className="rounded-3xl bg-surface p-4 text-center shadow-sm">
                 <p className="text-2xl font-extrabold text-sage-600">{logs.length}</p>
                 <p className="text-[11px] font-bold text-ink-soft">au total</p>
               </div>
@@ -207,13 +207,13 @@ export default function Progress() {
                   : '🌱 Complétez une séance pour démarrer votre série'}
               </p>
               <Heatmap logs={logs} />
-              <p className="mt-2 text-right text-[10px] font-semibold text-ink-soft/60">16 dernières semaines</p>
+              <p className="mt-2 text-right text-[11px] font-semibold text-ink-soft">16 dernières semaines</p>
             </ChartCard>
 
             <ChartCard title="Séances complétées par semaine">
-              <div className="h-44">
+              <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weekly} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+                  <BarChart data={weekly} margin={{ top: 4, right: 8, left: -22, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#eee9dd" vertical={false} />
                     <XAxis dataKey="label" tick={axisStyle} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                     <YAxis tick={axisStyle} axisLine={false} tickLine={false} allowDecimals={false} />
@@ -228,20 +228,20 @@ export default function Progress() {
 
         {metricSessions.length > 0 && selectedSession && (
           <ChartCard title="📈 Mesures par séance">
-            <select
+            <Select
               value={selectedSession.id}
-              onChange={(e) => {
-                setMsId(e.target.value)
+              onChange={(v) => {
+                setMsId(v)
                 setMetricKey('')
               }}
-              className="mb-3 w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
+              className="mb-3 w-full"
             >
               {metricSessions.map((s) => (
                 <option key={s.id} value={s.id}>
                   {CATEGORY_META[s.category].emoji} {s.name}
                 </option>
               ))}
-            </select>
+            </Select>
             <div className="mb-3 flex flex-wrap gap-1.5">
               {metricDefs.map((d) => (
                 <Chip key={d.key} active={selDef?.key === d.key} onClick={() => setMetricKey(d.key)}>
@@ -277,17 +277,13 @@ export default function Progress() {
 
         {exosWithLogs.length > 0 && (
           <ChartCard title={`${CATEGORY_META.muscu.emoji} Par exercice`}>
-            <select
-              value={selectedEx?.id ?? ''}
-              onChange={(e) => setExId(e.target.value)}
-              className="mb-3 w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
-            >
+            <Select value={selectedEx?.id ?? ''} onChange={setExId} className="mb-3 w-full">
               {exosWithLogs.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.name}
                 </option>
               ))}
-            </select>
+            </Select>
             <div className="mb-3 flex gap-1.5">
               <Chip active={muscuMetric === 'volume'} onClick={() => setMuscuMetric('volume')}>
                 Volume total
@@ -361,7 +357,7 @@ export default function Progress() {
                 </div>
               ))}
               {logs.length > 15 && (
-                <p className="pt-2 text-center text-xs font-semibold text-ink-soft/60">
+                <p className="pt-2 text-center text-xs font-semibold text-ink-soft">
                   … et {logs.length - 15} autres séances
                 </p>
               )}

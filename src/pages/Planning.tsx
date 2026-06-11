@@ -71,7 +71,7 @@ function Row({
         <span className="block truncate text-xs font-extrabold">
           {meta.emoji} {session.name}
         </span>
-        {sublabel && <span className="block truncate text-[10px] font-bold text-ink-soft/70">↻ {sublabel}</span>}
+        {sublabel && <span className="block truncate text-[11px] font-bold text-ink-soft">↻ {sublabel}</span>}
       </button>
       {Array.from({ length: 7 }, (_, d) => {
         const solid = !inCycle && session.days.includes(d)
@@ -204,7 +204,7 @@ export default function Planning() {
             </SortableContext>
           </DndContext>
 
-          <p className="px-2 pt-4 text-center text-xs font-semibold text-ink-soft/60">
+          <p className="px-2 pt-4 text-center text-xs font-semibold text-ink-soft">
             Votre semaine type se répète automatiquement. Touchez le nom d'une séance pour la modifier.
           </p>
         </div>

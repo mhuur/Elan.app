@@ -1,6 +1,7 @@
-// Vérifie l'alternance multiple : nettoyage des jours fixes des membres,
-// cycle partagé modifiable des deux côtés, et réparation des anciennes
-// données « bidirectionnelles » corrompues (deux propriétaires concurrents).
+// Vérifie l'alternance par groupes de jours : plusieurs séances le même jour
+// (ex. Vélo + Full body) en alternance avec un autre jour (HIIT), nettoyage
+// des jours fixes des membres, cycle partagé modifiable des deux côtés, et
+// réparation des anciennes données « bidirectionnelles » corrompues.
 import { chromium } from 'playwright'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
@@ -19,6 +20,7 @@ const sessionByName = async (name) => {
   const d = await data()
   return d.sessions.find((s) => s.name.includes(name))
 }
+const stepsOf = (s) => (s.repeat?.steps ?? []).map((st) => st.ids.join(',')).join('|')
 
 try {
   await page.goto(BASE)
@@ -29,42 +31,57 @@ try {
   await page.click('[aria-label="HIIT — Cardio express — Lundi"]')
   await page.waitForSelector('[aria-label="HIIT — Cardio express — Lundi"][aria-pressed="true"]')
 
-  // --- Vélo : tous les 2 jours, en alternance avec HIIT puis Full body
-  await page.click('text=Exercices')
+  // --- Vélo : tous les 2 jours ; jour 1 = Vélo + Full body, jour 2 = HIIT
+  await page.getByRole('link', { name: 'Exercices' }).click()
   await page.waitForSelector('text=Bibliothèque')
   await page.click('p:has-text("Vélo d’appartement")')
   await page.waitForSelector('text=Planification')
   await page.getByRole('button', { name: 'Tous les X jours', exact: true }).click()
   await page.waitForSelector('text=À partir du')
-  await page.locator('select').first().selectOption({ label: '🔥 HIIT — Cardio express' })
-  await page.waitForSelector('text=Les séances tournent')
-  await page.locator('select').first().selectOption({ label: '💪 Muscu — Full body' })
+  await page.locator('select').first().selectOption({ label: '💪 Muscu — Full body' }) // même jour
   await page.waitForSelector('button:has-text("Muscu — Full body")')
+  await page.click("text=+ Ajouter un jour d'alternance")
+  await page.locator('select').last().selectOption({ label: '🔥 HIIT — Cardio express' }) // jour 2
+  await page.waitForSelector('button:has-text("HIIT — Cardio express")')
+  await page.waitForSelector('text=Les séances tournent')
+  await page.screenshot({ path: 'screenshots/24-rotation-groupes.png' })
   await page.click('text=Enregistrer')
   await page.waitForSelector('text=en alternance avec HIIT')
 
-  // --- Données : vélo propriétaire du cycle, membres nettoyés (ni repeat ni jours fixes)
+  // --- Données : vélo propriétaire de [Vélo+Full body | HIIT], membres nettoyés
   const velo = await sessionByName('appartement')
   const hiit = await sessionByName('HIIT')
   const full = await sessionByName('Full body')
-  if (!velo.repeat || velo.repeat.alternates.join() !== [hiit.id, full.id].join())
-    throw new Error('Le vélo devrait posséder le cycle [HIIT, Full body]')
-  if (hiit.repeat) throw new Error('Le HIIT ne devrait plus avoir de repeat propre')
+  const expected = `${velo.id},${full.id}|${hiit.id}`
+  if (stepsOf(velo) !== expected)
+    throw new Error(`Le vélo devrait porter la rotation [Vélo+Full body | HIIT], trouvé : ${stepsOf(velo)}`)
+  if (hiit.repeat || full.repeat) throw new Error('Les membres ne devraient plus avoir de repeat propre')
   if ((hiit.days ?? []).length)
     throw new Error('Les jours fixes du HIIT devraient être nettoyés, trouvé : ' + hiit.days.join(','))
-  if ((full.days ?? []).length || full.repeat) throw new Error('Full body devrait être nettoyé (membre du cycle)')
+  if ((full.days ?? []).length) throw new Error('Les jours fixes de Full body devraient être nettoyés')
 
-  // --- Côté membre : la fiche du HIIT montre le cycle complet et la re-sauvegarde le préserve
-  await page.click('p:has-text("HIIT — Cardio express")')
+  // --- Aujourd'hui (occurrence 0 = jour 1) : Vélo ET Full body planifiés ensemble, pas le HIIT
+  await page.getByRole('link', { name: "Aujourd'hui" }).click()
+  await page.waitForSelector('text=Séance libre')
+  await page.waitForSelector('main p:text-is("Vélo d’appartement")')
+  await page.waitForSelector('main p:text-is("Muscu — Full body")')
+  if ((await page.locator('main p:text-is("HIIT — Cardio express")').count()) > 0)
+    throw new Error("Le HIIT ne devrait pas être planifié aujourd'hui (il est au jour 2)")
+  await page.screenshot({ path: 'screenshots/25-deux-seances-meme-jour.png' })
+
+  // --- Côté membre : la fiche du Full body montre toute la rotation, la re-sauvegarde la préserve
+  await page.getByRole('link', { name: 'Exercices' }).click()
+  await page.waitForSelector('text=Bibliothèque')
+  await page.click('p:has-text("Muscu — Full body")')
   await page.waitForSelector('text=Planification')
   await page.waitForSelector('button:has-text("Vélo d’appartement")')
-  await page.waitForSelector('button:has-text("Muscu — Full body")')
+  await page.waitForSelector('button:has-text("HIIT — Cardio express")')
   await page.screenshot({ path: 'screenshots/20-alternance-bidirectionnelle.png' })
   await page.click('text=Enregistrer')
   await page.waitForSelector('text=Bibliothèque')
   const velo2 = await sessionByName('appartement')
-  if (!velo2.repeat || velo2.repeat.alternates.join() !== [hiit.id, full.id].join())
-    throw new Error('Après sauvegarde du HIIT, le cycle devrait rester [vélo ★, HIIT, Full body]')
+  if (stepsOf(velo2) !== expected)
+    throw new Error(`Après sauvegarde du Full body, la rotation devrait être intacte, trouvé : ${stepsOf(velo2)}`)
 
   // --- Réparation des anciennes données « bidirectionnelles » (deux propriétaires concurrents)
   await page.evaluate(
@@ -80,12 +97,12 @@ try {
   await page.waitForSelector('text=Bibliothèque')
   await page.getByRole('link', { name: "Aujourd'hui" }).click()
   await page.waitForSelector('text=Séance libre')
-  // À la lecture : un seul cycle canonique → seul le vélo est planifié aujourd'hui (pas de doublon HIIT)
-  await page.waitForSelector('p:has-text("Vélo d’appartement")')
-  const hiitCards = await page.locator('main p:text-is("HIIT — Cardio express")').count()
-  if (hiitCards > 0) throw new Error('Le HIIT ne devrait pas être planifié aujourd’hui (doublon du cycle corrompu)')
-  // À l'écriture : re-sauver le vélo répare les données (le repeat parasite du HIIT disparaît)
-  await page.click('text=Exercices')
+  // À la lecture : un seul cycle canonique → pas de doublon HIIT aujourd'hui
+  await page.waitForSelector('main p:text-is("Vélo d’appartement")')
+  if ((await page.locator('main p:text-is("HIIT — Cardio express")').count()) > 0)
+    throw new Error("Le HIIT ne devrait pas être planifié aujourd'hui (doublon du cycle corrompu)")
+  // À l'écriture : re-sauver le vélo répare les données (le repeat parasite disparaît)
+  await page.getByRole('link', { name: 'Exercices' }).click()
   await page.waitForSelector('text=Bibliothèque')
   await page.click('p:has-text("Vélo d’appartement")')
   await page.waitForSelector('text=Planification')
@@ -94,7 +111,7 @@ try {
   const hiit3 = await sessionByName('HIIT')
   if (hiit3.repeat) throw new Error('La re-sauvegarde du vélo devrait retirer le repeat parasite du HIIT')
 
-  console.log('ALTERNANCE OK — cycle partagé, jours fixes nettoyés, données corrompues réparées')
+  console.log('ALTERNANCE OK — groupes même jour, rotation partagée, jours fixes nettoyés, données réparées')
   if (errors.length) {
     console.error('ERREURS :')
     for (const e of errors) console.error(' -', e)

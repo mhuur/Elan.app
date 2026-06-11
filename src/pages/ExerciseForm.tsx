@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useData } from '../data/DataContext'
 import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, subtypesOf, type Category, type Measure } from '../types'
 import { youtubeSearch } from '../lib/format'
-import { Chip, Field, GhostButton, PrimaryButton, Seg, TextArea, TextInput } from '../components/ui'
+import { Chip, Field, GhostButton, PageHeader, PrimaryButton, Seg, TextArea, TextInput } from '../components/ui'
 
 export default function ExerciseForm() {
   const { id } = useParams()
@@ -70,14 +70,7 @@ export default function ExerciseForm() {
 
   return (
     <div>
-      <header className="flex items-center gap-3 px-5 pt-8 pb-4">
-        <button type="button" aria-label="Retour" onClick={() => navigate(-1)} className="rounded-full bg-surface p-2.5 shadow-sm">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-        </button>
-        <h1 className="text-xl font-extrabold">{existing ? "Modifier l'exercice" : 'Nouvel exercice'}</h1>
-      </header>
+      <PageHeader title={existing ? "Modifier l'exercice" : 'Nouvel exercice'} onBack={() => navigate(-1)} />
 
       <div className="space-y-4 px-5">
         <Field label="Nom">

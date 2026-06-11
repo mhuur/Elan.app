@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Exercise, type GoalLevel, type ObjectiveLevel, type Session } from '../types'
 import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
-import { EmptyState, Fab, Field, NumInput, PageHeader, PrimaryButton, Seg, Sheet } from '../components/ui'
+import { EmptyState, Fab, Field, NumInput, PageHeader, PrimaryButton, Seg, Select, Sheet } from '../components/ui'
 
 const inputSm =
   'w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
@@ -186,7 +186,7 @@ export default function Goals() {
             <div key={e.id} className="rounded-3xl bg-surface p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-extrabold">💪 {e.name}</p>
+                  <p className="truncate text-base font-extrabold">💪 {e.name}</p>
                   <p className="text-xs font-semibold text-ink-soft">
                     {goal.metric === 'best' ? 'Meilleure série' : 'Volume sur une séance'} ·{' '}
                     {levels.length > 1 ? `${levels.length} paliers` : `objectif ${levels[0].value} ${unit}`}
@@ -248,7 +248,7 @@ export default function Goals() {
             <div key={s.id} className="rounded-3xl bg-surface p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-extrabold">
+                  <p className="truncate text-base font-extrabold">
                     {CATEGORY_META[s.category].emoji} {s.name}
                   </p>
                   <p className="text-[11px] font-semibold text-ink-soft">
@@ -325,37 +325,32 @@ export default function Goals() {
       <Sheet open={addOpen} onClose={() => setAddOpen(false)} title={editing ? '🎯 Modifier l’objectif' : '🎯 Nouvel objectif'}>
         <div className="space-y-4">
           <Field label="Séance">
-            <select
+            <Select
               value={selSession?.id ?? ''}
-              onChange={(e) => {
-                setSelSessionId(e.target.value)
+              onChange={(v) => {
+                setSelSessionId(v)
                 setSelExId('')
                 resetDrafts()
               }}
-              className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
             >
               {sessions.map((s) => (
                 <option key={s.id} value={s.id}>
                   {CATEGORY_META[s.category].emoji} {s.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
 
           {isMuscuTarget && (
             <>
               <Field label="Exercice de la séance">
-                <select
-                  value={selEx?.id ?? ''}
-                  onChange={(e) => setSelExId(e.target.value)}
-                  className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
-                >
+                <Select value={selEx?.id ?? ''} onChange={setSelExId}>
                   {sessionExercises.map((e) => (
                     <option key={e.id} value={e.id}>
                       {e.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </Field>
               <Field label="Type d'objectif">
                 <Seg
@@ -372,7 +367,7 @@ export default function Goals() {
                   {exDrafts.map((d, i) => (
                     <div key={i} className="space-y-2 rounded-2xl bg-sage-50 p-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">
+                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
                           Palier {i + 1}
                         </p>
                         {exDrafts.length > 1 && (
@@ -421,7 +416,7 @@ export default function Goals() {
                   return (
                     <div key={i} className="space-y-2 rounded-2xl bg-sage-50 p-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">
+                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
                           Palier {i + 1}
                         </p>
                         {sessDrafts.length > 1 && (

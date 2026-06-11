@@ -70,7 +70,7 @@ export default function Library() {
                 <h2 className={`mb-2 text-[11px] font-extrabold uppercase tracking-wider ${meta.text}`}>
                   {meta.emoji} {meta.label}
                 </h2>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {list.map((s) => (
                     <button
                       key={s.id}
@@ -79,10 +79,10 @@ export default function Library() {
                       className="flex w-full items-center gap-3 rounded-3xl bg-surface p-4 text-left shadow-sm active:scale-[0.985]"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-extrabold">{s.name}</p>
+                        <p className="truncate text-base font-extrabold">{s.name}</p>
                         <p className="truncate text-xs font-semibold text-ink-soft">{summarizeSession(s)}</p>
                       </div>
-                      <span className="max-w-36 shrink-0 truncate rounded-full bg-sage-50 px-2.5 py-1 text-[10px] font-extrabold text-sage-600">
+                      <span className="max-w-36 shrink-0 truncate rounded-full bg-sage-50 px-2.5 py-1 text-[11px] font-extrabold text-sage-600">
                         {describeSchedule(s, sessions)}
                       </span>
                     </button>
@@ -126,7 +126,7 @@ export default function Library() {
                     <div key={subtype || '—'}>
                       {subtype && (
                         <div className="mb-1 flex items-center justify-between px-1">
-                          <p className="text-[10px] font-extrabold uppercase tracking-wider text-ink-soft/70">
+                          <p className="text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
                             {subtype}
                           </p>
                           <button
@@ -152,7 +152,7 @@ export default function Library() {
                           >
                             <span className="min-w-0 flex-1 truncate text-sm font-bold">{e.name}</span>
                             {e.measure === 'sec' && (
-                              <span className="shrink-0 rounded-full bg-sand px-2 py-0.5 text-[10px] font-extrabold text-ink-soft">
+                              <span className="shrink-0 rounded-full bg-sand px-2 py-0.5 text-[11px] font-extrabold text-ink-soft">
                                 secondes
                               </span>
                             )}

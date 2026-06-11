@@ -326,7 +326,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
           if (group.length === 1) return <div key={gi}>{renderItem(group[0], true)}</div>
           return (
             <div key={gi} className="rounded-3xl border-2 border-muscu/30 p-1.5">
-              <p className="px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-muscu">
+              <p className="px-2 py-1 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
                 🔗 Superset — enchaîner sans repos
               </p>
               <div className="space-y-1.5">{group.map((it) => renderItem(it, false))}</div>

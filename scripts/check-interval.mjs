@@ -25,7 +25,9 @@ try {
   await page.waitForSelector('text=Planification')
   await page.getByRole('button', { name: 'Tous les X jours', exact: true }).click()
   await page.waitForSelector('text=À partir du')
-  await page.selectOption('select', { label: '🔥 HIIT — Cardio express' })
+  // Le HIIT sur un nouveau jour de la rotation (jour 2)
+  await page.click("text=+ Ajouter un jour d'alternance")
+  await page.locator('select').last().selectOption({ label: '🔥 HIIT — Cardio express' })
   await page.waitForSelector('text=Les séances tournent') // chip ajoutée
   await page.click('text=Enregistrer')
 

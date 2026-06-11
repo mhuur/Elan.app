@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-export function PageHeader({ kicker, title, right }: { kicker?: string; title: string; right?: ReactNode }) {
+export function PageHeader({ kicker, title, right, onBack }: { kicker?: string; title: string; right?: ReactNode; onBack?: () => void }) {
   return (
-    <header className="flex items-end justify-between px-5 pt-8 pb-4">
-      <div>
-        {kicker && <p className="text-xs font-bold uppercase tracking-widest text-sage-500">{kicker}</p>}
-        <h1 className="mt-1 text-2xl font-extrabold text-ink first-letter:uppercase">{title}</h1>
+    <header className={'flex justify-between px-5 pt-8 pb-4 ' + (onBack ? 'items-center' : 'items-end')}>
+      <div className={onBack ? 'flex items-center gap-3' : ''}>
+        {onBack && (
+          <button type="button" aria-label="Retour" onClick={onBack} className="rounded-full bg-surface p-2.5 shadow-sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+        )}
+        <div>
+          {kicker && <p className="text-[11px] font-extrabold uppercase tracking-widest text-sage-500">{kicker}</p>}
+          <h1 className={(kicker ? 'mt-1 ' : '') + (onBack ? 'text-xl' : 'text-2xl') + ' font-extrabold text-ink first-letter:uppercase'}>
+            {title}
+          </h1>
+        </div>
       </div>
       {right}
     </header>
@@ -29,9 +40,35 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-bold text-ink-soft">{label}</span>
+      <span className="mb-1.5 block text-sm font-semibold text-ink-soft">{label}</span>
       {children}
     </label>
+  )
+}
+
+/** Liste déroulante au style commun de l'app */
+export function Select({
+  value,
+  onChange,
+  children,
+  className,
+}: {
+  value: string
+  onChange: (v: string) => void
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={
+        'rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400 ' +
+        (className ?? 'w-full')
+      }
+    >
+      {children}
+    </select>
   )
 }
 
