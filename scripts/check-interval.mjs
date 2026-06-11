@@ -28,7 +28,7 @@ try {
   // Le HIIT sur un nouveau jour de la rotation (jour 2)
   await page.click("text=+ Ajouter un jour d'alternance")
   await page.locator('select').last().selectOption({ label: '🔥 HIIT — Cardio express' })
-  await page.waitForSelector('text=Les séances tournent') // chip ajoutée
+  await page.waitForSelector('text=on recommence') // résumé de rotation affiché
   await page.click('text=Enregistrer')
 
   // La carte de la séance décrit l'alternance
@@ -37,7 +37,7 @@ try {
   // Bidirectionnel : la fiche du HIIT montre la même planification (chip Vélo)
   await page.click('p:has-text("HIIT — Cardio express")') // titre de la carte HIIT (pas le badge du vélo)
   await page.waitForSelector('text=Planification')
-  await page.waitForSelector('text=Les séances tournent')
+  await page.waitForSelector('text=on recommence')
   await page.waitForSelector('button:has-text("Vélo d’appartement")')
   await page.screenshot({ path: 'screenshots/20-alternance-bidirectionnelle.png' })
   await page.click('[aria-label="Retour"]')

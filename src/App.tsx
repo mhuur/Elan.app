@@ -29,10 +29,12 @@ function Shell() {
   if (!dataReady) return <Splash />
 
   const fullScreen = location.pathname.startsWith('/player')
+  // Écrans d'édition : pas de barre d'onglets, une barre d'action fixe les remplace
+  const formScreen = location.pathname.startsWith('/session/') || location.pathname.startsWith('/exercise/')
 
   return (
     <>
-      <main className={'mx-auto w-full max-w-lg ' + (fullScreen ? '' : 'min-h-dvh pb-28')}>
+      <main className={'mx-auto w-full max-w-lg ' + (fullScreen ? '' : formScreen ? 'min-h-dvh pb-24' : 'min-h-dvh pb-28')}>
         <Routes>
           <Route path="/" element={<Today />} />
           <Route path="/planning" element={<Planning />} />
@@ -47,7 +49,7 @@ function Shell() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      {!fullScreen && <BottomNav />}
+      {!fullScreen && !formScreen && <BottomNav />}
     </>
   )
 }

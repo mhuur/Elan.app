@@ -39,36 +39,147 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-semibold text-ink-soft">{label}</span>
+    <div>
+      <p className="mb-1.5 text-sm font-semibold text-ink-soft">{label}</p>
       {children}
-    </label>
+    </div>
   )
 }
 
-/** Liste déroulante au style commun de l'app */
+/** Liste déroulante au style commun de l'app (`bare` = sans cadre, pour les listes compactes) */
 export function Select({
   value,
   onChange,
   children,
   className,
+  bare,
 }: {
   value: string
   onChange: (v: string) => void
   children: ReactNode
   className?: string
+  bare?: boolean
 }) {
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={
-        'rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400 ' +
+        (bare
+          ? 'bg-transparent py-1 text-[15px] font-extrabold text-ink outline-none '
+          : 'rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400 ') +
         (className ?? 'w-full')
       }
     >
       {children}
     </select>
+  )
+}
+
+const normTxt = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+
+/**
+ * Champ texte avec suggestions filtrées au fil de la saisie (remplace les murs de chips).
+ * `onCreate` ajoute une entrée « + Créer “texte” » quand rien ne correspond exactement.
+ */
+export function Combobox({
+  value,
+  onChange,
+  options,
+  onSelect,
+  onCreate,
+  placeholder,
+  small,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: { id: string; label: string; hint?: string }[]
+  onSelect: (id: string) => void
+  onCreate?: (text: string) => void
+  placeholder?: string
+  small?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const q = normTxt(value.trim())
+  const filtered = q ? options.filter((o) => normTxt(o.label).includes(q)) : options
+  const hasExact = options.some((o) => normTxt(o.label) === q)
+  const canCreate = !!onCreate && q.length > 0 && !hasExact
+  const showPanel = open && (filtered.length > 0 || canCreate)
+
+  const pick = (id: string) => {
+    onSelect(id)
+    setOpen(false)
+  }
+  const create = () => {
+    onCreate?.(value.trim())
+    setOpen(false)
+  }
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          onChange(e.target.value)
+          setOpen(true)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            const m = filtered.find((o) => normTxt(o.label) === q) ?? (filtered.length === 1 ? filtered[0] : undefined)
+            if (m) pick(m.id)
+            else if (canCreate) create()
+            else setOpen(false)
+          }
+          if (e.key === 'Escape') setOpen(false)
+        }}
+        className={
+          small
+            ? 'w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/60 focus:border-sage-400'
+            : inputCls
+        }
+      />
+      {showPanel && (
+        <>
+          <div
+            className="fixed inset-0 z-50"
+            onClick={(e) => {
+              e.preventDefault()
+              setOpen(false)
+            }}
+          />
+          <div className="absolute inset-x-0 top-full z-50 mt-1.5 max-h-56 overflow-y-auto rounded-2xl border border-sand bg-surface py-1 shadow-xl">
+            {filtered.slice(0, 30).map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => pick(o.id)}
+                className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left active:bg-sage-50"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm font-bold">{o.label}</span>
+                {o.hint && <span className="shrink-0 text-[11px] font-semibold text-ink-soft">{o.hint}</span>}
+              </button>
+            ))}
+            {canCreate && (
+              <button
+                type="button"
+                onClick={create}
+                className="w-full px-4 py-2.5 text-left text-sm font-extrabold text-sage-600 active:bg-sage-50"
+              >
+                + Créer « {value.trim()} »
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -223,6 +334,46 @@ export function Fab({ onClick, label }: { onClick: () => void; label: string }) 
     >
       {label}
     </button>
+  )
+}
+
+/** Barre d'action fixée en bas des formulaires : Enregistrer + actions secondaires en icônes */
+export function FormActions({
+  onSave,
+  saveDisabled,
+  onDuplicate,
+  onDelete,
+}: {
+  onSave: () => void
+  saveDisabled?: boolean
+  onDuplicate?: () => void
+  onDelete?: () => void
+}) {
+  const iconBtn =
+    'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-surface text-lg shadow-sm active:bg-sage-100'
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-sand bg-cream/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+      <div className="mx-auto flex max-w-lg items-center gap-2 px-5 py-2.5">
+        {onDelete && (
+          <button type="button" aria-label="Supprimer" title="Supprimer" onClick={onDelete} className={iconBtn}>
+            🗑️
+          </button>
+        )}
+        {onDuplicate && (
+          <button type="button" aria-label="Dupliquer" title="Dupliquer" onClick={onDuplicate} className={iconBtn}>
+            📋
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saveDisabled}
+          className="h-12 flex-1 rounded-2xl bg-sage-500 text-base font-extrabold text-white shadow-md shadow-sage-500/25 active:bg-sage-600 disabled:opacity-40"
+        >
+          Enregistrer
+        </button>
+      </div>
+    </div>
   )
 }
 

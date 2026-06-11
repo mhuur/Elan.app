@@ -92,12 +92,12 @@ try {
   await page.waitForSelector('[aria-label="HIIT — Cardio express — Lundi"][aria-pressed="true"]')
   await shot('08-planning')
 
-  // --- Bibliothèque : séances, formulaire de séance (mesures + liens)
+  // --- Bibliothèque : séances, formulaire de séance épuré
   await page.click('text=Exercices')
   await page.waitForSelector('text=Bibliothèque')
   await shot('09-bibliotheque-seances')
   await page.click('text=appartement')
-  await page.waitForSelector('text=Mesures à saisir')
+  await page.waitForSelector('text=Planification')
   await shot('10-seance-form')
   await page.click('[aria-label="Retour"]')
 

@@ -8,7 +8,7 @@ App PWA mobile-first de suivi sportif (running, vélo d'appartement, muscu, HIIT
 - `npm run dev:demo` — serveur en mode local forcé (port 5174, `.env.demo` vide les clés Firebase)
 - `npm run build` — tsc + vite build vers `dist/`
 - `node scripts/smoke.mjs` — test de fumée Playwright (lancer `dev:demo` avant), captures dans `screenshots/`
-- `node scripts/check-alternance.mjs` / `check-interval.mjs` / `check-v4.mjs` / `check-blocs.mjs` — vérifs Playwright ciblées (alternance, intervalle, objectifs à paliers, blocs muscu), aussi sur `dev:demo`
+- `node scripts/check-alternance.mjs` / `check-interval.mjs` / `check-v4.mjs` / `check-blocs.mjs` / `check-form-ui.mjs` — vérifs Playwright ciblées (alternance, intervalle, objectifs à paliers, blocs muscu, formulaires épurés), aussi sur `dev:demo`
 - `node scripts/check-cloud.mjs` — vérifie l'écran de connexion Google sur 5173
 - `node scripts/make-icons.mjs` — régénère les PNG PWA depuis `public/icon.svg`
 
@@ -33,6 +33,7 @@ Ne jamais lancer d'installation nécessitant une élévation UAC (winget MSI, et
 - Sémantique par sport : running = simple coche ; vélo = formulaire perfs (préremplies depuis le dernier log, programme prévu affiché à l'avance via `MetricDef.target`) ; muscu = séries×reps (exercices `measure: 'sec'` pour le gainage) ; HIIT/étirements/muscu = minuteur guidé `src/pages/Player.tsx` (WebAudio + vibration + wake lock, log auto en fin ; en muscu les séries en reps s'avancent avec « Série faite ✓ », le gainage et les repos sont chronométrés). Le bouton de complétion s'appelle « Valider la séance ✓ » (+ « Fermer sans valider »).
 - **Blocs muscu** (`src/lib/blocks.ts`) : une séance se découpe en blocs d'exercices répétés indépendamment (`SessionItem.blockBreak` démarre un bloc, `blockRounds` = ses tours, posés sur le 1er exercice du bloc). Sans découpage, un seul bloc avec l'ancien `Session.rounds`. Utilisé par CompleteSheet (multiplication des séries) et le Player.
 - Planning : sections personnalisées via `Session.group` (champ « Section du planning » de la fiche, drag & drop entre sections) ; ronds de la semaine = anneau « prévu » / plein « fait » ; **toucher un rond valide/dévalide la séance ce jour-là (crée/supprime un log)** — la grille ne modifie jamais la planification, qui s'édite dans la fiche.
+- **Formulaires épurés** (demande utilisateur, juin 2026) : les fiches séance/exercice n'affichent plus de murs de chips — catégorie en `Select`, section du planning et sous-types via `Combobox` (`src/components/ui.tsx` : saisie → filtre → « + Créer » en fin de liste si aucune correspondance exacte ; panneau en z-50 au-dessus de la barre d'action). Les exercices d'une séance s'ajoutent/créent par la même combobox ; chaque item = carte blanche compacte avec saisie directe `MiniNum` (séries × cible + bascule reps/sec + repos). Le formulaire de séance n'édite plus `metrics`/`links`/`notes` : ils sont **préservés tels quels** à la sauvegarde (le vélo retombe sur `DEFAULT_VELO_METRICS` via `effectiveMetrics`) et toujours affichés dans CompleteSheet s'ils existent. Boutons Enregistrer/Dupliquer/Supprimer regroupés dans `FormActions` (barre fixe en bas) ; la BottomNav est masquée sur `/session/*` et `/exercise/*` (`formScreen` dans App.tsx).
 - Tailwind v4 : thème en CSS-first dans `src/index.css` (`@theme`), pas de tailwind.config.
 
 ## Pièges connus
