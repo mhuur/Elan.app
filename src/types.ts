@@ -1,6 +1,15 @@
 export type Category = 'running' | 'velo' | 'muscu' | 'hiit' | 'etirements'
 export type Measure = 'reps' | 'sec'
-export type ColName = 'exercises' | 'sessions' | 'logs'
+export type ColName = 'exercises' | 'sessions' | 'logs' | 'ideas'
+
+/** Note libre « bug ou idée d'amélioration » saisie depuis les Réglages */
+export interface Idea {
+  id: string
+  text: string
+  /** Traitée / réglée */
+  done?: boolean
+  createdAt: number
+}
 
 /** Palier d'objectif : valeur à atteindre et récompense promise (ex. lunettes de soleil 😎) */
 export interface GoalLevel {
@@ -122,6 +131,8 @@ export interface MetricDef {
   key: string
   label: string
   unit: string
+  /** Programme prévu, affiché à l'avance (ex. Durée 45 min, Force 10) */
+  target?: number
 }
 
 /** Lien utile attaché à une séance (YouTube ou autre) */
@@ -159,6 +170,8 @@ export interface Session {
   links?: LinkDef[]
   /** Ordre d'affichage dans le planning et la journée */
   sortOrder?: number
+  /** Section du planning (regroupement libre : Matinale, Cardio…) */
+  group?: string
   /** Objectif à atteindre sur une mesure (null = aucun) */
   objective?: SessionObjective | null
   /** Vélo (hérité) : puissance cible en watts */

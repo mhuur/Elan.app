@@ -41,7 +41,7 @@ try {
   await nums.nth(2).fill('12.5') // distance km
   await nums.nth(4).fill('128') // bpm
   await shot('03-sheet-velo')
-  await page.click('text=Enregistrer ✓')
+  await page.click('text=Valider la séance ✓')
   await page.waitForSelector('text=12.5 km')
 
   // --- Séance libre : muscu (steppers préremplis + commentaire d'exercice)
@@ -50,7 +50,7 @@ try {
   await page.waitForSelector('text=Série 1')
   await page.waitForSelector('text=Dos bien droit')
   await shot('04-sheet-muscu')
-  await page.click('text=Enregistrer ✓')
+  await page.click('text=Valider la séance ✓')
   await page.waitForSelector('text=5 exercices · 15 séries')
   await shot('05-aujourdhui-complet')
 

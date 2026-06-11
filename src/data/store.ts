@@ -28,7 +28,7 @@ export interface Store {
   importAll(data: Partial<StoreData>): Promise<void>
 }
 
-const COLS: ColName[] = ['exercises', 'sessions', 'logs']
+const COLS: ColName[] = ['exercises', 'sessions', 'logs', 'ideas']
 
 /** Firestore refuse `undefined` : on nettoie récursivement */
 function clean<T>(value: T): T {
@@ -48,7 +48,7 @@ function clean<T>(value: T): T {
 const LOCAL_KEY = 'elan-data-v1'
 
 function emptyData(): StoreData {
-  return { exercises: [], sessions: [], logs: [] }
+  return { exercises: [], sessions: [], logs: [], ideas: [] }
 }
 
 export class LocalStore implements Store {
@@ -58,6 +58,7 @@ export class LocalStore implements Store {
     exercises: new Set(),
     sessions: new Set(),
     logs: new Set(),
+    ideas: new Set(),
   }
 
   constructor() {
@@ -145,9 +146,17 @@ export class FirestoreStore implements Store {
   }
 
   subscribe(col: ColName, cb: (docs: StoreDoc[]) => void): () => void {
-    return onSnapshot(this.colRef(col), (snap) => {
-      cb(snap.docs.map((d) => ({ ...(d.data() as Record<string, unknown>), id: d.id })))
-    })
+    return onSnapshot(
+      this.colRef(col),
+      (snap) => {
+        cb(snap.docs.map((d) => ({ ...(d.data() as Record<string, unknown>), id: d.id })))
+      },
+      () => {
+        // Règles Firestore restrictives sur une collection ajoutée après coup :
+        // on dégrade en liste vide plutôt que de bloquer le chargement.
+        cb([])
+      },
+    )
   }
 
   async add(col: ColName, data: Record<string, unknown>): Promise<string> {
@@ -166,8 +175,12 @@ export class FirestoreStore implements Store {
   async exportAll(): Promise<StoreData> {
     const out = emptyData()
     for (const col of COLS) {
-      const snap = await getDocs(this.colRef(col))
-      out[col] = snap.docs.map((d) => ({ ...(d.data() as Record<string, unknown>), id: d.id }))
+      try {
+        const snap = await getDocs(this.colRef(col))
+        out[col] = snap.docs.map((d) => ({ ...(d.data() as Record<string, unknown>), id: d.id }))
+      } catch {
+        // collection inaccessible (règles) : on l'omet de l'export
+      }
     }
     return out
   }

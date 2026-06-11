@@ -69,7 +69,7 @@ try {
   await page.click('text=Séance libre')
   await page.click('text=Full body')
   await page.waitForSelector('text=Superset — enchaîner sans repos')
-  await page.click('text=Enregistrer ✓')
+  await page.click('text=Valider la séance ✓')
   await page.waitForSelector('text=Récompense débloquée : Glace')
   await page.screenshot({ path: 'screenshots/17-celebration.png' })
   await page.click('text=Continuer')
@@ -100,7 +100,7 @@ try {
   const veloNums = page.locator('input[type="number"]')
   await veloNums.nth(1).fill('30') // durée
   await veloNums.nth(4).fill('128') // bpm
-  await page.click('text=Enregistrer ✓')
+  await page.click('text=Valider la séance ✓')
   await page.waitForSelector('text=Objectif atteint')
   await page.click('text=Continuer')
   await page.click('text=Objectifs')

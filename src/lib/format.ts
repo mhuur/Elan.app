@@ -59,6 +59,9 @@ export function summarizeSession(s: Session): string {
       return s.notes || 'À cocher une fois la sortie faite'
     case 'velo': {
       const m = effectiveMetrics(s)
+      // Programme prévu affiché à l'avance (ex. « Durée 45 min · Force 10 »)
+      const prog = m.filter((x) => x.target != null)
+      if (prog.length) return prog.map((x) => `${x.label} ${x.target}${x.unit ? ' ' + x.unit : ''}`).join(' · ')
       if (!m.length) return 'Saisie des perfs à la fin'
       return m.slice(0, 3).map((x) => x.label).join(' · ') + (m.length > 3 ? '…' : '')
     }

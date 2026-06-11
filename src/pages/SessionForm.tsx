@@ -68,7 +68,13 @@ export default function SessionForm() {
   const [stretchRest, setStretchRest] = useState(existing?.category === 'etirements' ? (existing.restSec ?? 0) : 5)
   const [muscuRounds, setMuscuRounds] = useState(existing?.category === 'muscu' ? (existing.rounds ?? 1) : 1)
   const [notes, setNotes] = useState(existing?.notes ?? '')
+  const [group, setGroup] = useState(existing?.group ?? '')
   const [quickName, setQuickName] = useState('')
+
+  // Sections déjà utilisées dans le planning, proposées en raccourci
+  const groupSuggestions = [...new Set(sessions.map((s) => (s.group ?? '').trim()).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, 'fr'),
+  )
 
   // --- Édition de la rotation
   const usedIds = new Set(steps.flat())
@@ -226,7 +232,12 @@ export default function SessionForm() {
   const save = async () => {
     const cleanMetrics = metrics
       .filter((m) => m.label.trim())
-      .map((m) => ({ key: m.key, label: m.label.trim(), unit: m.unit.trim() }))
+      .map((m) => ({
+        key: m.key,
+        label: m.label.trim(),
+        unit: m.unit.trim(),
+        ...(m.target != null ? { target: m.target } : {}),
+      }))
     const cleanLinks = links
       .filter((l) => l.url.trim())
       .map((l) => ({ label: l.label.trim() || 'Lien', url: l.url.trim() }))
@@ -241,6 +252,7 @@ export default function SessionForm() {
       metrics: cleanMetrics,
       links: cleanLinks,
       notes: notes.trim(),
+      group: group.trim(),
       sortOrder: existing?.sortOrder ?? maxOrder + 1,
       createdAt: existing?.createdAt ?? Date.now(),
       ...(category === 'hiit' ? { workSec, restSec, rounds } : {}),
@@ -297,6 +309,27 @@ export default function SessionForm() {
               </Chip>
             ))}
           </div>
+        </Field>
+
+        <Field label="Section du planning (optionnel)">
+          <TextInput value={group} onChange={setGroup} placeholder="Ex. Matinale, Cardio, Renfo…" />
+          {groupSuggestions.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {groupSuggestions.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGroup(group.trim() === g ? '' : g)}
+                  className={
+                    'rounded-full px-3 py-1.5 text-xs font-bold transition-colors ' +
+                    (group.trim() === g ? 'bg-sage-500 text-white shadow-sm' : 'bg-sage-100 text-sage-700')
+                  }
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          )}
         </Field>
 
         <Field label="Planification">
@@ -653,7 +686,17 @@ export default function SessionForm() {
                   value={m.unit}
                   onChange={(e) => setMetric(idx, { unit: e.target.value })}
                   placeholder="unité"
-                  className={smallInput + ' w-24'}
+                  className={smallInput + ' w-16'}
+                />
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  value={m.target ?? ''}
+                  onChange={(e) => setMetric(idx, { target: e.target.value === '' ? undefined : Number(e.target.value) })}
+                  placeholder="prévu"
+                  title="Programme prévu, affiché avant la séance"
+                  className={smallInput + ' w-18'}
                 />
                 <button type="button" aria-label="Retirer la mesure" onClick={() => setMetrics((p) => p.filter((_, i) => i !== idx))} className="px-1 text-ink-soft/60">
                   ✕
@@ -667,9 +710,14 @@ export default function SessionForm() {
             >
               + Ajouter une mesure
             </button>
-            {metrics.length === 0 && (
+            {metrics.length === 0 ? (
               <p className="text-xs font-semibold text-ink-soft">
                 Optionnel — ex. durée, calories, niveau de résistance… Saisies à chaque séance et suivies dans Progrès.
+              </p>
+            ) : (
+              <p className="text-xs font-semibold text-ink-soft">
+                « prévu » = programme affiché à l'avance (ex. Durée 45, Force 10) ; vous saisissez vos perfs réelles à
+                la fin de la séance.
               </p>
             )}
           </div>

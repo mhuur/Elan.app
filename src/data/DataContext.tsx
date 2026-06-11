@@ -17,7 +17,7 @@ import {
   type User,
 } from 'firebase/auth'
 import { auth, db, firebaseEnabled } from '../firebase'
-import type { Exercise, Log, Session } from '../types'
+import type { Exercise, Idea, Log, Session } from '../types'
 import { FirestoreStore, LocalStore, type Store, type StoreData } from './store'
 import { runSeed, SUBTYPE_BY_NAME } from './seed'
 
@@ -29,6 +29,7 @@ interface DataCtx {
   exercises: Exercise[]
   sessions: Session[]
   logs: Log[]
+  ideas: Idea[]
   addExercise(e: Omit<Exercise, 'id'>): Promise<string>
   updateExercise(id: string, patch: Partial<Exercise>): Promise<void>
   removeExercise(id: string): Promise<void>
@@ -37,6 +38,9 @@ interface DataCtx {
   removeSession(id: string): Promise<void>
   addLog(l: Omit<Log, 'id'>): Promise<string>
   removeLog(id: string): Promise<void>
+  addIdea(i: Omit<Idea, 'id'>): Promise<string>
+  updateIdea(id: string, patch: Partial<Idea>): Promise<void>
+  removeIdea(id: string): Promise<void>
   signIn(): Promise<void>
   signOut(): Promise<void>
   exportAll(): Promise<StoreData>
@@ -60,6 +64,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
   const [logs, setLogs] = useState<Log[]>([])
+  const [ideas, setIdeas] = useState<Idea[]>([])
   const [dataReady, setDataReady] = useState(false)
   const seedCheckedRef = useRef(false)
   const migCheckedRef = useRef(false)
@@ -114,10 +119,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
       flags.logs = true
       checkReady()
     })
+    // Les idées ne conditionnent pas dataReady (collection ajoutée après coup)
+    const u4 = store.subscribe('ideas', (d) => {
+      setIdeas((d as unknown as Idea[]).slice().sort((a, b) => b.createdAt - a.createdAt))
+    })
     return () => {
       u1()
       u2()
       u3()
+      u4()
       setDataReady(false)
     }
   }, [store])
@@ -161,6 +171,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       exercises,
       sessions,
       logs,
+      ideas,
       addExercise: (e) => need().add('exercises', e as unknown as Record<string, unknown>),
       updateExercise: (id, patch) => need().update('exercises', id, patch as Record<string, unknown>),
       removeExercise: async (id) => {
@@ -182,6 +193,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       removeSession: (id) => need().remove('sessions', id),
       addLog: (l) => need().add('logs', l as unknown as Record<string, unknown>),
       removeLog: (id) => need().remove('logs', id),
+      addIdea: (i) => need().add('ideas', i as unknown as Record<string, unknown>),
+      updateIdea: (id, patch) => need().update('ideas', id, patch as Record<string, unknown>),
+      removeIdea: (id) => need().remove('ideas', id),
       signIn: async () => {
         if (!auth) return
         const provider = new GoogleAuthProvider()
@@ -202,7 +216,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       exportAll: () => need().exportAll(),
       importAll: (data) => need().importAll(data),
     }),
-    [mode, user, authReady, dataReady, exercises, sessions, logs, need],
+    [mode, user, authReady, dataReady, exercises, sessions, logs, ideas, need],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

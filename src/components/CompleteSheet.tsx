@@ -8,8 +8,8 @@ import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { tone } from '../lib/audio'
 import { Field, GhostButton, NumInput, PrimaryButton, Sheet, Stepper, TextArea } from './ui'
 
-/** Compte à rebours de repos entre les séries, avec bip à la fin */
-function RestTimer({ sec }: { sec: number }) {
+/** Compte à rebours (repos entre séries, ou effort pour le gainage), avec bip à la fin */
+function CountdownButton({ sec, label, color = 'velo' }: { sec: number; label: string; color?: 'velo' | 'muscu' }) {
   const [left, setLeft] = useState<number | null>(null)
   const audioRef = useRef<AudioContext | null>(null)
   const endAtRef = useRef(0)
@@ -42,15 +42,17 @@ function RestTimer({ sec }: { sec: number }) {
     setLeft(sec)
   }
 
+  const idle = color === 'muscu' ? 'bg-muscu/10 text-muscu' : 'bg-velo/10 text-velo'
+  const run = color === 'muscu' ? 'bg-muscu' : 'bg-velo'
   return left == null ? (
-    <button type="button" onClick={start} className="rounded-full bg-velo/10 px-3 py-1.5 text-xs font-extrabold text-velo">
-      ⏱ Repos {sec} s
+    <button type="button" onClick={start} className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${idle}`}>
+      {label}
     </button>
   ) : (
     <button
       type="button"
       onClick={() => setLeft(null)}
-      className="rounded-full bg-velo px-3 py-1.5 text-xs font-extrabold tabular-nums text-white"
+      className={`rounded-full px-3 py-1.5 text-xs font-extrabold tabular-nums text-white ${run}`}
     >
       {mmss(left)} · stop
     </button>
@@ -243,9 +245,18 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
     )
   }
 
+  const program = metrics.filter((m) => m.target != null)
+
   return (
     <div className="space-y-4">
       {session.notes && <p className="text-sm font-semibold text-ink-soft">{session.notes}</p>}
+
+      {program.length > 0 && (
+        <p className="rounded-2xl bg-sage-50 px-4 py-2.5 text-sm font-bold">
+          📋 Programme :{' '}
+          {program.map((m) => `${m.label} ${m.target}${m.unit ? ' ' + m.unit : ''}`).join(' · ')}
+        </p>
+      )}
 
       {links.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -300,8 +311,11 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
                 {it.comment && <p className="mt-0.5 text-xs font-semibold text-ink-soft">💡 {it.comment}</p>}
                 <div className="mt-2 space-y-1.5">
                   {(values[it.exerciseId] ?? []).map((rep, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-ink-soft">Série {i + 1}</span>
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <span className="shrink-0 text-xs font-bold text-ink-soft">Série {i + 1}</span>
+                      {ex?.measure === 'sec' && (
+                        <CountdownButton sec={rep} label={`▶ chrono ${rep} s`} color="muscu" />
+                      )}
                       <Stepper value={rep} onChange={(v) => setRep(it.exerciseId, i, v)} suffix={suffix} step={ex?.measure === 'sec' ? 5 : 1} />
                     </div>
                   ))}
@@ -317,7 +331,9 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
                       </button>
                     )}
                   </div>
-                  {showRest && (it.restSec ?? 60) > 0 && <RestTimer sec={it.restSec ?? 60} />}
+                  {showRest && (it.restSec ?? 60) > 0 && (
+                    <CountdownButton sec={it.restSec ?? 60} label={`⏱ Repos ${it.restSec ?? 60} s`} />
+                  )}
                 </div>
               </div>
             )
@@ -333,7 +349,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
               {(group[0].restSec ?? 60) > 0 && (
                 <div className="flex items-center justify-between px-2 py-2">
                   <span className="text-xs font-bold text-ink-soft">Repos après le superset</span>
-                  <RestTimer sec={group[0].restSec ?? 60} />
+                  <CountdownButton sec={group[0].restSec ?? 60} label={`⏱ Repos ${group[0].restSec ?? 60} s`} />
                 </div>
               )}
             </div>
@@ -364,8 +380,17 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
       {hasTimer ? (
         <GhostButton onClick={() => void save()}>Marquer comme faite ✓ (sans minuteur)</GhostButton>
       ) : (
-        <PrimaryButton onClick={() => void save()}>{hasForm ? 'Enregistrer ✓' : 'Marquer comme faite ✓'}</PrimaryButton>
+        <PrimaryButton onClick={() => void save()}>
+          {hasForm ? 'Valider la séance ✓' : 'Marquer comme faite ✓'}
+        </PrimaryButton>
       )}
+      <button
+        type="button"
+        onClick={onClose}
+        className="w-full py-1 text-center text-sm font-bold text-ink-soft active:text-ink"
+      >
+        Fermer sans valider
+      </button>
     </div>
   )
 }

@@ -13,7 +13,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Session } from '../types'
-import { DAY_LETTER, DAY_NAMES, addDays, mondayIndex, startOfWeek } from '../lib/dates'
+import { DAY_LETTER, DAY_NAMES, addDays, mondayIndex, startOfWeek, toDateStr } from '../lib/dates'
 import { describeSchedule, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
 import { EmptyState, PageHeader } from '../components/ui'
 
@@ -23,7 +23,8 @@ const GRID = 'grid grid-cols-[1rem_minmax(0,1fr)_repeat(7,1.85rem)] items-center
 function Row({
   session,
   todayIdx,
-  autoDays,
+  plannedDays,
+  doneDays,
   inCycle,
   sublabel,
   onToggle,
@@ -31,8 +32,10 @@ function Row({
 }: {
   session: Session
   todayIdx: number
-  /** Occurrences calculées (intervalle / alternance) pour la semaine en cours */
-  autoDays: boolean[]
+  /** Jours planifiés cette semaine (jours fixes + rotation) */
+  plannedDays: boolean[]
+  /** Jours où la séance a été complétée cette semaine */
+  doneDays: boolean[]
   /** Membre ou propriétaire d'un cycle : la rotation pilote, pas les jours fixes */
   inCycle: boolean
   sublabel?: string
@@ -74,14 +77,14 @@ function Row({
         {sublabel && <span className="block truncate text-[11px] font-bold text-ink-soft">↻ {sublabel}</span>}
       </button>
       {Array.from({ length: 7 }, (_, d) => {
-        const solid = !inCycle && session.days.includes(d)
-        const auto = !solid && autoDays[d]
+        const done = doneDays[d]
+        const planned = plannedDays[d]
         return (
           <button
             key={d}
             type="button"
             aria-label={`${session.name} — ${DAY_NAMES[d]}`}
-            aria-pressed={solid || auto}
+            aria-pressed={done || planned}
             onClick={() => (inCycle ? onEdit() : onToggle(d))}
             className={
               'flex h-10 items-center justify-center rounded-lg transition-colors ' +
@@ -91,9 +94,9 @@ function Row({
             <span
               className={
                 'rounded-full transition-all ' +
-                (solid ? 'h-4 w-4 shadow-sm' : auto ? 'h-4 w-4 border-[3px] bg-surface' : 'h-2 w-2 bg-sand')
+                (done ? 'h-4 w-4 shadow-sm' : planned ? 'h-4 w-4 border-[3px] bg-surface' : 'h-2 w-2 bg-sand')
               }
-              style={solid ? { backgroundColor: meta.hex } : auto ? { borderColor: meta.hex } : undefined}
+              style={done ? { backgroundColor: meta.hex } : planned ? { borderColor: meta.hex } : undefined}
             />
           </button>
         )
@@ -103,7 +106,7 @@ function Row({
 }
 
 export default function Planning() {
-  const { sessions, updateSession } = useData()
+  const { sessions, logs, updateSession } = useData()
   const navigate = useNavigate()
   const todayIdx = mondayIndex()
 
@@ -120,10 +123,25 @@ export default function Planning() {
 
   const ordered = orderIds.map((id) => sessions.find((s) => s.id === id)).filter((s): s is Session => !!s)
 
-  // Occurrences calculées pour la semaine en cours (intervalles et alternances)
+  // Semaine en cours : planifié (jours fixes + rotation) et fait (logs)
   const monday = startOfWeek(new Date())
-  const autoByDay = Array.from({ length: 7 }, (_, d) => plannedSessionIdsOn(addDays(monday, d), sessions))
-  const perWeek = autoByDay.reduce((a, ids) => a + ids.size, 0)
+  const weekDates = Array.from({ length: 7 }, (_, d) => toDateStr(addDays(monday, d)))
+  const plannedByDay = Array.from({ length: 7 }, (_, d) => plannedSessionIdsOn(addDays(monday, d), sessions))
+  const doneByDay = weekDates.map((ds) => new Set(logs.filter((l) => l.date === ds).map((l) => l.sessionId)))
+  const perWeek = plannedByDay.reduce((a, ids) => a + ids.size, 0)
+
+  // Sections personnalisées (Session.group) : ordre d'apparition, « Autres » à la fin
+  const groupOf = (s: Session) => (s.group ?? '').trim()
+  const groupNames: string[] = []
+  for (const s of ordered) {
+    const g = groupOf(s)
+    if (g && !groupNames.includes(g)) groupNames.push(g)
+  }
+  const hasGroups = groupNames.length > 0
+  const grouped: [string, Session[]][] = hasGroups
+    ? [...groupNames.map((g): [string, Session[]] => [g, ordered.filter((s) => groupOf(s) === g)]),
+       ...(ordered.some((s) => !groupOf(s)) ? [['', ordered.filter((s) => !groupOf(s))] as [string, Session[]]] : [])]
+    : [['', ordered]]
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e
@@ -133,6 +151,10 @@ export default function Planning() {
     if (oldIdx === -1 || newIdx === -1) return
     const next = arrayMove(orderIds, oldIdx, newIdx)
     setOrderIds(next)
+    // Déposer sur une autre section déplace la séance dans cette section
+    const a = sessions.find((s) => s.id === String(active.id))
+    const o = sessions.find((s) => s.id === String(over.id))
+    if (a && o && groupOf(a) !== groupOf(o)) void updateSession(a.id, { group: groupOf(o) })
     next.forEach((sid, i) => {
       const s = sessions.find((x) => x.id === sid)
       if (s && s.sortOrder !== i) void updateSession(sid, { sortOrder: i })
@@ -149,11 +171,11 @@ export default function Planning() {
       <PageHeader kicker="Semaine type" title="Planning" />
       <p className="-mt-2 px-5 pb-4 text-xs font-semibold text-ink-soft">
         Touchez un rond pour planifier · glissez{' '}
-        <span className="inline-block align-middle text-ink-soft/60">⠿</span> pour réordonner. Rond plein = jour fixe,
-        anneau = automatique (tous les X jours / alternance).
+        <span className="inline-block align-middle text-ink-soft/60">⠿</span> pour réordonner ou changer de section.
+        Anneau = prévu, rond plein = fait cette semaine.
         {perWeek > 0 && (
           <span className="ml-1 text-sage-600">
-            {perWeek} séance{perWeek > 1 ? 's' : ''} cette semaine.
+            {perWeek} séance{perWeek > 1 ? 's' : ''} prévue{perWeek > 1 ? 's' : ''} cette semaine.
           </span>
         )}
       </p>
@@ -184,28 +206,39 @@ export default function Planning() {
 
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={orderIds} strategy={verticalListSortingStrategy}>
-              <div className="space-y-1.5">
-                {ordered.map((s) => {
-                  const inCycle = !!ownerOf(s.id, sessions)
-                  return (
-                    <Row
-                      key={s.id}
-                      session={s}
-                      todayIdx={todayIdx}
-                      autoDays={autoByDay.map((ids) => ids.has(s.id))}
-                      inCycle={inCycle}
-                      sublabel={inCycle ? describeSchedule(s, sessions) : undefined}
-                      onToggle={(d) => toggle(s, d)}
-                      onEdit={() => navigate(`/session/${s.id}`)}
-                    />
-                  )
-                })}
-              </div>
+              {grouped.map(([g, list]) => (
+                <div key={g || '—'}>
+                  {hasGroups && (
+                    <h2 className="px-1.5 pb-1 pt-3 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+                      {g || 'Autres'}
+                    </h2>
+                  )}
+                  <div className="space-y-1.5">
+                    {list.map((s) => {
+                      const inCycle = !!ownerOf(s.id, sessions)
+                      return (
+                        <Row
+                          key={s.id}
+                          session={s}
+                          todayIdx={todayIdx}
+                          plannedDays={plannedByDay.map((ids) => ids.has(s.id))}
+                          doneDays={doneByDay.map((ids) => ids.has(s.id))}
+                          inCycle={inCycle}
+                          sublabel={inCycle ? describeSchedule(s, sessions) : undefined}
+                          onToggle={(d) => toggle(s, d)}
+                          onEdit={() => navigate(`/session/${s.id}`)}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
             </SortableContext>
           </DndContext>
 
           <p className="px-2 pt-4 text-center text-xs font-semibold text-ink-soft">
-            Votre semaine type se répète automatiquement. Touchez le nom d'une séance pour la modifier.
+            Votre semaine type se répète automatiquement. Touchez le nom d'une séance pour la modifier — la section se
+            choisit dans sa fiche (champ « Section du planning »).
           </p>
         </div>
       )}
