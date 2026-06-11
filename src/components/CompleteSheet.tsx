@@ -1,10 +1,61 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Log, type MetricValue, type Session } from '../types'
 import { todayStr } from '../lib/dates'
+import { mmss } from '../lib/format'
 import { effectiveMetrics } from '../lib/metrics'
+import { tone } from '../lib/audio'
 import { Field, GhostButton, NumInput, PrimaryButton, Sheet, Stepper, TextArea } from './ui'
+
+/** Compte à rebours de repos entre les séries, avec bip à la fin */
+function RestTimer({ sec }: { sec: number }) {
+  const [left, setLeft] = useState<number | null>(null)
+  const audioRef = useRef<AudioContext | null>(null)
+  const endAtRef = useRef(0)
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current && audioRef.current.state !== 'closed') void audioRef.current.close()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (left == null) return
+    const iv = window.setInterval(() => {
+      const ms = endAtRef.current - Date.now()
+      if (ms <= 0) {
+        if (audioRef.current) tone(audioRef.current, 880, 0.5)
+        navigator.vibrate?.([150, 80, 150])
+        setLeft(null)
+      } else {
+        setLeft(Math.ceil(ms / 1000))
+      }
+    }, 200)
+    return () => window.clearInterval(iv)
+  }, [left])
+
+  const start = () => {
+    audioRef.current = audioRef.current ?? new AudioContext()
+    void audioRef.current.resume()
+    endAtRef.current = Date.now() + sec * 1000
+    setLeft(sec)
+  }
+
+  return left == null ? (
+    <button type="button" onClick={start} className="rounded-full bg-velo/10 px-3 py-1.5 text-xs font-extrabold text-velo">
+      ⏱ Repos {sec} s
+    </button>
+  ) : (
+    <button
+      type="button"
+      onClick={() => setLeft(null)}
+      className="rounded-full bg-velo px-3 py-1.5 text-xs font-extrabold tabular-nums text-white"
+    >
+      {mmss(left)} · stop
+    </button>
+  )
+}
 
 /** Feuille de complétion d'une séance : formulaire adapté à chaque sport */
 export default function CompleteSheet({ session, onClose }: { session: Session | null; onClose: () => void }) {
@@ -149,15 +200,18 @@ function Inner({ session, onClose }: { session: Session; onClose: () => void }) 
                   </div>
                 ))}
               </div>
-              <div className="mt-2 flex gap-3 text-xs font-bold">
-                <button type="button" className="text-sage-600" onClick={() => addSet(it.exerciseId)}>
-                  + Ajouter une série
-                </button>
-                {(values[it.exerciseId]?.length ?? 0) > 1 && (
-                  <button type="button" className="text-ink-soft" onClick={() => removeSet(it.exerciseId)}>
-                    − Retirer
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <div className="flex gap-3 text-xs font-bold">
+                  <button type="button" className="text-sage-600" onClick={() => addSet(it.exerciseId)}>
+                    + Ajouter une série
                   </button>
-                )}
+                  {(values[it.exerciseId]?.length ?? 0) > 1 && (
+                    <button type="button" className="text-ink-soft" onClick={() => removeSet(it.exerciseId)}>
+                      − Retirer
+                    </button>
+                  )}
+                </div>
+                {(it.restSec ?? 60) > 0 && <RestTimer sec={it.restSec ?? 60} />}
               </div>
             </div>
           )

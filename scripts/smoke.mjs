@@ -84,19 +84,21 @@ try {
   await shot('10-seance-form')
   await page.click('[aria-label="Retour"]')
 
-  // --- Banque d'exercices + fiche
+  // --- Banque d'exercices (groupée par sous-type) + recherche + fiche
   await page.getByRole('button', { name: "Banque d'exercices", exact: true }).click()
   await page.waitForSelector('button:has-text("Pompes")')
+  await page.waitForSelector('text=Abdominaux') // en-tête de sous-type
   await shot('11-bibliotheque-exos')
   await page.click('button:has-text("Pompes")')
   await page.waitForSelector("text=Modifier l'exercice")
   await shot('12-fiche-exercice')
   await page.click('[aria-label="Retour"]')
 
-  // --- Progrès : activité + mesures par séance
+  // --- Progrès : activité + mesures par séance + historique
   await page.click('text=Progrès')
   await page.waitForSelector('text=Séances complétées par semaine')
   await page.waitForSelector('text=Mesures par séance')
+  await page.waitForSelector('text=Historique')
   await page.waitForTimeout(800)
   await shot('13-progres')
 

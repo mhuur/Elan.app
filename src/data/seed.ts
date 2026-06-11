@@ -6,42 +6,48 @@ import type { Store, StoreDoc } from './store'
 interface SeedEx {
   name: string
   category: Category
+  subtype?: string
   measure?: Measure
   description?: string
 }
 
 const SEED_EXERCISES: SeedEx[] = [
   // Muscu au poids du corps
-  { name: 'Pompes', category: 'muscu' },
-  { name: 'Squats', category: 'muscu' },
-  { name: 'Fentes', category: 'muscu' },
-  { name: 'Gainage', category: 'muscu', measure: 'sec' },
-  { name: 'Gainage latéral', category: 'muscu', measure: 'sec' },
-  { name: 'Tractions', category: 'muscu' },
-  { name: 'Dips', category: 'muscu' },
-  { name: 'Crunchs', category: 'muscu' },
-  { name: 'Pont fessier', category: 'muscu' },
-  { name: 'Superman', category: 'muscu' },
+  { name: 'Pompes', category: 'muscu', subtype: 'Pectoraux' },
+  { name: 'Squats', category: 'muscu', subtype: 'Jambes' },
+  { name: 'Fentes', category: 'muscu', subtype: 'Jambes' },
+  { name: 'Gainage', category: 'muscu', subtype: 'Abdominaux', measure: 'sec' },
+  { name: 'Gainage latéral', category: 'muscu', subtype: 'Abdominaux', measure: 'sec' },
+  { name: 'Tractions', category: 'muscu', subtype: 'Dos' },
+  { name: 'Dips', category: 'muscu', subtype: 'Bras' },
+  { name: 'Crunchs', category: 'muscu', subtype: 'Abdominaux' },
+  { name: 'Pont fessier', category: 'muscu', subtype: 'Fessiers' },
+  { name: 'Superman', category: 'muscu', subtype: 'Dos' },
   // HIIT
-  { name: 'Burpees', category: 'hiit' },
-  { name: 'Mountain climbers', category: 'hiit' },
-  { name: 'Jumping jacks', category: 'hiit' },
-  { name: 'Squats sautés', category: 'hiit' },
-  { name: 'Montées de genoux', category: 'hiit' },
-  { name: 'Planche commando', category: 'hiit' },
-  { name: 'Fentes sautées', category: 'hiit' },
+  { name: 'Burpees', category: 'hiit', subtype: 'Cardio' },
+  { name: 'Mountain climbers', category: 'hiit', subtype: 'Cardio' },
+  { name: 'Jumping jacks', category: 'hiit', subtype: 'Cardio' },
+  { name: 'Squats sautés', category: 'hiit', subtype: 'Jambes' },
+  { name: 'Montées de genoux', category: 'hiit', subtype: 'Cardio' },
+  { name: 'Planche commando', category: 'hiit', subtype: 'Abdominaux' },
+  { name: 'Fentes sautées', category: 'hiit', subtype: 'Jambes' },
   // Étirements
-  { name: 'Ischio-jambiers', category: 'etirements', description: 'Jambes tendues, penchez-vous doucement vers l’avant.' },
-  { name: 'Quadriceps debout', category: 'etirements', description: 'Talon vers la fesse, genoux serrés.' },
-  { name: 'Mollets au mur', category: 'etirements' },
-  { name: 'Pigeon (hanches)', category: 'etirements' },
-  { name: 'Chat-vache (dos)', category: 'etirements' },
-  { name: 'Posture de l’enfant', category: 'etirements' },
-  { name: 'Papillon (adducteurs)', category: 'etirements' },
-  { name: 'Cobra', category: 'etirements' },
-  { name: 'Torsion allongée', category: 'etirements' },
-  { name: 'Épaules croisées', category: 'etirements' },
+  { name: 'Ischio-jambiers', category: 'etirements', subtype: 'Souplesse', description: 'Jambes tendues, penchez-vous doucement vers l’avant.' },
+  { name: 'Quadriceps debout', category: 'etirements', subtype: 'Souplesse', description: 'Talon vers la fesse, genoux serrés.' },
+  { name: 'Mollets au mur', category: 'etirements', subtype: 'Souplesse' },
+  { name: 'Pigeon (hanches)', category: 'etirements', subtype: 'Mobilité' },
+  { name: 'Chat-vache (dos)', category: 'etirements', subtype: 'Mobilité' },
+  { name: 'Posture de l’enfant', category: 'etirements', subtype: 'Mobilité' },
+  { name: 'Papillon (adducteurs)', category: 'etirements', subtype: 'Souplesse' },
+  { name: 'Cobra', category: 'etirements', subtype: 'Mobilité' },
+  { name: 'Torsion allongée', category: 'etirements', subtype: 'Mobilité' },
+  { name: 'Épaules croisées', category: 'etirements', subtype: 'Souplesse' },
 ]
+
+/** Sous-types des exercices du jeu de départ, pour enrichir les données déjà créées */
+export const SUBTYPE_BY_NAME: Record<string, string> = Object.fromEntries(
+  SEED_EXERCISES.filter((e) => e.subtype).map((e) => [e.name, e.subtype!]),
+)
 
 /**
  * Jeu de départ : exercices + séances types, créés au premier lancement
@@ -56,6 +62,7 @@ export function buildSeed(): { exercises: Exercise[]; sessions: Session[] } {
     measure: e.measure ?? 'reps',
     videoUrl: youtubeSearch(e.name),
     createdAt: now + i,
+    ...(e.subtype ? { subtype: e.subtype } : {}),
     ...(e.description ? { description: e.description } : {}),
   }))
 

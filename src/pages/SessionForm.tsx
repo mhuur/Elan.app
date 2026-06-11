@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useData } from '../data/DataContext'
 import { CATEGORIES, CATEGORY_META, type Category, type LinkDef, type MetricDef, type SessionItem } from '../types'
-import { DAY_LETTER, DAY_NAMES } from '../lib/dates'
+import { DAY_LETTER, DAY_NAMES, todayStr } from '../lib/dates'
 import { DEFAULT_VELO_METRICS, effectiveMetrics, newMetric } from '../lib/metrics'
-import { Chip, Field, GhostButton, PrimaryButton, Stepper, TextArea, TextInput } from '../components/ui'
+import { Chip, Field, GhostButton, PrimaryButton, Seg, Stepper, TextArea, TextInput } from '../components/ui'
 
 const smallInput =
   'rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
@@ -18,12 +18,17 @@ export default function SessionForm() {
   const [name, setName] = useState(existing?.name ?? '')
   const [category, setCategory] = useState<Category>(existing?.category ?? 'muscu')
   const [days, setDays] = useState<number[]>(existing?.days ?? [])
+  const [scheduleMode, setScheduleMode] = useState<'weekly' | 'interval'>(existing?.repeat ? 'interval' : 'weekly')
+  const [everyDays, setEveryDays] = useState(existing?.repeat?.everyDays ?? 2)
+  const [startDate, setStartDate] = useState(existing?.repeat?.startDate ?? todayStr())
+  const [alternateWith, setAlternateWith] = useState(existing?.repeat?.alternateWith ?? '')
   const [items, setItems] = useState<SessionItem[]>(existing?.items ?? [])
   const [metrics, setMetrics] = useState<MetricDef[]>(existing ? effectiveMetrics(existing) : [])
   const [links, setLinks] = useState<LinkDef[]>(existing?.links ?? [])
   const [workSec, setWorkSec] = useState(existing?.workSec ?? 45)
   const [restSec, setRestSec] = useState(existing?.restSec ?? 15)
   const [rounds, setRounds] = useState(existing?.rounds ?? 2)
+  const [stretchRest, setStretchRest] = useState(existing?.category === 'etirements' ? (existing.restSec ?? 0) : 5)
   const [notes, setNotes] = useState(existing?.notes ?? '')
 
   const catExercises = exercises.filter((e) => e.category === category)
@@ -85,7 +90,11 @@ export default function SessionForm() {
     const data = {
       name: name.trim() || 'Séance',
       category,
-      days,
+      days: scheduleMode === 'weekly' ? days : [],
+      repeat:
+        scheduleMode === 'interval'
+          ? { everyDays, startDate, ...(alternateWith ? { alternateWith } : {}) }
+          : null,
       items: hasItems ? items : [],
       metrics: cleanMetrics,
       links: cleanLinks,
@@ -93,10 +102,26 @@ export default function SessionForm() {
       sortOrder: existing?.sortOrder ?? maxOrder + 1,
       createdAt: existing?.createdAt ?? Date.now(),
       ...(category === 'hiit' ? { workSec, restSec, rounds } : {}),
+      ...(category === 'etirements' ? { restSec: stretchRest } : {}),
     }
     if (existing) await updateSession(existing.id, data)
     else await addSession(data)
     navigate(-1)
+  }
+
+  const duplicate = async () => {
+    if (!existing) return
+    const { id: _ignored, ...rest } = existing
+    const maxOrder = sessions.reduce((a, s) => Math.max(a, s.sortOrder ?? -1), -1)
+    await addSession({
+      ...rest,
+      name: existing.name + ' (copie)',
+      days: [],
+      repeat: null,
+      sortOrder: maxOrder + 1,
+      createdAt: Date.now(),
+    })
+    navigate('/library', { replace: true })
   }
 
   const del = async () => {
@@ -132,23 +157,75 @@ export default function SessionForm() {
           </div>
         </Field>
 
-        <Field label="Jours de la semaine">
-          <div className="flex gap-1.5">
-            {DAY_LETTER.map((letter, d) => (
-              <button
-                key={d}
-                type="button"
-                title={DAY_NAMES[d]}
-                onClick={() => toggleDay(d)}
-                className={
-                  'h-10 flex-1 rounded-xl text-sm font-extrabold transition-colors ' +
-                  (days.includes(d) ? 'bg-sage-500 text-white shadow-sm' : 'bg-sage-100 text-sage-700')
-                }
-              >
-                {letter}
-              </button>
-            ))}
-          </div>
+        <Field label="Planification">
+          <Seg
+            options={[
+              { value: 'weekly' as const, label: 'Jours fixes' },
+              { value: 'interval' as const, label: 'Tous les X jours' },
+            ]}
+            value={scheduleMode}
+            onChange={setScheduleMode}
+          />
+          {scheduleMode === 'weekly' ? (
+            <div className="mt-2 flex gap-1.5">
+              {DAY_LETTER.map((letter, d) => (
+                <button
+                  key={d}
+                  type="button"
+                  title={DAY_NAMES[d]}
+                  onClick={() => toggleDay(d)}
+                  className={
+                    'h-10 flex-1 rounded-xl text-sm font-extrabold transition-colors ' +
+                    (days.includes(d) ? 'bg-sage-500 text-white shadow-sm' : 'bg-sage-100 text-sage-700')
+                  }
+                >
+                  {letter}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-2 space-y-3 rounded-2xl bg-sage-50 p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold">Tous les</p>
+                <div className="flex items-center gap-1.5">
+                  <Stepper value={everyDays} onChange={setEveryDays} min={1} max={30} />
+                  <span className="text-sm font-bold">jour{everyDays > 1 ? 's' : ''}</span>
+                </div>
+              </div>
+              <label className="flex items-center justify-between gap-2">
+                <span className="text-sm font-bold">À partir du</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value || todayStr())}
+                  className="rounded-xl border border-sand bg-surface px-3 py-2 text-sm font-bold outline-none focus:border-sage-400"
+                />
+              </label>
+              <div>
+                <p className="mb-1 text-sm font-bold">En alternance avec (optionnel)</p>
+                <select
+                  value={alternateWith}
+                  onChange={(e) => setAlternateWith(e.target.value)}
+                  className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
+                >
+                  <option value="">— Aucune alternance —</option>
+                  {sessions
+                    .filter((s) => s.id !== existing?.id)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {CATEGORY_META[s.category].emoji} {s.name}
+                      </option>
+                    ))}
+                </select>
+                {alternateWith && (
+                  <p className="mt-1.5 text-xs font-semibold text-ink-soft">
+                    Une fois sur deux, c'est la séance choisie qui sera proposée à la place. Inutile de la planifier
+                    elle-même.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </Field>
 
         {category === 'hiit' && (
@@ -166,6 +243,15 @@ export default function SessionForm() {
                 <p className="mb-1 text-xs font-bold text-ink-soft">Tours</p>
                 <Stepper value={rounds} onChange={setRounds} min={1} />
               </div>
+            </div>
+          </div>
+        )}
+
+        {category === 'etirements' && (
+          <div className="rounded-2xl bg-sage-50 p-3.5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-ink-soft">Transition entre postures</p>
+              <Stepper value={stretchRest} onChange={setStretchRest} min={0} step={5} suffix="s" />
             </div>
           </div>
         )}
@@ -204,21 +290,34 @@ export default function SessionForm() {
                     </div>
 
                     {category === 'muscu' && (
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <div className="text-center">
-                          <p className="mb-1 text-xs font-bold text-ink-soft">Séries</p>
-                          <Stepper value={it.sets ?? 3} onChange={(v) => setItem(idx, { sets: v })} min={1} />
+                      <>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <div className="text-center">
+                            <p className="mb-1 text-xs font-bold text-ink-soft">Séries</p>
+                            <Stepper value={it.sets ?? 3} onChange={(v) => setItem(idx, { sets: v })} min={1} />
+                          </div>
+                          <div className="text-center">
+                            <p className="mb-1 text-xs font-bold text-ink-soft">{ex?.measure === 'sec' ? 'Secondes' : 'Répétitions'}</p>
+                            <Stepper
+                              value={it.target ?? 10}
+                              onChange={(v) => setItem(idx, { target: v })}
+                              min={1}
+                              step={ex?.measure === 'sec' ? 5 : 1}
+                            />
+                          </div>
                         </div>
-                        <div className="text-center">
-                          <p className="mb-1 text-xs font-bold text-ink-soft">{ex?.measure === 'sec' ? 'Secondes' : 'Répétitions'}</p>
+                        <div className="mt-2 flex items-center justify-between">
+                          <p className="text-xs font-bold text-ink-soft">Repos entre séries</p>
                           <Stepper
-                            value={it.target ?? 10}
-                            onChange={(v) => setItem(idx, { target: v })}
-                            min={1}
-                            step={ex?.measure === 'sec' ? 5 : 1}
+                            value={it.restSec ?? 60}
+                            onChange={(v) => setItem(idx, { restSec: v })}
+                            min={0}
+                            max={600}
+                            step={15}
+                            suffix="s"
                           />
                         </div>
-                      </div>
+                      </>
                     )}
 
                     {category === 'etirements' && (
@@ -334,6 +433,7 @@ export default function SessionForm() {
           <PrimaryButton onClick={() => void save()} disabled={!name.trim()}>
             Enregistrer
           </PrimaryButton>
+          {existing && <GhostButton onClick={() => void duplicate()}>📋 Dupliquer la séance</GhostButton>}
           {existing && (
             <GhostButton danger onClick={() => void del()}>
               Supprimer la séance

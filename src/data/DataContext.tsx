@@ -19,7 +19,7 @@ import {
 import { auth, db, firebaseEnabled } from '../firebase'
 import type { Exercise, Log, Session } from '../types'
 import { FirestoreStore, LocalStore, type Store, type StoreData } from './store'
-import { runSeed } from './seed'
+import { runSeed, SUBTYPE_BY_NAME } from './seed'
 
 interface DataCtx {
   mode: 'local' | 'cloud'
@@ -62,6 +62,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [logs, setLogs] = useState<Log[]>([])
   const [dataReady, setDataReady] = useState(false)
   const seedCheckedRef = useRef(false)
+  const migCheckedRef = useRef(false)
 
   // Authentification (mode cloud uniquement)
   useEffect(() => {
@@ -70,6 +71,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setUser(u)
       setStore(u && db ? new FirestoreStore(db, u.uid) : null)
       seedCheckedRef.current = false
+      migCheckedRef.current = false
       setAuthReady(true)
     })
   }, [])
@@ -130,6 +132,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(key, '1')
     void runSeed(store)
   }, [store, dataReady, exercises.length, sessions.length, logs.length, mode, user])
+
+  // Migration douce : ajoute les sous-types aux exercices du jeu de départ déjà créés
+  useEffect(() => {
+    if (!store || !dataReady || migCheckedRef.current || !exercises.length) return
+    migCheckedRef.current = true
+    const key = `elan-mig-subtypes-${mode === 'cloud' && user ? user.uid : 'local'}`
+    if (localStorage.getItem(key)) return
+    localStorage.setItem(key, '1')
+    for (const e of exercises) {
+      if (!e.subtype && SUBTYPE_BY_NAME[e.name]) {
+        void store.update('exercises', e.id, { subtype: SUBTYPE_BY_NAME[e.name] })
+      }
+    }
+  }, [store, dataReady, exercises, mode, user])
 
   const need = useCallback((): Store => {
     if (!store) throw new Error('Stockage non initialisé')

@@ -11,8 +11,9 @@ import {
   YAxis,
 } from 'recharts'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, type MetricValue } from '../types'
+import { CATEGORY_META, type Log, type MetricValue } from '../types'
 import { addDays, formatDayMonth, formatShortFr, startOfWeek } from '../lib/dates'
+import { logSummary } from '../lib/format'
 import { Chip, EmptyState, PageHeader } from '../components/ui'
 
 const axisStyle = { fontSize: 11, fontFamily: 'Nunito', fill: '#717d72' }
@@ -27,7 +28,11 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 }
 
 export default function Progress() {
-  const { logs, exercises, sessions } = useData()
+  const { logs, exercises, sessions, removeLog } = useData()
+
+  const deleteLog = (l: Log) => {
+    if (window.confirm(`Supprimer « ${l.sessionName} » du ${formatShortFr(l.date)} ?`)) void removeLog(l.id)
+  }
 
   // Séances par semaine (8 dernières semaines)
   const weekly = useMemo(() => {
@@ -226,6 +231,43 @@ export default function Progress() {
                 Encore une séance avec cet exercice et la courbe apparaît 💪
               </p>
             )}
+            {muscuData.length > 0 && (
+              <p className="pt-2 text-center text-xs font-extrabold text-muscu">
+                🏆 Record : {Math.max(...muscuData.map((d) => d.value))} {muscuUnit}
+                {muscuMetric === 'volume' ? ' (volume)' : ' (série)'}
+              </p>
+            )}
+          </ChartCard>
+        )}
+
+        {logs.length > 0 && (
+          <ChartCard title="🗓️ Historique">
+            <div>
+              {logs.slice(0, 15).map((l) => (
+                <div key={l.id} className="flex items-center gap-2 border-b border-cream py-2 last:border-0">
+                  <span className="w-14 shrink-0 text-xs font-bold text-ink-soft">{formatShortFr(l.date)}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-extrabold">
+                      {CATEGORY_META[l.category].emoji} {l.sessionName}
+                    </p>
+                    <p className="truncate text-xs font-semibold text-ink-soft">{logSummary(l)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Supprimer cette entrée"
+                    onClick={() => deleteLog(l)}
+                    className="shrink-0 px-1.5 text-ink-soft/50 active:text-hiit"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {logs.length > 15 && (
+                <p className="pt-2 text-center text-xs font-semibold text-ink-soft/60">
+                  … et {logs.length - 15} autres séances
+                </p>
+              )}
+            </div>
           </ChartCard>
         )}
       </div>

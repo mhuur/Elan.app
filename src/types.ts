@@ -6,12 +6,30 @@ export interface Exercise {
   id: string
   name: string
   category: Category
+  /** Sous-type : groupe musculaire ou famille (Abdominaux, Jambes, Cardio…) */
+  subtype?: string
   /** Unité de mesure : répétitions ou secondes (ex. gainage) */
   measure: Measure
   description?: string
   videoUrl?: string
   createdAt: number
 }
+
+/** Sous-types proposés à la création d'un exercice (saisie libre possible) */
+export const PRESET_SUBTYPES = [
+  'Abdominaux',
+  'Pectoraux',
+  'Dos',
+  'Bras',
+  'Épaules',
+  'Jambes',
+  'Fessiers',
+  'Full body',
+  'Cardio',
+  'Endurance',
+  'Mobilité',
+  'Souplesse',
+]
 
 export interface SessionItem {
   exerciseId: string
@@ -21,8 +39,19 @@ export interface SessionItem {
   target?: number
   /** Étirements : durée de la posture en secondes */
   durationSec?: number
+  /** Muscu : repos entre les séries, en secondes */
+  restSec?: number
   /** Consigne libre affichée pendant la séance (tempo, posture…) */
   comment?: string
+}
+
+/** Planification par intervalle : « tous les X jours » depuis une date */
+export interface Repeat {
+  everyDays: number
+  /** Date de départ YYYY-MM-DD */
+  startDate: string
+  /** Alternance : une occurrence sur deux est remplacée par cette séance */
+  alternateWith?: string
 }
 
 /** Mesure personnalisée définie sur une séance, saisie à la complétion */
@@ -52,6 +81,8 @@ export interface Session {
   category: Category
   /** Jours de la semaine type : 0 = lundi … 6 = dimanche */
   days: number[]
+  /** Planification par intervalle (remplace les jours fixes si défini, null = désactivé) */
+  repeat?: Repeat | null
   items: SessionItem[]
   /** HIIT : secondes d'effort */
   workSec?: number

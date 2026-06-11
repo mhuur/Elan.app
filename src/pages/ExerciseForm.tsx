@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useData } from '../data/DataContext'
-import { CATEGORIES, CATEGORY_META, type Category, type Measure } from '../types'
+import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, type Category, type Measure } from '../types'
 import { youtubeSearch } from '../lib/format'
 import { Chip, Field, GhostButton, PrimaryButton, Seg, TextArea, TextInput } from '../components/ui'
 
@@ -13,14 +13,25 @@ export default function ExerciseForm() {
 
   const [name, setName] = useState(existing?.name ?? '')
   const [category, setCategory] = useState<Category>(existing?.category ?? 'muscu')
+  const [subtype, setSubtype] = useState(existing?.subtype ?? '')
+  const [customSubtype, setCustomSubtype] = useState(
+    () => !!existing?.subtype && !PRESET_SUBTYPES.includes(existing.subtype),
+  )
   const [measure, setMeasure] = useState<Measure>(existing?.measure ?? 'reps')
   const [description, setDescription] = useState(existing?.description ?? '')
   const [videoUrl, setVideoUrl] = useState(existing?.videoUrl ?? '')
+
+  // Sous-types déjà utilisés dans la banque, en plus des presets
+  const customSubtypes = [
+    ...new Set(exercises.map((e) => e.subtype).filter((s): s is string => !!s && !PRESET_SUBTYPES.includes(s))),
+  ].sort((a, b) => a.localeCompare(b, 'fr'))
+  const subtypeOptions = [...PRESET_SUBTYPES, ...customSubtypes]
 
   const save = async () => {
     const data = {
       name: name.trim() || 'Exercice',
       category,
+      subtype: subtype.trim(),
       measure,
       description: description.trim(),
       videoUrl: videoUrl.trim(),
@@ -62,6 +73,46 @@ export default function ExerciseForm() {
               </Chip>
             ))}
           </div>
+        </Field>
+
+        <Field label="Sous-type (optionnel)">
+          <div className="flex flex-wrap gap-1.5">
+            <Chip
+              active={!subtype.trim() && !customSubtype}
+              onClick={() => {
+                setSubtype('')
+                setCustomSubtype(false)
+              }}
+            >
+              Aucun
+            </Chip>
+            {subtypeOptions.map((st) => (
+              <Chip
+                key={st}
+                active={!customSubtype && subtype === st}
+                onClick={() => {
+                  setSubtype(st)
+                  setCustomSubtype(false)
+                }}
+              >
+                {st}
+              </Chip>
+            ))}
+            <Chip
+              active={customSubtype}
+              onClick={() => {
+                setCustomSubtype(true)
+                if (subtypeOptions.includes(subtype)) setSubtype('')
+              }}
+            >
+              ✏️ Autre
+            </Chip>
+          </div>
+          {customSubtype && (
+            <div className="mt-2">
+              <TextInput value={subtype} onChange={setSubtype} placeholder="Votre sous-type (ex. Triceps)" />
+            </div>
+          )}
         </Field>
 
         <Field label="Mesure de l'effort">

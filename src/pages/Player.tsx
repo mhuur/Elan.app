@@ -4,6 +4,7 @@ import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Exercise, type Session } from '../types'
 import { todayStr } from '../lib/dates'
 import { mmss } from '../lib/format'
+import { tone as playTone } from '../lib/audio'
 
 interface Step {
   type: 'prep' | 'work' | 'rest'
@@ -27,9 +28,11 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
       })
     }
   } else {
-    for (const it of session.items) {
+    const rest = session.restSec ?? 0
+    session.items.forEach((it, i) => {
       steps.push({ type: 'work', label: nameOf(it.exerciseId), sec: it.durationSec ?? 30, comment: it.comment })
-    }
+      if (rest > 0 && i < session.items.length - 1) steps.push({ type: 'rest', label: 'Transition', sec: rest })
+    })
   }
   return steps
 }
@@ -55,19 +58,8 @@ export default function Player() {
   const lastBeepRef = useRef(-1)
   const loggedRef = useRef(false)
 
-  const tone = (freq: number, durSec: number, vol = 0.2) => {
-    const ctx = audioRef.current
-    if (!ctx) return
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.type = 'sine'
-    osc.frequency.value = freq
-    gain.gain.setValueAtTime(vol, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durSec)
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.start()
-    osc.stop(ctx.currentTime + durSec)
+  const tone = (freq: number, durSec: number) => {
+    if (audioRef.current) playTone(audioRef.current, freq, durSec)
   }
 
   const acquireWakeLock = async () => {

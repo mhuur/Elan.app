@@ -1,4 +1,4 @@
-import type { Session } from '../types'
+import type { Log, Session } from '../types'
 import { effectiveMetrics } from './metrics'
 
 /** « 12:05 » à partir de secondes */
@@ -26,6 +26,30 @@ export function hiitTotalSec(s: Session): number {
 /** Durée totale d'une routine d'étirements en secondes */
 export function stretchTotalSec(s: Session): number {
   return s.items.reduce((acc, it) => acc + (it.durationSec ?? 30), 0)
+}
+
+/** Petit résumé d'un log (séance complétée) pour les listes */
+export function logSummary(l: Log): string {
+  if (l.metrics?.length) {
+    return l.metrics
+      .slice(0, 3)
+      .map((m) => `${m.value}${m.unit ? ' ' + m.unit : ''}`)
+      .join(' · ')
+  }
+  if (l.velo) {
+    const parts: string[] = []
+    if (l.velo.durationMin) parts.push(`${l.velo.durationMin} min`)
+    if (l.velo.distanceKm) parts.push(`${l.velo.distanceKm} km`)
+    if (l.velo.powerW) parts.push(`${l.velo.powerW} W`)
+    if (l.velo.avgSpeedKmh) parts.push(`${l.velo.avgSpeedKmh} km/h`)
+    if (l.velo.avgBpm) parts.push(`${l.velo.avgBpm} bpm`)
+    if (parts.length) return parts.join(' · ')
+  }
+  if (l.results?.length) {
+    const totalSets = l.results.reduce((a, r) => a + r.sets.length, 0)
+    return `${l.results.length} exercices · ${totalSets} séries`
+  }
+  return l.note || 'Bien joué !'
 }
 
 /** Petit résumé d'une séance pour les cartes */

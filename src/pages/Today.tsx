@@ -1,34 +1,12 @@
 import { useState } from 'react'
 import { useData } from '../data/DataContext'
 import { CATEGORIES, CATEGORY_META, type Log, type Session } from '../types'
-import { formatLongFr, mondayIndex, todayStr } from '../lib/dates'
-import { summarizeSession } from '../lib/format'
+import { formatLongFr, todayStr } from '../lib/dates'
+import { logSummary, summarizeSession } from '../lib/format'
+import { plannedSessionIdsOn } from '../lib/schedule'
 import { EmptyState, PageHeader, Sheet } from '../components/ui'
 import CompleteSheet from '../components/CompleteSheet'
 import SettingsSheet from '../components/SettingsSheet'
-
-function logSummary(l: Log): string {
-  if (l.metrics?.length) {
-    return l.metrics
-      .slice(0, 3)
-      .map((m) => `${m.value}${m.unit ? ' ' + m.unit : ''}`)
-      .join(' · ')
-  }
-  if (l.velo) {
-    const parts: string[] = []
-    if (l.velo.durationMin) parts.push(`${l.velo.durationMin} min`)
-    if (l.velo.distanceKm) parts.push(`${l.velo.distanceKm} km`)
-    if (l.velo.powerW) parts.push(`${l.velo.powerW} W`)
-    if (l.velo.avgSpeedKmh) parts.push(`${l.velo.avgSpeedKmh} km/h`)
-    if (l.velo.avgBpm) parts.push(`${l.velo.avgBpm} bpm`)
-    if (parts.length) return parts.join(' · ')
-  }
-  if (l.results?.length) {
-    const totalSets = l.results.reduce((a, r) => a + r.sets.length, 0)
-    return `${l.results.length} exercices · ${totalSets} séries`
-  }
-  return l.note || 'Bien joué !'
-}
 
 export default function Today() {
   const { sessions, logs, removeLog } = useData()
@@ -37,10 +15,10 @@ export default function Today() {
   const [completing, setCompleting] = useState<Session | null>(null)
 
   const today = new Date()
-  const dayIdx = mondayIndex(today)
   const dStr = todayStr()
 
-  const planned = sessions.filter((s) => s.days.includes(dayIdx))
+  const plannedIds = plannedSessionIdsOn(today, sessions)
+  const planned = sessions.filter((s) => plannedIds.has(s.id))
   const todayLogs = logs.filter((l) => l.date === dStr)
   const doneIds = new Set(todayLogs.map((l) => l.sessionId))
   const toDo = planned.filter((s) => !doneIds.has(s.id))
