@@ -62,7 +62,7 @@ export function buildSeed(): { exercises: Exercise[]; sessions: Session[] } {
     measure: e.measure ?? 'reps',
     videoUrl: youtubeSearch(e.name),
     createdAt: now + i,
-    ...(e.subtype ? { subtype: e.subtype } : {}),
+    ...(e.subtype ? { subtypes: [e.subtype] } : {}),
     ...(e.description ? { description: e.description } : {}),
   }))
 

@@ -2,17 +2,33 @@ export type Category = 'running' | 'velo' | 'muscu' | 'hiit' | 'etirements'
 export type Measure = 'reps' | 'sec'
 export type ColName = 'exercises' | 'sessions' | 'logs'
 
+/** Objectif sur un exercice : meilleure série ou volume total à atteindre */
+export interface Goal {
+  metric: 'best' | 'volume'
+  value: number
+}
+
 export interface Exercise {
   id: string
   name: string
   category: Category
-  /** Sous-type : groupe musculaire ou famille (Abdominaux, Jambes, Cardio…) */
+  /** Sous-types : groupes musculaires ou familles (Abdominaux, Jambes, Cardio…) */
+  subtypes?: string[]
+  /** Hérité : ancien sous-type unique */
   subtype?: string
   /** Unité de mesure : répétitions ou secondes (ex. gainage) */
   measure: Measure
+  /** Objectif à atteindre (null = aucun) */
+  goal?: Goal | null
   description?: string
   videoUrl?: string
   createdAt: number
+}
+
+/** Sous-types d'un exercice (gère l'ancien champ unique) */
+export function subtypesOf(e: Exercise): string[] {
+  if (e.subtypes && e.subtypes.length) return e.subtypes
+  return e.subtype ? [e.subtype] : []
 }
 
 /** Sous-types proposés à la création d'un exercice (saisie libre possible) */
@@ -41,6 +57,8 @@ export interface SessionItem {
   durationSec?: number
   /** Muscu : repos entre les séries, en secondes */
   restSec?: number
+  /** Muscu : superset — enchaîner avec l'exercice suivant sans repos */
+  linkNext?: boolean
   /** Consigne libre affichée pendant la séance (tempo, posture…) */
   comment?: string
 }
@@ -88,7 +106,7 @@ export interface Session {
   workSec?: number
   /** HIIT : secondes de repos */
   restSec?: number
-  /** HIIT : nombre de tours */
+  /** HIIT : nombre de tours · Muscu : tours du circuit */
   rounds?: number
   /** Mesures saisies à la fin de la séance (vélo par défaut, personnalisable partout) */
   metrics?: MetricDef[]

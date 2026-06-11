@@ -5,16 +5,54 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, type Log, type MetricValue } from '../types'
-import { addDays, formatDayMonth, formatShortFr, startOfWeek } from '../lib/dates'
+import { CATEGORY_META, type Log, type MetricValue, type Session } from '../types'
+import { addDays, formatDayMonth, formatShortFr, startOfWeek, toDateStr, todayStr } from '../lib/dates'
 import { logSummary } from '../lib/format'
-import { Chip, EmptyState, PageHeader } from '../components/ui'
+import { Chip, EmptyState, Field, PageHeader, PrimaryButton, Sheet } from '../components/ui'
+import CompleteSheet from '../components/CompleteSheet'
+
+const HEAT_WEEKS = 16
+
+/** Heatmap d'activité façon Strava/GitHub : 16 semaines, lundi en haut */
+function Heatmap({ logs }: { logs: Log[] }) {
+  const byDate = new Map<string, number>()
+  for (const l of logs) byDate.set(l.date, (byDate.get(l.date) ?? 0) + 1)
+  const monday = startOfWeek(new Date())
+  const today = todayStr()
+  return (
+    <div className="flex justify-between gap-1">
+      {Array.from({ length: HEAT_WEEKS }, (_, w) => {
+        const ws = addDays(monday, -7 * (HEAT_WEEKS - 1 - w))
+        return (
+          <div key={w} className="flex flex-col gap-1">
+            {Array.from({ length: 7 }, (_, d) => {
+              const ds = toDateStr(addDays(ws, d))
+              const count = byDate.get(ds) ?? 0
+              const cls =
+                ds > today
+                  ? 'bg-transparent'
+                  : count === 0
+                    ? 'bg-sand/70'
+                    : count === 1
+                      ? 'bg-sage-300'
+                      : count === 2
+                        ? 'bg-sage-500'
+                        : 'bg-sage-700'
+              return <div key={d} title={`${formatShortFr(ds)} : ${count}`} className={'h-3.5 w-3.5 rounded-[4px] ' + cls} />
+            })}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 const axisStyle = { fontSize: 11, fontFamily: 'Nunito', fill: '#717d72' }
 
@@ -33,6 +71,30 @@ export default function Progress() {
   const deleteLog = (l: Log) => {
     if (window.confirm(`Supprimer « ${l.sessionName} » du ${formatShortFr(l.date)} ?`)) void removeLog(l.id)
   }
+
+  // Saisie rétroactive : séance + date passée
+  const [retroOpen, setRetroOpen] = useState(false)
+  const [retroSessionId, setRetroSessionId] = useState('')
+  const [retroDate, setRetroDate] = useState(todayStr())
+  const [retroCompleting, setRetroCompleting] = useState<Session | null>(null)
+  const retroSession = sessions.find((s) => s.id === retroSessionId) ?? sessions[0]
+
+  // Streak : semaines consécutives avec au moins une séance (semaine en cours tolérée)
+  const streak = useMemo(() => {
+    const monday = startOfWeek(new Date())
+    const hasWeek = (offset: number) => {
+      const a = toDateStr(addDays(monday, -7 * offset))
+      const b = toDateStr(addDays(monday, -7 * offset + 6))
+      return logs.some((l) => l.date >= a && l.date <= b)
+    }
+    let count = 0
+    let w = hasWeek(0) ? 0 : 1
+    while (hasWeek(w)) {
+      count++
+      w++
+    }
+    return count
+  }, [logs])
 
   // Séances par semaine (8 dernières semaines)
   const weekly = useMemo(() => {
@@ -101,6 +163,19 @@ export default function Progress() {
       })
   }, [logs, selectedEx, muscuMetric])
   const muscuUnit = selectedEx?.measure === 'sec' ? 's' : 'reps'
+  const goal = selectedEx?.goal ?? null
+  // Ligne sur le graphique uniquement si la métrique affichée correspond à l'objectif
+  const goalOnChart = goal && goal.metric === muscuMetric ? goal : null
+  const goalReached = useMemo(() => {
+    if (!selectedEx?.goal) return false
+    const g = selectedEx.goal
+    return logs.some((l) => {
+      const r = l.results?.find((x) => x.exerciseId === selectedEx.id)
+      if (!r || !r.sets.length) return false
+      const v = g.metric === 'best' ? Math.max(...r.sets) : r.sets.reduce((a, b) => a + b, 0)
+      return v >= g.value
+    })
+  }, [logs, selectedEx])
 
   const hasAnyLog = logs.length > 0
 
@@ -127,6 +202,16 @@ export default function Progress() {
                 <p className="text-[11px] font-bold text-ink-soft">au total</p>
               </div>
             </div>
+
+            <ChartCard title="Régularité">
+              <p className="mb-3 text-sm font-extrabold text-sage-700">
+                {streak > 0
+                  ? `🔥 ${streak} semaine${streak > 1 ? 's' : ''} d'affilée avec au moins une séance`
+                  : '🌱 Complétez une séance pour démarrer votre série'}
+              </p>
+              <Heatmap logs={logs} />
+              <p className="mt-2 text-right text-[10px] font-semibold text-ink-soft/60">16 dernières semaines</p>
+            </ChartCard>
 
             <ChartCard title="Séances complétées par semaine">
               <div className="h-44">
@@ -222,6 +307,7 @@ export default function Progress() {
                     <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                     <YAxis tick={axisStyle} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
                     <Tooltip formatter={(v) => [`${v} ${muscuUnit}`, '']} />
+                    {goalOnChart && <ReferenceLine y={goalOnChart.value} stroke="#c2773e" strokeWidth={2} strokeDasharray="6 4" />}
                     <Line type="monotone" dataKey="value" stroke="#8d6ba0" strokeWidth={3} dot={{ r: 4, fill: '#8d6ba0' }} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -235,13 +321,26 @@ export default function Progress() {
               <p className="pt-2 text-center text-xs font-extrabold text-muscu">
                 🏆 Record : {Math.max(...muscuData.map((d) => d.value))} {muscuUnit}
                 {muscuMetric === 'volume' ? ' (volume)' : ' (série)'}
+                {goal && (
+                  <span className={'ml-2 ' + (goalReached ? 'text-sage-600' : 'text-running')}>
+                    🎯 Objectif {goal.value} ({goal.metric === 'best' ? 'série' : 'volume'})
+                    {goalReached ? ' — atteint 🎉' : ''}
+                  </span>
+                )}
               </p>
             )}
           </ChartCard>
         )}
 
-        {logs.length > 0 && (
+        {(logs.length > 0 || sessions.length > 0) && (
           <ChartCard title="🗓️ Historique">
+            <button
+              type="button"
+              onClick={() => setRetroOpen(true)}
+              className="mb-2 w-full rounded-2xl border-2 border-dashed border-sage-300 px-4 py-2.5 text-xs font-extrabold text-sage-600 active:bg-sage-100"
+            >
+              + Saisir une séance passée (oubli)
+            </button>
             <div>
               {logs.slice(0, 15).map((l) => (
                 <div key={l.id} className="flex items-center gap-2 border-b border-cream py-2 last:border-0">
@@ -271,6 +370,44 @@ export default function Progress() {
           </ChartCard>
         )}
       </div>
+
+      <Sheet open={retroOpen} onClose={() => setRetroOpen(false)} title="Saisir une séance passée">
+        <div className="space-y-4">
+          <Field label="Séance">
+            <select
+              value={retroSession?.id ?? ''}
+              onChange={(e) => setRetroSessionId(e.target.value)}
+              className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
+            >
+              {sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {CATEGORY_META[s.category].emoji} {s.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Date de la séance">
+            <input
+              type="date"
+              value={retroDate}
+              max={todayStr()}
+              onChange={(e) => setRetroDate(e.target.value || todayStr())}
+              className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
+            />
+          </Field>
+          <PrimaryButton
+            onClick={() => {
+              setRetroOpen(false)
+              if (retroSession) setRetroCompleting(retroSession)
+            }}
+            disabled={!retroSession}
+          >
+            Saisir les détails →
+          </PrimaryButton>
+        </div>
+      </Sheet>
+
+      <CompleteSheet session={retroCompleting} date={retroDate} onClose={() => setRetroCompleting(null)} />
     </div>
   )
 }

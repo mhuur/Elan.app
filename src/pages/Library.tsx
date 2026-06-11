@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useData } from '../data/DataContext'
-import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, type Exercise } from '../types'
+import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, subtypesOf, type Exercise } from '../types'
 import { summarizeSession } from '../lib/format'
 import { describeSchedule } from '../lib/schedule'
 import { EmptyState, Fab, PageHeader, Seg } from '../components/ui'
@@ -12,14 +12,16 @@ const norm = (s: string) =>
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
 
-/** Groupes de sous-types : presets dans l'ordre, customs ensuite, « sans » à la fin */
+/** Groupes de sous-types (un exercice multi-tags apparaît dans chacun) : presets dans l'ordre, customs ensuite, « sans » à la fin */
 function subtypeGroups(list: Exercise[]): [string, Exercise[]][] {
   const map = new Map<string, Exercise[]>()
   for (const e of list) {
-    const k = e.subtype?.trim() || ''
-    const arr = map.get(k)
-    if (arr) arr.push(e)
-    else map.set(k, [e])
+    const sts = subtypesOf(e)
+    for (const k of sts.length ? sts : ['']) {
+      const arr = map.get(k)
+      if (arr) arr.push(e)
+      else map.set(k, [e])
+    }
   }
   const rank = (k: string) => {
     if (!k) return 10000
@@ -37,7 +39,10 @@ export default function Library() {
   const [query, setQuery] = useState('')
 
   const visibleExercises = exercises.filter(
-    (e) => !query.trim() || norm(e.name).includes(norm(query)) || norm(e.subtype ?? '').includes(norm(query)),
+    (e) =>
+      !query.trim() ||
+      norm(e.name).includes(norm(query)) ||
+      subtypesOf(e).some((st) => norm(st).includes(norm(query))),
   )
 
   return (

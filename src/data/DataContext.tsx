@@ -141,8 +141,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (localStorage.getItem(key)) return
     localStorage.setItem(key, '1')
     for (const e of exercises) {
-      if (!e.subtype && SUBTYPE_BY_NAME[e.name]) {
-        void store.update('exercises', e.id, { subtype: SUBTYPE_BY_NAME[e.name] })
+      if (!e.subtype && !e.subtypes?.length && SUBTYPE_BY_NAME[e.name]) {
+        void store.update('exercises', e.id, { subtypes: [SUBTYPE_BY_NAME[e.name]] })
       }
     }
   }, [store, dataReady, exercises, mode, user])

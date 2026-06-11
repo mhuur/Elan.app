@@ -1,7 +1,17 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useData } from '../data/DataContext'
-import { CATEGORIES, CATEGORY_META, type Category, type LinkDef, type MetricDef, type SessionItem } from '../types'
+import {
+  CATEGORIES,
+  CATEGORY_META,
+  PRESET_SUBTYPES,
+  subtypesOf,
+  type Category,
+  type Exercise,
+  type LinkDef,
+  type MetricDef,
+  type SessionItem,
+} from '../types'
 import { DAY_LETTER, DAY_NAMES, todayStr } from '../lib/dates'
 import { DEFAULT_VELO_METRICS, effectiveMetrics, newMetric } from '../lib/metrics'
 import { Chip, Field, GhostButton, PrimaryButton, Seg, Stepper, TextArea, TextInput } from '../components/ui'
@@ -9,10 +19,27 @@ import { Chip, Field, GhostButton, PrimaryButton, Seg, Stepper, TextArea, TextIn
 const smallInput =
   'rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
 
+/** Options du sélecteur d'exercice, groupées par premier sous-type (comme la banque) */
+function groupedOptions(list: Exercise[]): [string, Exercise[]][] {
+  const map = new Map<string, Exercise[]>()
+  for (const e of list) {
+    const k = subtypesOf(e)[0] ?? ''
+    const arr = map.get(k)
+    if (arr) arr.push(e)
+    else map.set(k, [e])
+  }
+  const rank = (k: string) => {
+    if (!k) return 10000
+    const i = PRESET_SUBTYPES.indexOf(k)
+    return i === -1 ? 5000 : i
+  }
+  return [...map.entries()].sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0], 'fr'))
+}
+
 export default function SessionForm() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { sessions, exercises, addSession, updateSession, removeSession } = useData()
+  const { sessions, exercises, addSession, updateSession, removeSession, updateExercise } = useData()
   const existing = sessions.find((s) => s.id === id)
 
   const [name, setName] = useState(existing?.name ?? '')
@@ -29,6 +56,7 @@ export default function SessionForm() {
   const [restSec, setRestSec] = useState(existing?.restSec ?? 15)
   const [rounds, setRounds] = useState(existing?.rounds ?? 2)
   const [stretchRest, setStretchRest] = useState(existing?.category === 'etirements' ? (existing.restSec ?? 0) : 5)
+  const [muscuRounds, setMuscuRounds] = useState(existing?.category === 'muscu' ? (existing.rounds ?? 1) : 1)
   const [notes, setNotes] = useState(existing?.notes ?? '')
 
   const catExercises = exercises.filter((e) => e.category === category)
@@ -103,6 +131,7 @@ export default function SessionForm() {
       createdAt: existing?.createdAt ?? Date.now(),
       ...(category === 'hiit' ? { workSec, restSec, rounds } : {}),
       ...(category === 'etirements' ? { restSec: stretchRest } : {}),
+      ...(category === 'muscu' ? { rounds: muscuRounds } : {}),
     }
     if (existing) await updateSession(existing.id, data)
     else await addSession(data)
@@ -256,84 +285,143 @@ export default function SessionForm() {
           </div>
         )}
 
+        {category === 'muscu' && (
+          <div className="rounded-2xl bg-sage-50 p-3.5">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-bold text-ink-soft">Tours du circuit</p>
+                <p className="text-[10px] font-semibold text-ink-soft/70">Refaire toute la série d'exercices</p>
+              </div>
+              <Stepper value={muscuRounds} onChange={setMuscuRounds} min={1} max={10} small />
+            </div>
+          </div>
+        )}
+
         {hasItems && (
           <Field label={category === 'etirements' ? 'Postures de la routine' : 'Exercices de la séance'}>
             <div className="space-y-2">
               {items.map((it, idx) => {
                 const ex = exOf(it.exerciseId)
+                const isSec = ex?.measure === 'sec'
                 return (
-                  <div key={idx} className="rounded-2xl bg-sage-50 p-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex flex-col">
-                        <button type="button" aria-label="Monter" onClick={() => moveItem(idx, -1)} className="text-xs text-ink-soft/60 disabled:opacity-30" disabled={idx === 0}>
-                          ▲
-                        </button>
-                        <button type="button" aria-label="Descendre" onClick={() => moveItem(idx, 1)} className="text-xs text-ink-soft/60 disabled:opacity-30" disabled={idx === items.length - 1}>
-                          ▼
+                  <div key={idx}>
+                    <div className="rounded-2xl bg-sage-50 p-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex flex-col">
+                          <button type="button" aria-label="Monter" onClick={() => moveItem(idx, -1)} className="text-xs text-ink-soft/60 disabled:opacity-30" disabled={idx === 0}>
+                            ▲
+                          </button>
+                          <button type="button" aria-label="Descendre" onClick={() => moveItem(idx, 1)} className="text-xs text-ink-soft/60 disabled:opacity-30" disabled={idx === items.length - 1}>
+                            ▼
+                          </button>
+                        </div>
+                        <select
+                          value={it.exerciseId}
+                          onChange={(e) => setItem(idx, { exerciseId: e.target.value })}
+                          className="min-w-0 flex-1 rounded-xl border border-sand bg-surface px-3 py-2 text-sm font-bold outline-none focus:border-sage-400"
+                        >
+                          {groupedOptions(catExercises).map(([st, exos]) => {
+                            const opts = exos.map((e) => (
+                              <option key={e.id} value={e.id}>
+                                {e.name}
+                              </option>
+                            ))
+                            return st ? (
+                              <optgroup key={st} label={st}>
+                                {opts}
+                              </optgroup>
+                            ) : (
+                              <optgroup key="autres" label="Autres">
+                                {opts}
+                              </optgroup>
+                            )
+                          })}
+                          {ex && ex.category !== category && <option value={ex.id}>{ex.name}</option>}
+                        </select>
+                        {it.comment === undefined && (
+                          <button
+                            type="button"
+                            aria-label="Ajouter un commentaire"
+                            onClick={() => setItem(idx, { comment: '' })}
+                            className="px-0.5 text-sm text-ink-soft/60"
+                          >
+                            💬
+                          </button>
+                        )}
+                        <button type="button" aria-label="Retirer" onClick={() => removeItem(idx)} className="px-0.5 text-ink-soft/60">
+                          ✕
                         </button>
                       </div>
-                      <select
-                        value={it.exerciseId}
-                        onChange={(e) => setItem(idx, { exerciseId: e.target.value })}
-                        className="min-w-0 flex-1 rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400"
-                      >
-                        {catExercises.map((e) => (
-                          <option key={e.id} value={e.id}>
-                            {e.name}
-                          </option>
-                        ))}
-                        {ex && ex.category !== category && <option value={ex.id}>{ex.name}</option>}
-                      </select>
-                      <button type="button" aria-label="Retirer" onClick={() => removeItem(idx)} className="px-1 text-ink-soft/60">
-                        ✕
-                      </button>
-                    </div>
 
-                    {category === 'muscu' && (
-                      <>
-                        <div className="mt-2 flex items-center justify-between gap-2">
-                          <div className="text-center">
-                            <p className="mb-1 text-xs font-bold text-ink-soft">Séries</p>
-                            <Stepper value={it.sets ?? 3} onChange={(v) => setItem(idx, { sets: v })} min={1} />
-                          </div>
-                          <div className="text-center">
-                            <p className="mb-1 text-xs font-bold text-ink-soft">{ex?.measure === 'sec' ? 'Secondes' : 'Répétitions'}</p>
+                      {category === 'muscu' && (
+                        <div className="mt-1.5 space-y-1.5">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-[11px] font-bold text-ink-soft">Séries</span>
+                            <Stepper small value={it.sets ?? 3} onChange={(v) => setItem(idx, { sets: v })} min={1} />
+                            <span className="text-xs font-extrabold text-ink-soft/60">×</span>
                             <Stepper
+                              small
                               value={it.target ?? 10}
                               onChange={(v) => setItem(idx, { target: v })}
                               min={1}
-                              step={ex?.measure === 'sec' ? 5 : 1}
+                              step={isSec ? 5 : 1}
                             />
+                            <div className="flex overflow-hidden rounded-lg border border-sand text-[10px] font-extrabold">
+                              <button
+                                type="button"
+                                onClick={() => ex && void updateExercise(ex.id, { measure: 'reps' })}
+                                className={'px-1.5 py-1 ' + (!isSec ? 'bg-sage-500 text-white' : 'bg-surface text-ink-soft')}
+                              >
+                                reps
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => ex && void updateExercise(ex.id, { measure: 'sec' })}
+                                className={'px-1.5 py-1 ' + (isSec ? 'bg-sage-500 text-white' : 'bg-surface text-ink-soft')}
+                              >
+                                sec
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-ink-soft">Repos entre séries</span>
+                            <Stepper small value={it.restSec ?? 60} onChange={(v) => setItem(idx, { restSec: v })} min={0} max={600} step={15} suffix="s" />
                           </div>
                         </div>
-                        <div className="mt-2 flex items-center justify-between">
-                          <p className="text-xs font-bold text-ink-soft">Repos entre séries</p>
-                          <Stepper
-                            value={it.restSec ?? 60}
-                            onChange={(v) => setItem(idx, { restSec: v })}
-                            min={0}
-                            max={600}
-                            step={15}
-                            suffix="s"
-                          />
-                        </div>
-                      </>
-                    )}
+                      )}
 
-                    {category === 'etirements' && (
-                      <div className="mt-2 flex items-center justify-between">
-                        <p className="text-xs font-bold text-ink-soft">Durée de la posture</p>
-                        <Stepper value={it.durationSec ?? 30} onChange={(v) => setItem(idx, { durationSec: v })} min={5} step={5} suffix="s" />
+                      {category === 'etirements' && (
+                        <div className="mt-1.5 flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-ink-soft">Durée de la posture</span>
+                          <Stepper small value={it.durationSec ?? 30} onChange={(v) => setItem(idx, { durationSec: v })} min={5} step={5} suffix="s" />
+                        </div>
+                      )}
+
+                      {it.comment !== undefined && (
+                        <input
+                          type="text"
+                          value={it.comment}
+                          onChange={(e) => setItem(idx, { comment: e.target.value })}
+                          placeholder="Commentaire (tempo, consigne…)"
+                          className={smallInput + ' mt-1.5 w-full py-2'}
+                        />
+                      )}
+                    </div>
+
+                    {category === 'muscu' && idx < items.length - 1 && (
+                      <div className="-my-0.5 flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setItem(idx, { linkNext: !it.linkNext })}
+                          className={
+                            'relative z-10 rounded-full px-3 py-1 text-[10px] font-extrabold transition-colors ' +
+                            (it.linkNext ? 'bg-muscu text-white shadow-sm' : 'bg-sage-100 text-ink-soft/70')
+                          }
+                        >
+                          {it.linkNext ? '🔗 Superset — enchaîné sans repos' : '+ lier en superset'}
+                        </button>
                       </div>
                     )}
-
-                    <input
-                      type="text"
-                      value={it.comment ?? ''}
-                      onChange={(e) => setItem(idx, { comment: e.target.value })}
-                      placeholder="Commentaire (tempo, consigne…)"
-                      className={smallInput + ' mt-2 w-full'}
-                    />
                   </div>
                 )
               })}

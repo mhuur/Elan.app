@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useData } from '../data/DataContext'
-import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, type Category, type Measure } from '../types'
+import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, subtypesOf, type Category, type Measure } from '../types'
 import { youtubeSearch } from '../lib/format'
-import { Chip, Field, GhostButton, PrimaryButton, Seg, TextArea, TextInput } from '../components/ui'
+import { Chip, Field, GhostButton, NumInput, PrimaryButton, Seg, TextArea, TextInput } from '../components/ui'
 
 export default function ExerciseForm() {
   const { id } = useParams()
@@ -13,26 +13,39 @@ export default function ExerciseForm() {
 
   const [name, setName] = useState(existing?.name ?? '')
   const [category, setCategory] = useState<Category>(existing?.category ?? 'muscu')
-  const [subtype, setSubtype] = useState(existing?.subtype ?? '')
-  const [customSubtype, setCustomSubtype] = useState(
-    () => !!existing?.subtype && !PRESET_SUBTYPES.includes(existing.subtype),
-  )
+  const [subtypes, setSubtypes] = useState<string[]>(() => (existing ? subtypesOf(existing) : []))
+  const [customInput, setCustomInput] = useState('')
   const [measure, setMeasure] = useState<Measure>(existing?.measure ?? 'reps')
+  const [goalMetric, setGoalMetric] = useState<'best' | 'volume'>(existing?.goal?.metric ?? 'best')
+  const [goalValue, setGoalValue] = useState<number | undefined>(existing?.goal?.value)
   const [description, setDescription] = useState(existing?.description ?? '')
   const [videoUrl, setVideoUrl] = useState(existing?.videoUrl ?? '')
 
-  // Sous-types déjà utilisés dans la banque, en plus des presets
+  // Sous-types déjà utilisés dans la banque (et sélectionnés ici), en plus des presets
   const customSubtypes = [
-    ...new Set(exercises.map((e) => e.subtype).filter((s): s is string => !!s && !PRESET_SUBTYPES.includes(s))),
+    ...new Set(
+      [...exercises.flatMap((e) => subtypesOf(e)), ...subtypes].filter((s) => !PRESET_SUBTYPES.includes(s)),
+    ),
   ].sort((a, b) => a.localeCompare(b, 'fr'))
   const subtypeOptions = [...PRESET_SUBTYPES, ...customSubtypes]
+
+  const toggleSubtype = (st: string) =>
+    setSubtypes((p) => (p.includes(st) ? p.filter((x) => x !== st) : [...p, st]))
+
+  const addCustomSubtype = () => {
+    const st = customInput.trim()
+    if (st && !subtypes.includes(st)) setSubtypes((p) => [...p, st])
+    setCustomInput('')
+  }
 
   const save = async () => {
     const data = {
       name: name.trim() || 'Exercice',
       category,
-      subtype: subtype.trim(),
+      subtypes,
+      subtype: '',
       measure,
+      goal: category === 'muscu' && goalValue ? { metric: goalMetric, value: goalValue } : null,
       description: description.trim(),
       videoUrl: videoUrl.trim(),
       createdAt: existing?.createdAt ?? Date.now(),
@@ -75,44 +88,28 @@ export default function ExerciseForm() {
           </div>
         </Field>
 
-        <Field label="Sous-type (optionnel)">
+        <Field label="Sous-types (plusieurs possibles)">
           <div className="flex flex-wrap gap-1.5">
-            <Chip
-              active={!subtype.trim() && !customSubtype}
-              onClick={() => {
-                setSubtype('')
-                setCustomSubtype(false)
-              }}
-            >
-              Aucun
-            </Chip>
             {subtypeOptions.map((st) => (
-              <Chip
-                key={st}
-                active={!customSubtype && subtype === st}
-                onClick={() => {
-                  setSubtype(st)
-                  setCustomSubtype(false)
-                }}
-              >
+              <Chip key={st} active={subtypes.includes(st)} onClick={() => toggleSubtype(st)}>
                 {st}
               </Chip>
             ))}
-            <Chip
-              active={customSubtype}
-              onClick={() => {
-                setCustomSubtype(true)
-                if (subtypeOptions.includes(subtype)) setSubtype('')
-              }}
-            >
-              ✏️ Autre
-            </Chip>
           </div>
-          {customSubtype && (
-            <div className="mt-2">
-              <TextInput value={subtype} onChange={setSubtype} placeholder="Votre sous-type (ex. Triceps)" />
+          <div className="mt-2 flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <TextInput value={customInput} onChange={setCustomInput} placeholder="Autre sous-type (ex. Triceps)…" />
             </div>
-          )}
+            {customInput.trim() && (
+              <button
+                type="button"
+                onClick={addCustomSubtype}
+                className="shrink-0 rounded-full bg-sage-500 px-4 py-2.5 text-sm font-extrabold text-white"
+              >
+                + Ajouter
+              </button>
+            )}
+          </div>
         </Field>
 
         <Field label="Mesure de l'effort">
@@ -125,6 +122,30 @@ export default function ExerciseForm() {
             onChange={setMeasure}
           />
         </Field>
+
+        {category === 'muscu' && (
+          <Field label="🎯 Objectif (optionnel)">
+            <div className="space-y-2 rounded-2xl bg-sage-50 p-3">
+              <Seg
+                options={[
+                  { value: 'best' as const, label: 'Meilleure série' },
+                  { value: 'volume' as const, label: 'Volume total' },
+                ]}
+                value={goalMetric}
+                onChange={setGoalMetric}
+              />
+              <NumInput
+                value={goalValue}
+                onChange={setGoalValue}
+                suffix={measure === 'sec' ? 's' : 'reps'}
+                placeholder="Ex. 20 — vide = aucun objectif"
+              />
+              <p className="text-xs font-semibold text-ink-soft">
+                Suivi dans Progrès, avec une petite célébration quand vous l'atteignez 🎉
+              </p>
+            </div>
+          </Field>
+        )}
 
         <Field label="Description (optionnel)">
           <TextArea value={description} onChange={setDescription} placeholder="Consignes, posture, respiration…" />

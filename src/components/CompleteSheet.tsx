@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, type Log, type MetricValue, type Session } from '../types'
+import { CATEGORY_META, type Log, type MetricValue, type Session, type SessionItem } from '../types'
 import { todayStr } from '../lib/dates'
 import { mmss } from '../lib/format'
 import { effectiveMetrics } from '../lib/metrics'
@@ -57,23 +57,48 @@ function RestTimer({ sec }: { sec: number }) {
   )
 }
 
+/** Groupes d'exercices : les items liés (superset) sont regroupés */
+function buildGroups(items: SessionItem[]): SessionItem[][] {
+  const groups: SessionItem[][] = []
+  let current: SessionItem[] = []
+  items.forEach((it, i) => {
+    current.push(it)
+    if (!(it.linkNext && i < items.length - 1)) {
+      groups.push(current)
+      current = []
+    }
+  })
+  return groups
+}
+
 /** Feuille de complétion d'une séance : formulaire adapté à chaque sport */
-export default function CompleteSheet({ session, onClose }: { session: Session | null; onClose: () => void }) {
+export default function CompleteSheet({
+  session,
+  onClose,
+  date,
+}: {
+  session: Session | null
+  onClose: () => void
+  /** Date du log (YYYY-MM-DD), aujourd'hui par défaut — permet la saisie rétroactive */
+  date?: string
+}) {
   return (
     <Sheet
       open={!!session}
       onClose={onClose}
       title={session ? `${CATEGORY_META[session.category].emoji} ${session.name}` : undefined}
     >
-      {session && <Inner key={session.id} session={session} onClose={onClose} />}
+      {session && <Inner key={session.id} session={session} onClose={onClose} date={date} />}
     </Sheet>
   )
 }
 
-function Inner({ session, onClose }: { session: Session; onClose: () => void }) {
+function Inner({ session, onClose, date }: { session: Session; onClose: () => void; date?: string }) {
   const { addLog, logs, exercises } = useData()
   const navigate = useNavigate()
   const [note, setNote] = useState('')
+  const [celebrate, setCelebrate] = useState<string[] | null>(null)
+  const logDate = date ?? todayStr()
 
   const metrics = useMemo(() => effectiveMetrics(session), [session])
   const links = session.links ?? []
@@ -91,13 +116,16 @@ function Inner({ session, onClose }: { session: Session; onClose: () => void }) 
     return m
   })
 
-  // Muscu : répétitions réalisées par série
+  // Muscu : répétitions réalisées par série (tours du circuit inclus)
   const exOf = (id: string) => exercises.find((e) => e.id === id)
+  const roundsMul = isMuscu ? (session.rounds ?? 1) : 1
   const [values, setValues] = useState<Record<string, number[]>>(() => {
     const m: Record<string, number[]> = {}
     for (const it of session.items) {
       const prev = lastLog?.results?.find((r) => r.exerciseId === it.exerciseId)
-      m[it.exerciseId] = prev ? [...prev.sets] : Array.from({ length: it.sets ?? 3 }, () => it.target ?? 10)
+      m[it.exerciseId] = prev
+        ? [...prev.sets]
+        : Array.from({ length: (it.sets ?? 3) * roundsMul }, () => it.target ?? 10)
     }
     return m
   })
@@ -122,19 +150,29 @@ function Inner({ session, onClose }: { session: Session; onClose: () => void }) 
     const extra: Partial<Omit<Log, 'id'>> = {}
     const mv = buildMetricValues()
     if (mv.length) extra.metrics = mv
+    const achieved: string[] = []
     if (isMuscu && session.items.length) {
       extra.results = session.items.map((it) => {
         const ex = exOf(it.exerciseId)
+        const sets = values[it.exerciseId] ?? []
+        // Objectif atteint ?
+        if (ex?.goal && sets.length) {
+          const v = ex.goal.metric === 'best' ? Math.max(...sets) : sets.reduce((a, b) => a + b, 0)
+          if (v >= ex.goal.value) {
+            const unit = ex.measure === 'sec' ? 's' : 'reps'
+            achieved.push(`${ex.name} : ${v} ${unit} (objectif ${ex.goal.value})`)
+          }
+        }
         return {
           exerciseId: it.exerciseId,
           name: ex?.name ?? 'Exercice',
           measure: ex?.measure ?? ('reps' as const),
-          sets: values[it.exerciseId] ?? [],
+          sets,
         }
       })
     }
     await addLog({
-      date: todayStr(),
+      date: logDate,
       sessionId: session.id,
       sessionName: session.name,
       category: session.category,
@@ -142,7 +180,27 @@ function Inner({ session, onClose }: { session: Session; onClose: () => void }) 
       note: note.trim(),
       ...extra,
     })
-    onClose()
+    if (achieved.length) setCelebrate(achieved)
+    else onClose()
+  }
+
+  if (celebrate) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-6 text-center">
+        <div className="text-6xl">🎉</div>
+        <h3 className="text-xl font-extrabold">Objectif atteint, bravo !</h3>
+        <div className="space-y-1">
+          {celebrate.map((a, i) => (
+            <p key={i} className="text-sm font-bold text-sage-700">
+              🎯 {a}
+            </p>
+          ))}
+        </div>
+        <div className="w-full">
+          <PrimaryButton onClick={onClose}>Continuer</PrimaryButton>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -177,42 +235,67 @@ function Inner({ session, onClose }: { session: Session; onClose: () => void }) 
         <p className="text-xs font-semibold text-ink-soft">Prérempli avec votre dernière séance — ajustez en deux taps.</p>
       )}
 
+      {isMuscu && roundsMul > 1 && (
+        <p className="rounded-2xl bg-muscu/10 px-4 py-2.5 text-xs font-bold text-muscu">
+          🔁 Circuit × {roundsMul} tours : faites tous les exercices, puis recommencez. Les séries des tours sont déjà
+          comptées ci-dessous.
+        </p>
+      )}
+
       {isMuscu &&
-        session.items.map((it) => {
-          const ex = exOf(it.exerciseId)
-          const suffix = ex?.measure === 'sec' ? 's' : ''
-          return (
-            <div key={it.exerciseId} className="rounded-2xl bg-sage-50 p-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-extrabold">{ex?.name ?? 'Exercice'}</p>
-                {ex?.videoUrl && (
-                  <a href={ex.videoUrl} target="_blank" rel="noreferrer" className="rounded-full bg-surface px-2.5 py-1 text-xs font-bold text-velo">
-                    ▶ démo
-                  </a>
-                )}
-              </div>
-              {it.comment && <p className="mt-0.5 text-xs font-semibold text-ink-soft">💡 {it.comment}</p>}
-              <div className="mt-2 space-y-1.5">
-                {(values[it.exerciseId] ?? []).map((rep, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-ink-soft">Série {i + 1}</span>
-                    <Stepper value={rep} onChange={(v) => setRep(it.exerciseId, i, v)} suffix={suffix} step={ex?.measure === 'sec' ? 5 : 1} />
-                  </div>
-                ))}
-              </div>
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <div className="flex gap-3 text-xs font-bold">
-                  <button type="button" className="text-sage-600" onClick={() => addSet(it.exerciseId)}>
-                    + Ajouter une série
-                  </button>
-                  {(values[it.exerciseId]?.length ?? 0) > 1 && (
-                    <button type="button" className="text-ink-soft" onClick={() => removeSet(it.exerciseId)}>
-                      − Retirer
-                    </button>
+        buildGroups(session.items).map((group, gi) => {
+          const renderItem = (it: SessionItem, showRest: boolean) => {
+            const ex = exOf(it.exerciseId)
+            const suffix = ex?.measure === 'sec' ? 's' : ''
+            return (
+              <div key={it.exerciseId} className="rounded-2xl bg-sage-50 p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-extrabold">{ex?.name ?? 'Exercice'}</p>
+                  {ex?.videoUrl && (
+                    <a href={ex.videoUrl} target="_blank" rel="noreferrer" className="rounded-full bg-surface px-2.5 py-1 text-xs font-bold text-velo">
+                      ▶ démo
+                    </a>
                   )}
                 </div>
-                {(it.restSec ?? 60) > 0 && <RestTimer sec={it.restSec ?? 60} />}
+                {it.comment && <p className="mt-0.5 text-xs font-semibold text-ink-soft">💡 {it.comment}</p>}
+                <div className="mt-2 space-y-1.5">
+                  {(values[it.exerciseId] ?? []).map((rep, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-ink-soft">Série {i + 1}</span>
+                      <Stepper value={rep} onChange={(v) => setRep(it.exerciseId, i, v)} suffix={suffix} step={ex?.measure === 'sec' ? 5 : 1} />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div className="flex gap-3 text-xs font-bold">
+                    <button type="button" className="text-sage-600" onClick={() => addSet(it.exerciseId)}>
+                      + Ajouter une série
+                    </button>
+                    {(values[it.exerciseId]?.length ?? 0) > 1 && (
+                      <button type="button" className="text-ink-soft" onClick={() => removeSet(it.exerciseId)}>
+                        − Retirer
+                      </button>
+                    )}
+                  </div>
+                  {showRest && (it.restSec ?? 60) > 0 && <RestTimer sec={it.restSec ?? 60} />}
+                </div>
               </div>
+            )
+          }
+
+          if (group.length === 1) return <div key={gi}>{renderItem(group[0], true)}</div>
+          return (
+            <div key={gi} className="rounded-3xl border-2 border-muscu/30 p-1.5">
+              <p className="px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-muscu">
+                🔗 Superset — enchaîner sans repos
+              </p>
+              <div className="space-y-1.5">{group.map((it) => renderItem(it, false))}</div>
+              {(group[0].restSec ?? 60) > 0 && (
+                <div className="flex items-center justify-between px-2 py-2">
+                  <span className="text-xs font-bold text-ink-soft">Repos après le superset</span>
+                  <RestTimer sec={group[0].restSec ?? 60} />
+                </div>
+              )}
             </div>
           )
         })}

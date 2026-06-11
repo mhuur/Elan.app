@@ -62,8 +62,10 @@ export function summarizeSession(s: Session): string {
       if (!m.length) return 'Saisie des perfs à la fin'
       return m.slice(0, 3).map((x) => x.label).join(' · ') + (m.length > 3 ? '…' : '')
     }
-    case 'muscu':
-      return `${s.items.length} exercice${s.items.length > 1 ? 's' : ''}`
+    case 'muscu': {
+      const rounds = s.rounds ?? 1
+      return `${s.items.length} exercice${s.items.length > 1 ? 's' : ''}${rounds > 1 ? ` × ${rounds} tours` : ''}`
+    }
     case 'hiit': {
       const total = Math.round(hiitTotalSec(s) / 60)
       return `${s.items.length} exos · ${s.workSec ?? 45}s / ${s.restSec ?? 15}s · ~${total} min`
