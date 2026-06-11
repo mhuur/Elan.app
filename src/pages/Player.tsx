@@ -4,13 +4,21 @@ import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Exercise, type Session } from '../types'
 import { todayStr } from '../lib/dates'
 import { mmss } from '../lib/format'
+import { muscuBlocks } from '../lib/blocks'
 import { tone as playTone } from '../lib/audio'
 
 interface Step {
   type: 'prep' | 'work' | 'rest'
   label: string
+  /** Durée (estimation pour les étapes manuelles, utilisée par la barre de progression) */
   sec: number
   comment?: string
+  /** Étape sans chrono : on avance avec le bouton « Série faite ✓ » (reps muscu) */
+  manual?: boolean
+  /** Répétitions à faire (étapes manuelles) */
+  reps?: number
+  /** Contexte affiché sous le nom : « Bloc 1 · Tour 1/2 · Série 2/4 » */
+  detail?: string
 }
 
 function buildSteps(session: Session, exercises: Exercise[]): Step[] {
@@ -27,6 +35,47 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
         if (!isLast && rest > 0) steps.push({ type: 'rest', label: 'Repos', sec: rest })
       })
     }
+  } else if (session.category === 'muscu') {
+    // Séries guidées : chrono pour les exercices en secondes, validation manuelle pour les reps,
+    // repos automatique entre les séries (sauté entre supersets).
+    const blocks = muscuBlocks(session)
+    blocks.forEach((b, bi) => {
+      for (let r = 0; r < b.rounds; r++) {
+        b.items.forEach((it, ii) => {
+          const ex = exercises.find((e) => e.id === it.exerciseId)
+          const isSec = ex?.measure === 'sec'
+          const sets = Math.max(1, it.sets ?? 3)
+          for (let s = 0; s < sets; s++) {
+            const detail = [
+              blocks.length > 1 ? `Bloc ${bi + 1}` : '',
+              b.rounds > 1 ? `Tour ${r + 1}/${b.rounds}` : '',
+              `Série ${s + 1}/${sets}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')
+            if (isSec) {
+              steps.push({ type: 'work', label: nameOf(it.exerciseId), sec: it.target ?? 30, comment: it.comment, detail })
+            } else {
+              steps.push({
+                type: 'work',
+                label: nameOf(it.exerciseId),
+                sec: 45,
+                manual: true,
+                reps: it.target ?? 10,
+                comment: it.comment,
+                detail,
+              })
+            }
+            const lastSetOfItem = s === sets - 1
+            const veryLast =
+              bi === blocks.length - 1 && r === b.rounds - 1 && ii === b.items.length - 1 && lastSetOfItem
+            const superset = lastSetOfItem && !!it.linkNext && ii < b.items.length - 1
+            const restSec = it.restSec ?? 60
+            if (!veryLast && !superset && restSec > 0) steps.push({ type: 'rest', label: 'Repos', sec: restSec })
+          }
+        })
+      }
+    })
   } else {
     const rest = session.restSec ?? 0
     session.items.forEach((it, i) => {
@@ -105,6 +154,21 @@ export default function Player() {
   const finish = () => {
     if (!loggedRef.current && session) {
       loggedRef.current = true
+      // Muscu : on journalise les séries prévues (séries × tours du bloc, à la valeur cible)
+      const extra: { results?: { exerciseId: string; name: string; measure: 'reps' | 'sec'; sets: number[] }[] } = {}
+      if (session.category === 'muscu' && session.items.length) {
+        const blocks = muscuBlocks(session)
+        extra.results = session.items.map((it) => {
+          const ex = exercises.find((e) => e.id === it.exerciseId)
+          const rounds = blocks.find((b) => b.items.includes(it))?.rounds ?? 1
+          return {
+            exerciseId: it.exerciseId,
+            name: ex?.name ?? 'Exercice',
+            measure: ex?.measure ?? ('reps' as const),
+            sets: Array.from({ length: Math.max(1, it.sets ?? 3) * rounds }, () => it.target ?? 10),
+          }
+        })
+      }
       void addLog({
         date: todayStr(),
         sessionId: session.id,
@@ -112,6 +176,7 @@ export default function Player() {
         category: session.category,
         createdAt: Date.now(),
         note: '',
+        ...extra,
       })
     }
     tone(880, 0.6)
@@ -120,9 +185,9 @@ export default function Player() {
     setPhase('done')
   }
 
-  // Boucle du minuteur
+  // Boucle du minuteur (les étapes manuelles attendent le bouton « Série faite ✓ »)
   useEffect(() => {
-    if (phase !== 'running' || paused) return
+    if (phase !== 'running' || paused || steps[stepIdx]?.manual) return
     endAtRef.current = Date.now() + remainMsRef.current
     const iv = window.setInterval(() => {
       const ms = endAtRef.current - Date.now()
@@ -186,7 +251,8 @@ export default function Player() {
         <div>
           <h1 className="text-2xl font-extrabold">{session.name}</h1>
           <p className="mt-1 text-sm font-semibold text-ink-soft">
-            {steps.filter((s) => s.type === 'work').length} exercices · ~{Math.max(1, Math.round(totalSec / 60))} min
+            {steps.filter((s) => s.type === 'work').length}{' '}
+            {session.category === 'muscu' ? 'séries' : 'exercices'} · ~{Math.max(1, Math.round(totalSec / 60))} min
           </p>
         </div>
         <button
@@ -244,11 +310,30 @@ export default function Player() {
           {step.type === 'work' ? meta.label : step.type === 'rest' ? 'Récupération' : 'Préparation'}
         </p>
         <h1 className="text-3xl font-extrabold leading-tight">{step.label}</h1>
+        {step.detail && <p className="text-sm font-extrabold text-ink-soft">{step.detail}</p>}
         {step.comment && <p className="text-sm font-semibold text-ink-soft">💡 {step.comment}</p>}
-        <p className="my-2 text-8xl font-extrabold tabular-nums tracking-tight">{mmss(remaining)}</p>
+        {step.manual ? (
+          <>
+            <p className="my-2 text-8xl font-extrabold tabular-nums tracking-tight">{step.reps}</p>
+            <p className="-mt-3 text-base font-extrabold text-ink-soft">répétitions</p>
+            <button
+              type="button"
+              onClick={() => {
+                tone(520, 0.2)
+                goTo(stepIdx + 1)
+              }}
+              className="mt-4 rounded-full bg-sage-500 px-10 py-5 text-lg font-extrabold text-white shadow-lg shadow-sage-500/30 active:bg-sage-600"
+            >
+              Série faite ✓
+            </button>
+          </>
+        ) : (
+          <p className="my-2 text-8xl font-extrabold tabular-nums tracking-tight">{mmss(remaining)}</p>
+        )}
         {next && (
           <p className="text-sm font-bold text-ink-soft">
             Ensuite : <span className="text-ink">{next.label}</span>
+            {next.detail ? <span className="text-ink-soft"> — {next.detail}</span> : null}
           </p>
         )}
       </main>

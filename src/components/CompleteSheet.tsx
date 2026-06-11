@@ -5,6 +5,7 @@ import { CATEGORY_META, type Log, type MetricValue, type Session, type SessionIt
 import { todayStr } from '../lib/dates'
 import { mmss } from '../lib/format'
 import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
+import { muscuBlocks } from '../lib/blocks'
 import { tone } from '../lib/audio'
 import { Field, GhostButton, NumInput, PrimaryButton, Sheet, Stepper, TextArea } from './ui'
 
@@ -107,7 +108,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
   const isMuscu = session.category === 'muscu'
   // Le minuteur guidé n'a de sens que pour la journée en cours
   const hasTimer =
-    (session.category === 'hiit' || session.category === 'etirements') &&
+    (session.category === 'hiit' || session.category === 'etirements' || isMuscu) &&
     session.items.length > 0 &&
     logDate === todayStr()
   const hasForm = metrics.length > 0 || (isMuscu && session.items.length > 0)
@@ -122,16 +123,17 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
     return m
   })
 
-  // Muscu : répétitions réalisées par série (tours du circuit inclus)
+  // Muscu : répétitions réalisées par série (tours du bloc inclus)
   const exOf = (id: string) => exercises.find((e) => e.id === id)
-  const roundsMul = isMuscu ? (session.rounds ?? 1) : 1
+  const blocks = useMemo(() => (isMuscu ? muscuBlocks(session) : []), [session, isMuscu])
+  const roundsOf = (it: SessionItem) => blocks.find((b) => b.items.includes(it))?.rounds ?? 1
   const [values, setValues] = useState<Record<string, number[]>>(() => {
     const m: Record<string, number[]> = {}
     for (const it of session.items) {
       const prev = lastLog?.results?.find((r) => r.exerciseId === it.exerciseId)
       m[it.exerciseId] = prev
         ? [...prev.sets]
-        : Array.from({ length: (it.sets ?? 3) * roundsMul }, () => it.target ?? 10)
+        : Array.from({ length: (it.sets ?? 3) * (isMuscu ? roundsOf(it) : 1) }, () => it.target ?? 10)
     }
     return m
   })
@@ -286,15 +288,23 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         <p className="text-xs font-semibold text-ink-soft">Prérempli avec votre dernière séance — ajustez en deux taps.</p>
       )}
 
-      {isMuscu && roundsMul > 1 && (
+      {isMuscu && blocks.length === 1 && blocks[0].rounds > 1 && (
         <p className="rounded-2xl bg-muscu/10 px-4 py-2.5 text-xs font-bold text-muscu">
-          🔁 Circuit × {roundsMul} tours : faites tous les exercices, puis recommencez. Les séries des tours sont déjà
-          comptées ci-dessous.
+          🔁 Circuit × {blocks[0].rounds} tours : faites tous les exercices, puis recommencez. Les séries des tours
+          sont déjà comptées ci-dessous.
         </p>
       )}
 
       {isMuscu &&
-        buildGroups(session.items).map((group, gi) => {
+        blocks.map((b, bi) => (
+          <div key={bi} className="space-y-3">
+            {blocks.length > 1 && (
+              <p className="rounded-xl bg-muscu/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
+                ▦ Bloc {bi + 1}
+                {b.rounds > 1 ? ` · × ${b.rounds} tours (séries déjà comptées)` : ''}
+              </p>
+            )}
+            {buildGroups(b.items).map((group, gi) => {
           const renderItem = (it: SessionItem, showRest: boolean) => {
             const ex = exOf(it.exerciseId)
             const suffix = ex?.measure === 'sec' ? 's' : ''
@@ -339,22 +349,24 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
             )
           }
 
-          if (group.length === 1) return <div key={gi}>{renderItem(group[0], true)}</div>
-          return (
-            <div key={gi} className="rounded-3xl border-2 border-muscu/30 p-1.5">
-              <p className="px-2 py-1 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
-                🔗 Superset — enchaîner sans repos
-              </p>
-              <div className="space-y-1.5">{group.map((it) => renderItem(it, false))}</div>
-              {(group[0].restSec ?? 60) > 0 && (
-                <div className="flex items-center justify-between px-2 py-2">
-                  <span className="text-xs font-bold text-ink-soft">Repos après le superset</span>
-                  <CountdownButton sec={group[0].restSec ?? 60} label={`⏱ Repos ${group[0].restSec ?? 60} s`} />
+              if (group.length === 1) return <div key={gi}>{renderItem(group[0], true)}</div>
+              return (
+                <div key={gi} className="rounded-3xl border-2 border-muscu/30 p-1.5">
+                  <p className="px-2 py-1 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
+                    🔗 Superset — enchaîner sans repos
+                  </p>
+                  <div className="space-y-1.5">{group.map((it) => renderItem(it, false))}</div>
+                  {(group[0].restSec ?? 60) > 0 && (
+                    <div className="flex items-center justify-between px-2 py-2">
+                      <span className="text-xs font-bold text-ink-soft">Repos après le superset</span>
+                      <CountdownButton sec={group[0].restSec ?? 60} label={`⏱ Repos ${group[0].restSec ?? 60} s`} />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          )
-        })}
+              )
+            })}
+          </div>
+        ))}
 
       {metrics.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
@@ -377,7 +389,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         </Field>
       )}
 
-      {hasTimer ? (
+      {hasTimer && !isMuscu ? (
         <GhostButton onClick={() => void save()}>Marquer comme faite ✓ (sans minuteur)</GhostButton>
       ) : (
         <PrimaryButton onClick={() => void save()}>

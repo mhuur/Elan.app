@@ -26,10 +26,16 @@ try {
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
-  // --- Donner des jours fixes au HIIT via le planning (ils devront être nettoyés)
-  await page.click('text=Planning')
-  await page.click('[aria-label="HIIT — Cardio express — Lundi"]')
-  await page.waitForSelector('[aria-label="HIIT — Cardio express — Lundi"][aria-pressed="true"]')
+  // --- Donner des jours fixes au HIIT via sa fiche (ils devront être nettoyés par l'alternance)
+  await page.getByRole('link', { name: 'Exercices' }).click()
+  await page.waitForSelector('text=Bibliothèque')
+  await page.click('p:has-text("HIIT — Cardio express")')
+  await page.waitForSelector('text=Planification')
+  await page.click('button[title="Lundi"]')
+  await page.click('text=Enregistrer')
+  await page.waitForSelector('text=Bibliothèque')
+  const hiit0 = await sessionByName('HIIT')
+  if (!(hiit0.days ?? []).includes(0)) throw new Error('Le HIIT devrait avoir le lundi en jour fixe')
 
   // --- Vélo : tous les 2 jours ; jour 1 = Vélo + Full body, jour 2 = HIIT
   await page.getByRole('link', { name: 'Exercices' }).click()

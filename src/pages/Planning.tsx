@@ -13,7 +13,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Session } from '../types'
-import { DAY_LETTER, DAY_NAMES, addDays, mondayIndex, startOfWeek, toDateStr } from '../lib/dates'
+import { DAY_LETTER, DAY_NAMES, addDays, formatShortFr, mondayIndex, startOfWeek, toDateStr, todayStr } from '../lib/dates'
 import { describeSchedule, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
 import { EmptyState, PageHeader } from '../components/ui'
 
@@ -25,9 +25,8 @@ function Row({
   todayIdx,
   plannedDays,
   doneDays,
-  inCycle,
   sublabel,
-  onToggle,
+  onDay,
   onEdit,
 }: {
   session: Session
@@ -36,10 +35,9 @@ function Row({
   plannedDays: boolean[]
   /** Jours où la séance a été complétée cette semaine */
   doneDays: boolean[]
-  /** Membre ou propriétaire d'un cycle : la rotation pilote, pas les jours fixes */
-  inCycle: boolean
   sublabel?: string
-  onToggle: (day: number) => void
+  /** Toucher un rond : valider / dévalider la séance ce jour-là */
+  onDay: (day: number) => void
   onEdit: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: session.id })
@@ -85,7 +83,7 @@ function Row({
             type="button"
             aria-label={`${session.name} — ${DAY_NAMES[d]}`}
             aria-pressed={done || planned}
-            onClick={() => (inCycle ? onEdit() : onToggle(d))}
+            onClick={() => onDay(d)}
             className={
               'flex h-10 items-center justify-center rounded-lg transition-colors ' +
               (d === todayIdx ? 'bg-sage-50' : '')
@@ -106,7 +104,7 @@ function Row({
 }
 
 export default function Planning() {
-  const { sessions, logs, updateSession } = useData()
+  const { sessions, logs, updateSession, addLog, removeLog } = useData()
   const navigate = useNavigate()
   const todayIdx = mondayIndex()
 
@@ -161,18 +159,42 @@ export default function Planning() {
     })
   }
 
-  const toggle = (s: Session, day: number) => {
-    const days = s.days.includes(day) ? s.days.filter((d) => d !== day) : [...s.days, day].sort((a, b) => a - b)
-    void updateSession(s.id, { days })
+  /**
+   * Toucher un rond : valide (crée un log) ou dévalide (supprime le log) la
+   * séance ce jour-là. Ne modifie JAMAIS la planification — elle s'édite dans
+   * la fiche de la séance.
+   */
+  const validateDay = (s: Session, day: number) => {
+    const ds = weekDates[day]
+    if (ds > todayStr()) return // jour pas encore arrivé
+    const log = logs.find((l) => l.sessionId === s.id && l.date === ds)
+    if (log) {
+      const hasPerfs = !!(log.metrics?.length || log.results?.length)
+      if (
+        hasPerfs &&
+        !window.confirm(`Dévalider « ${s.name} » du ${formatShortFr(ds)} ? Les perfs enregistrées seront supprimées.`)
+      )
+        return
+      void removeLog(log.id)
+    } else {
+      void addLog({
+        date: ds,
+        sessionId: s.id,
+        sessionName: s.name,
+        category: s.category,
+        createdAt: Date.now(),
+        note: '',
+      })
+    }
   }
 
   return (
     <div>
       <PageHeader kicker="Semaine type" title="Planning" />
       <p className="-mt-2 px-5 pb-4 text-xs font-semibold text-ink-soft">
-        Touchez un rond pour planifier · glissez{' '}
+        Anneau = prévu · rond plein = fait. Touchez un rond pour valider / dévalider la séance ce jour-là ; la
+        planification se modifie dans la fiche de la séance. Glissez{' '}
         <span className="inline-block align-middle text-ink-soft/60">⠿</span> pour réordonner ou changer de section.
-        Anneau = prévu, rond plein = fait cette semaine.
         {perWeek > 0 && (
           <span className="ml-1 text-sage-600">
             {perWeek} séance{perWeek > 1 ? 's' : ''} prévue{perWeek > 1 ? 's' : ''} cette semaine.
@@ -214,22 +236,18 @@ export default function Planning() {
                     </h2>
                   )}
                   <div className="space-y-1.5">
-                    {list.map((s) => {
-                      const inCycle = !!ownerOf(s.id, sessions)
-                      return (
-                        <Row
-                          key={s.id}
-                          session={s}
-                          todayIdx={todayIdx}
-                          plannedDays={plannedByDay.map((ids) => ids.has(s.id))}
-                          doneDays={doneByDay.map((ids) => ids.has(s.id))}
-                          inCycle={inCycle}
-                          sublabel={inCycle ? describeSchedule(s, sessions) : undefined}
-                          onToggle={(d) => toggle(s, d)}
-                          onEdit={() => navigate(`/session/${s.id}`)}
-                        />
-                      )
-                    })}
+                    {list.map((s) => (
+                      <Row
+                        key={s.id}
+                        session={s}
+                        todayIdx={todayIdx}
+                        plannedDays={plannedByDay.map((ids) => ids.has(s.id))}
+                        doneDays={doneByDay.map((ids) => ids.has(s.id))}
+                        sublabel={ownerOf(s.id, sessions) ? describeSchedule(s, sessions) : undefined}
+                        onDay={(d) => validateDay(s, d)}
+                        onEdit={() => navigate(`/session/${s.id}`)}
+                      />
+                    ))}
                   </div>
                 </div>
               ))}

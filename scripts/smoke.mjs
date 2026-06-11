@@ -68,7 +68,24 @@ try {
   await page.click('[aria-label="Quitter"]') // confirm auto-accepté
   await page.waitForSelector('text=Séance libre')
 
-  // --- Planning : grille, toggle d'un rond (HIIT le lundi)
+  // --- Minuteur guidé muscu : séries manuelles + repos automatique
+  await page.click('text=Séance libre')
+  await page.locator('[role="dialog"] button:has-text("Full body")').click()
+  await page.waitForSelector('text=Lancer le minuteur')
+  await page.click('text=Lancer le minuteur')
+  await page.waitForSelector("text=C'est parti")
+  await page.click("text=C'est parti")
+  await page.waitForSelector('text=Préparation')
+  await page.click('text=Passer ⏭')
+  await page.waitForSelector('text=Série faite ✓')
+  await page.waitForSelector('text=répétitions')
+  await shot('26-player-muscu')
+  await page.click('text=Série faite ✓')
+  await page.waitForSelector('text=Repos')
+  await page.click('[aria-label="Quitter"]') // confirm auto-accepté
+  await page.waitForSelector('text=Séance libre')
+
+  // --- Planning : toucher un rond valide / dévalide la séance ce jour-là (lundi passé)
   await page.click('text=Planning')
   await page.waitForSelector('text=Semaine type')
   await page.click('[aria-label="HIIT — Cardio express — Lundi"]')

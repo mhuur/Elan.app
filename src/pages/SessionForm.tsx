@@ -90,6 +90,9 @@ export default function SessionForm() {
   const catExercises = exercises.filter((e) => e.category === category)
   const exOf = (exId: string) => exercises.find((e) => e.id === exId)
   const hasItems = category === 'muscu' || category === 'hiit' || category === 'etirements'
+  // Blocs muscu : découpage de la séance en groupes répétés indépendamment
+  const hasBreaks = category === 'muscu' && items.some((it, i) => i > 0 && it.blockBreak)
+  const blockNumberAt = (idx: number) => 1 + items.slice(1, idx + 1).filter((x) => x.blockBreak).length
 
   const switchCategory = (c: Category) => {
     if (c === category) return
@@ -495,7 +498,7 @@ export default function SessionForm() {
           </div>
         )}
 
-        {category === 'muscu' && (
+        {category === 'muscu' && !hasBreaks && (
           <div className="rounded-2xl bg-sage-50 p-3.5">
             <div className="flex items-center justify-between gap-2">
               <div>
@@ -515,6 +518,33 @@ export default function SessionForm() {
                 const isSec = ex?.measure === 'sec'
                 return (
                   <div key={idx}>
+                    {category === 'muscu' && hasBreaks && (idx === 0 || it.blockBreak) && (
+                      <div className="mb-1.5 flex items-center justify-between gap-2 rounded-xl bg-muscu/10 px-3 py-1.5">
+                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-muscu">
+                          ▦ Bloc {blockNumberAt(idx)} — tours
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <Stepper
+                            small
+                            value={it.blockRounds ?? 1}
+                            onChange={(v) => setItem(idx, { blockRounds: v })}
+                            min={1}
+                            max={10}
+                          />
+                          {idx > 0 && (
+                            <button
+                              type="button"
+                              aria-label="Fusionner avec le bloc précédent"
+                              title="Fusionner avec le bloc précédent"
+                              onClick={() => setItem(idx, { blockBreak: false })}
+                              className="px-1 text-ink-soft/50"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <div className="rounded-2xl bg-sage-50 p-2.5">
                       <div className="flex items-center gap-1.5">
                         <div className="flex flex-col">
@@ -618,8 +648,8 @@ export default function SessionForm() {
                       )}
                     </div>
 
-                    {category === 'muscu' && idx < items.length - 1 && (
-                      <div className="-my-0.5 flex justify-center">
+                    {category === 'muscu' && idx < items.length - 1 && !items[idx + 1].blockBreak && (
+                      <div className="-my-0.5 flex justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => setItem(idx, { linkNext: !it.linkNext })}
@@ -630,6 +660,19 @@ export default function SessionForm() {
                         >
                           {it.linkNext ? '🔗 Superset — enchaîné sans repos' : '+ lier en superset'}
                         </button>
+                        {!it.linkNext && (
+                          <button
+                            type="button"
+                            title="Couper la séance ici : la suite forme un bloc avec ses propres tours"
+                            onClick={() => {
+                              setItem(idx + 1, { blockBreak: true, blockRounds: items[idx + 1].blockRounds ?? 1 })
+                              setItem(idx, { linkNext: false })
+                            }}
+                            className="relative z-10 rounded-full bg-sage-100 px-3 py-1 text-[11px] font-extrabold text-ink-soft"
+                          >
+                            ▦ nouveau bloc
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

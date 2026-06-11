@@ -77,6 +77,10 @@ export interface SessionItem {
   restSec?: number
   /** Muscu : superset — enchaîner avec l'exercice suivant sans repos */
   linkNext?: boolean
+  /** Muscu : cet exercice démarre un nouveau bloc (chaque bloc se répète indépendamment) */
+  blockBreak?: boolean
+  /** Muscu : tours du bloc démarré par cet exercice */
+  blockRounds?: number
   /** Consigne libre affichée pendant la séance (tempo, posture…) */
   comment?: string
 }
