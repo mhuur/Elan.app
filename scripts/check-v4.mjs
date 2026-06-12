@@ -111,14 +111,16 @@ try {
   await page.waitForSelector('text=Tous les paliers atteints !')
   await page.screenshot({ path: 'screenshots/23-objectif-multi-atteint.png' })
 
-  // --- Progrès : régularité + prochain palier (avec récompense) sur le graphique
+  // --- Progrès : régularité + fiche d'exercice (palier suivant avec récompense)
   await page.click('text=Progrès')
   await page.waitForSelector('text=Régularité')
   await page.waitForSelector("text=d'affilée")
-  await page.selectOption('select:has(option:text-is("Pompes"))', { label: 'Pompes' })
+  await page.waitForSelector('text=Mes suivis')
+  await page.locator('button:has-text("Pompes")').first().click() // ligne du suivi → fiche
   await page.waitForSelector('text=Palier 20')
   await page.waitForSelector('text=🎁 Lunettes de soleil')
   await page.screenshot({ path: 'screenshots/18-progres-v4.png' })
+  await page.mouse.click(10, 10) // referme la fiche (backdrop)
 
   // --- Saisie rétroactive : naviguer à hier depuis Aujourd'hui et valider une sortie
   await page.getByRole('link', { name: "Aujourd'hui" }).click()
