@@ -282,6 +282,33 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         </p>
       )}
 
+      {(session.category === 'etirements' || session.category === 'hiit') && session.items.length > 0 && (
+        <div className="overflow-hidden rounded-2xl bg-sage-50">
+          {session.items.map((it, i) => {
+            const ex = exOf(it.exerciseId)
+            return (
+              <div
+                key={i}
+                className={'flex items-center justify-between gap-2 px-4 py-2.5 ' + (i > 0 ? 'border-t border-surface' : '')}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">{ex?.name ?? 'Exercice'}</p>
+                  {it.comment && <p className="truncate text-xs font-semibold text-ink-soft">💡 {it.comment}</p>}
+                </div>
+                <span className="shrink-0 text-xs font-extrabold text-ink-soft">
+                  {session.category === 'etirements' ? (it.durationSec ?? 30) : (session.workSec ?? 45)} s
+                </span>
+              </div>
+            )
+          })}
+          {session.category === 'hiit' && (
+            <p className="border-t border-surface px-4 py-2 text-xs font-extrabold text-ink-soft">
+              × {session.rounds ?? 1} tour{(session.rounds ?? 1) > 1 ? 's' : ''} · {session.restSec ?? 15} s de repos
+            </p>
+          )}
+        </div>
+      )}
+
       {hasTimer && <PrimaryButton onClick={() => navigate(`/player/${session.id}`)}>▶ Lancer le minuteur guidé</PrimaryButton>}
 
       {(hasForm || isMuscu) && lastLog && (

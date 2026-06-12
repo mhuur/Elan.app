@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 
 export function PageHeader({ kicker, title, right, onBack }: { kicker?: string; title: string; right?: ReactNode; onBack?: () => void }) {
   return (
@@ -85,6 +85,7 @@ const normTxt = (s: string) =>
 /**
  * Champ texte avec suggestions filtrées au fil de la saisie (remplace les murs de chips).
  * `onCreate` ajoute une entrée « + Créer “texte” » quand rien ne correspond exactement.
+ * `group` (optionnel, options pré-triées par groupe) ajoute des en-têtes de section.
  */
 export function Combobox({
   value,
@@ -97,7 +98,7 @@ export function Combobox({
 }: {
   value: string
   onChange: (v: string) => void
-  options: { id: string; label: string; hint?: string }[]
+  options: { id: string; label: string; hint?: string; group?: string }[]
   onSelect: (id: string) => void
   onCreate?: (text: string) => void
   placeholder?: string
@@ -105,7 +106,9 @@ export function Combobox({
 }) {
   const [open, setOpen] = useState(false)
   const q = normTxt(value.trim())
-  const filtered = q ? options.filter((o) => normTxt(o.label).includes(q)) : options
+  const filtered = q
+    ? options.filter((o) => normTxt(o.label).includes(q) || (o.group && normTxt(o.group).includes(q)))
+    : options
   const hasExact = options.some((o) => normTxt(o.label) === q)
   const canCreate = !!onCreate && q.length > 0 && !hasExact
   const showPanel = open && (filtered.length > 0 || canCreate)
@@ -156,16 +159,22 @@ export function Combobox({
             }}
           />
           <div className="absolute inset-x-0 top-full z-50 mt-1.5 max-h-56 overflow-y-auto rounded-2xl border border-sand bg-surface py-1 shadow-xl">
-            {filtered.slice(0, 30).map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                onClick={() => pick(o.id)}
-                className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left active:bg-sage-50"
-              >
-                <span className="min-w-0 flex-1 truncate text-sm font-bold">{o.label}</span>
-                {o.hint && <span className="shrink-0 text-[11px] font-semibold text-ink-soft">{o.hint}</span>}
-              </button>
+            {filtered.slice(0, 40).map((o, i, arr) => (
+              <Fragment key={o.id}>
+                {o.group && o.group !== arr[i - 1]?.group && (
+                  <p className="px-4 pb-1 pt-2.5 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+                    {o.group}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => pick(o.id)}
+                  className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left active:bg-sage-50"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm font-bold">{o.label}</span>
+                  {o.hint && <span className="shrink-0 text-[11px] font-semibold text-ink-soft">{o.hint}</span>}
+                </button>
+              </Fragment>
             ))}
             {canCreate && (
               <button

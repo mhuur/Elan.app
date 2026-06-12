@@ -663,7 +663,9 @@ export default function SessionForm() {
                 small
                 value={addQuery}
                 onChange={setAddQuery}
-                options={catExercises.map((e) => ({ id: e.id, label: e.name, hint: subtypesOf(e)[0] }))}
+                options={groupedOptions(catExercises).flatMap(([st, exos]) =>
+                  exos.map((e) => ({ id: e.id, label: e.name, group: st || 'Autres' })),
+                )}
                 onSelect={(exId) => {
                   appendItem(exId)
                   setAddQuery('')

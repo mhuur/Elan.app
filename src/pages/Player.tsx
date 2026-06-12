@@ -19,6 +19,8 @@ interface Step {
   reps?: number
   /** Contexte affiché sous le nom : « Bloc 1 · Tour 1/2 · Série 2/4 » */
   detail?: string
+  /** Muscu : exercice de la série, pour journaliser le réalisé réel */
+  exerciseId?: string
 }
 
 function buildSteps(session: Session, exercises: Exercise[]): Step[] {
@@ -54,7 +56,14 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
               .filter(Boolean)
               .join(' · ')
             if (isSec) {
-              steps.push({ type: 'work', label: nameOf(it.exerciseId), sec: it.target ?? 30, comment: it.comment, detail })
+              steps.push({
+                type: 'work',
+                label: nameOf(it.exerciseId),
+                sec: it.target ?? 30,
+                comment: it.comment,
+                detail,
+                exerciseId: it.exerciseId,
+              })
             } else {
               steps.push({
                 type: 'work',
@@ -64,6 +73,7 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
                 reps: it.target ?? 10,
                 comment: it.comment,
                 detail,
+                exerciseId: it.exerciseId,
               })
             }
             const lastSetOfItem = s === sets - 1
@@ -99,6 +109,8 @@ export default function Player() {
   const [stepIdx, setStepIdx] = useState(0)
   const [remaining, setRemaining] = useState(steps[0]?.sec ?? 0)
   const [paused, setPaused] = useState(false)
+  // Répétitions réellement faites sur la série en cours (ajustables avant « Série faite ✓ »)
+  const [actualReps, setActualReps] = useState(0)
 
   const audioRef = useRef<AudioContext | null>(null)
   const wakeRef = useRef<WakeLockSentinel | null>(null)
@@ -106,6 +118,13 @@ export default function Player() {
   const remainMsRef = useRef((steps[0]?.sec ?? 0) * 1000)
   const lastBeepRef = useRef(-1)
   const loggedRef = useRef(false)
+  // Séries réalisées par exercice (reps ou secondes), journalisées à la fin ou à l'abandon
+  const doneRef = useRef<Record<string, number[]>>({})
+
+  const recordSet = (exerciseId: string | undefined, value: number) => {
+    if (!exerciseId || value <= 0) return
+    ;(doneRef.current[exerciseId] ??= []).push(value)
+  }
 
   const tone = (freq: number, durSec: number) => {
     if (audioRef.current) playTone(audioRef.current, freq, durSec)
@@ -148,37 +167,44 @@ export default function Player() {
     remainMsRef.current = steps[idx].sec * 1000
     lastBeepRef.current = -1
     setRemaining(steps[idx].sec)
+    setActualReps(steps[idx].reps ?? 0)
     setStepIdx(idx)
   }
 
-  const finish = () => {
-    if (!loggedRef.current && session) {
-      loggedRef.current = true
-      // Muscu : on journalise les séries prévues (séries × tours du bloc, à la valeur cible)
-      const extra: { results?: { exerciseId: string; name: string; measure: 'reps' | 'sec'; sets: number[] }[] } = {}
-      if (session.category === 'muscu' && session.items.length) {
-        const blocks = muscuBlocks(session)
-        extra.results = session.items.map((it) => {
-          const ex = exercises.find((e) => e.id === it.exerciseId)
-          const rounds = blocks.find((b) => b.items.includes(it))?.rounds ?? 1
-          return {
-            exerciseId: it.exerciseId,
-            name: ex?.name ?? 'Exercice',
-            measure: ex?.measure ?? ('reps' as const),
-            sets: Array.from({ length: Math.max(1, it.sets ?? 3) * rounds }, () => it.target ?? 10),
-          }
-        })
-      }
-      void addLog({
-        date: todayStr(),
-        sessionId: session.id,
-        sessionName: session.name,
-        category: session.category,
-        createdAt: Date.now(),
-        note: '',
-        ...extra,
+  /** Résultats muscu à journaliser : les séries réellement faites (les exercices jamais commencés sont omis) */
+  const buildResults = () => {
+    if (!session || session.category !== 'muscu' || !session.items.length) return undefined
+    const uniques = [...new Map(session.items.map((it) => [it.exerciseId, it])).values()]
+    return uniques
+      .map((it) => {
+        const ex = exercises.find((e) => e.id === it.exerciseId)
+        return {
+          exerciseId: it.exerciseId,
+          name: ex?.name ?? 'Exercice',
+          measure: ex?.measure ?? ('reps' as const),
+          sets: doneRef.current[it.exerciseId] ?? [],
+        }
       })
-    }
+      .filter((r) => r.sets.length > 0)
+  }
+
+  const logNow = (note: string) => {
+    if (loggedRef.current || !session) return
+    loggedRef.current = true
+    const results = buildResults()
+    void addLog({
+      date: todayStr(),
+      sessionId: session.id,
+      sessionName: session.name,
+      category: session.category,
+      createdAt: Date.now(),
+      note,
+      ...(results && results.length ? { results } : {}),
+    })
+  }
+
+  const finish = () => {
+    logNow('')
     tone(880, 0.6)
     navigator.vibrate?.([200, 100, 200, 100, 400])
     void wakeRef.current?.release()
@@ -192,6 +218,9 @@ export default function Player() {
     const iv = window.setInterval(() => {
       const ms = endAtRef.current - Date.now()
       if (ms <= 0) {
+        // Série chronométrée tenue jusqu'au bout : on journalise la durée cible
+        const cur = steps[stepIdx]
+        if (cur.type === 'work') recordSet(cur.exerciseId, cur.sec)
         const nextIdx = stepIdx + 1
         if (nextIdx < steps.length) {
           tone(steps[nextIdx].type === 'work' ? 880 : 520, 0.35)
@@ -240,8 +269,24 @@ export default function Player() {
   }
 
   const quit = () => {
-    if (phase === 'running' && !window.confirm('Quitter la séance en cours ?')) return
+    if (phase === 'running') {
+      const partial = session.category === 'muscu' && Object.values(doneRef.current).some((s) => s.length > 0)
+      const msg = partial
+        ? 'Quitter ? Les séries déjà faites seront enregistrées.'
+        : 'Quitter la séance en cours ?'
+      if (!window.confirm(msg)) return
+      if (partial) logNow('Séance interrompue')
+    }
     navigate(-1)
+  }
+
+  /** Passer une étape : sur une série chronométrée, le temps déjà tenu est journalisé */
+  const skip = () => {
+    if (step.type === 'work' && !step.manual) {
+      const elapsed = Math.round((step.sec * 1000 - remainMsRef.current) / 1000)
+      if (elapsed >= 3) recordSet(step.exerciseId, elapsed)
+    }
+    goTo(stepIdx + 1)
   }
 
   if (phase === 'ready') {
@@ -314,11 +359,34 @@ export default function Player() {
         {step.comment && <p className="text-sm font-semibold text-ink-soft">💡 {step.comment}</p>}
         {step.manual ? (
           <>
-            <p className="my-2 text-8xl font-extrabold tabular-nums tracking-tight">{step.reps}</p>
-            <p className="-mt-3 text-base font-extrabold text-ink-soft">répétitions</p>
+            <div className="my-2 flex items-center gap-5">
+              <button
+                type="button"
+                aria-label="Une répétition de moins"
+                onClick={() => setActualReps((v) => Math.max(0, v - 1))}
+                className="flex h-13 w-13 items-center justify-center rounded-full bg-surface text-3xl font-extrabold text-ink-soft shadow-sm active:bg-sand"
+              >
+                −
+              </button>
+              <p className="min-w-28 text-8xl font-extrabold tabular-nums tracking-tight">{actualReps}</p>
+              <button
+                type="button"
+                aria-label="Une répétition de plus"
+                onClick={() => setActualReps((v) => v + 1)}
+                className="flex h-13 w-13 items-center justify-center rounded-full bg-surface text-3xl font-extrabold text-ink-soft shadow-sm active:bg-sand"
+              >
+                +
+              </button>
+            </div>
+            <p className="-mt-2 text-base font-extrabold text-ink-soft">
+              répétitions
+              {actualReps !== (step.reps ?? 0) && <span className="text-ink-soft/60"> · objectif {step.reps}</span>}
+            </p>
+            <p className="text-xs font-semibold text-ink-soft/70">Ajustez si vous avez fait plus ou moins</p>
             <button
               type="button"
               onClick={() => {
+                recordSet(step.exerciseId, actualReps)
                 tone(520, 0.2)
                 goTo(stepIdx + 1)
               }}
@@ -352,7 +420,7 @@ export default function Player() {
           </button>
           <button
             type="button"
-            onClick={() => goTo(stepIdx + 1)}
+            onClick={skip}
             className="rounded-2xl bg-surface/70 px-6 py-4 text-base font-extrabold text-ink-soft shadow-md active:bg-sand"
           >
             Passer ⏭
