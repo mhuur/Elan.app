@@ -37,21 +37,23 @@ try {
   if (!full.items[1].blockBreak || full.items[1].blockRounds !== 2)
     throw new Error('Le 2e exercice devrait démarrer un bloc × 2 tours')
 
-  // --- Complétion : en-têtes de blocs et séries multipliées (3 séries × 2 tours = 6)
+  // --- Feuille : programme par blocs en lecture seule, saisie du résultat par tours
   await page.getByRole('link', { name: "Aujourd'hui" }).click()
   await page.click('text=Séance libre')
   await page.locator('[role="dialog"] button:has-text("Full body")').click()
   await page.waitForSelector('text=Bloc 1')
   await page.waitForSelector('text=Bloc 2 · × 2 tours')
-  await page.waitForSelector('text=Série 6')
+  await page.click('text=Entrer le résultat')
+  await page.waitForSelector('text=Tour 2/2')
   await page.screenshot({ path: 'screenshots/28-blocs-completion.png' })
+  await page.click('text=← Retour à la séance')
 
   // --- Minuteur guidé : la 1re étape annonce la série du bloc 1
   await page.click('text=Lancer le minuteur')
   await page.waitForSelector("text=C'est parti")
   await page.click("text=C'est parti")
   await page.waitForSelector('text=Préparation')
-  await page.click('text=Passer')
+  await page.click('[aria-label="Passer"]')
   await page.waitForSelector('text=Bloc 1 · Série 1/3')
   await page.waitForSelector('text=Série faite ✓')
   await page.click('[aria-label="Quitter"]')

@@ -33,7 +33,7 @@ try {
   await page.waitForSelector("text=C'est parti")
   await page.click("text=C'est parti")
   await page.waitForSelector('text=Préparation')
-  await page.click('text=Passer')
+  await page.click('[aria-label="Passer"]')
   await page.waitForSelector('text=Série faite ✓')
   await page.click('[aria-label="Une répétition de plus"]')
   await page.click('[aria-label="Une répétition de plus"]')
@@ -42,8 +42,8 @@ try {
   await page.click('text=Série faite ✓')
   await page.waitForSelector('text=Repos')
 
-  // --- Quitter en cours : le confirm annonce l'enregistrement, le log contient le réalisé
-  await page.click('[aria-label="Quitter"]') // « Les séries déjà faites seront enregistrées » auto-accepté
+  // --- Arrêter en cours : confirm + prompt commentaire auto-acceptés, le log contient le réalisé
+  await page.click('[aria-label="Arrêter et enregistrer"]')
   await page.waitForSelector('text=Séance libre')
   const d = await page.evaluate(() => JSON.parse(localStorage.getItem('elan-data-v1')))
   const log = d.logs.find((l) => l.sessionName.includes('Full body') && l.note === 'Séance interrompue')

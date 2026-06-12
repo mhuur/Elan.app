@@ -1,11 +1,23 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronUp, LayoutGrid, Link2, MessageSquarePlus, Plus, Repeat, Timer, X } from 'lucide-react'
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { GripVertical, LayoutGrid, Link2, MessageSquarePlus, Plus, Repeat, SlidersHorizontal, Timer, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import {
   CATEGORIES,
   CATEGORY_META,
   PRESET_SUBTYPES,
+  setTargetsOf,
   subtypesOf,
   type Category,
   type Exercise,
@@ -51,6 +63,30 @@ function MiniNum({ value, onChange, min = 0, max = 990 }: { value: number; onCha
   )
 }
 
+/** Item en cours d'édition : un uid transitoire identifie la ligne pour le drag & drop */
+type DraftItem = SessionItem & { uid: string }
+const newUid = () => crypto.randomUUID()
+
+/** Enveloppe sortable d'une ligne d'exercice — la poignée reçoit attributes/listeners */
+function SortableItem({
+  uid,
+  children,
+}: {
+  uid: string
+  children: (drag: Pick<ReturnType<typeof useSortable>, 'attributes' | 'listeners'>) => ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: uid })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={isDragging ? 'relative z-10' : undefined}
+    >
+      {children({ attributes, listeners })}
+    </div>
+  )
+}
+
 /** Options du sélecteur d'exercice, groupées par premier sous-type (comme la banque) */
 function groupedOptions(list: Exercise[]): [string, Exercise[]][] {
   const map = new Map<string, Exercise[]>()
@@ -90,7 +126,7 @@ export default function SessionForm() {
   // Rotation en cours d'édition : un tableau de « jours », chacun regroupant
   // les séances faites ensemble ce jour-là (selfKey = cette séance).
   const [steps, setSteps] = useState<string[][]>(() => (ownerSteps.length ? ownerSteps : [[selfKey]]))
-  const [items, setItems] = useState<SessionItem[]>(existing?.items ?? [])
+  const [items, setItems] = useState<DraftItem[]>(() => (existing?.items ?? []).map((it) => ({ ...it, uid: newUid() })))
   const [workSec, setWorkSec] = useState(existing?.workSec ?? 45)
   const [restSec, setRestSec] = useState(existing?.restSec ?? 15)
   const [rounds, setRounds] = useState(existing?.rounds ?? 2)
@@ -138,7 +174,7 @@ export default function SessionForm() {
 
   /** Ajoute un exercice existant à la séance avec les réglages par défaut de la catégorie */
   const appendItem = (exId: string) => {
-    const base: SessionItem = { exerciseId: exId }
+    const base: DraftItem = { exerciseId: exId, uid: newUid() }
     if (category === 'muscu') {
       base.sets = 3
       base.target = exOf(exId)?.measure === 'sec' ? 30 : 10
@@ -167,14 +203,22 @@ export default function SessionForm() {
   const setItem = (idx: number, patch: Partial<SessionItem>) =>
     setItems((p) => p.map((it, i) => (i === idx ? { ...it, ...patch } : it)))
   const removeItem = (idx: number) => setItems((p) => p.filter((_, i) => i !== idx))
-  const moveItem = (idx: number, dir: -1 | 1) =>
+
+  // Drag & drop de la liste d'exercices (mêmes réglages tactiles que le Planning)
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+  )
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
     setItems((p) => {
-      const j = idx + dir
-      if (j < 0 || j >= p.length) return p
-      const copy = [...p]
-      ;[copy[idx], copy[j]] = [copy[j], copy[idx]]
-      return copy
+      const from = p.findIndex((x) => x.uid === active.id)
+      const to = p.findIndex((x) => x.uid === over.id)
+      if (from === -1 || to === -1) return p
+      return arrayMove(p, from, to)
     })
+  }
 
   /**
    * Applique la planification du cycle : la première séance du premier jour
@@ -252,7 +296,7 @@ export default function SessionForm() {
       days: scheduleMode === 'weekly' ? days : [],
       // La planification par cycle est réécrite par applySchedule ci-dessous
       repeat: null,
-      items: hasItems ? items : [],
+      items: hasItems ? items.map(({ uid: _uid, ...rest }) => rest) : [],
       // Mesures, liens et notes ne s'éditent plus ici : on conserve l'existant
       metrics: existing?.metrics ?? [],
       links: existing?.links ?? [],
@@ -502,12 +546,16 @@ export default function SessionForm() {
 
         {hasItems && (
           <Field label={category === 'etirements' ? 'Postures de la routine' : 'Exercices de la séance'}>
-            <div className="space-y-2">
-              {items.map((it, idx) => {
-                const ex = exOf(it.exerciseId)
-                const isSec = ex?.measure === 'sec'
-                return (
-                  <div key={idx}>
+            <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+              <SortableContext items={items.map((x) => x.uid)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {items.map((it, idx) => {
+                    const ex = exOf(it.exerciseId)
+                    const isSec = ex?.measure === 'sec'
+                    return (
+                      <SortableItem key={it.uid} uid={it.uid}>
+                        {(drag) => (
+                          <div>
                     {category === 'muscu' && hasBreaks && (idx === 0 || it.blockBreak) && (
                       <div className="mb-1.5 flex items-center justify-between gap-2 rounded-xl bg-muscu/10 px-3 py-1.5">
                         <p className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
@@ -537,26 +585,15 @@ export default function SessionForm() {
                     )}
                     <div className="rounded-2xl bg-surface p-3 shadow-sm">
                       <div className="flex items-center gap-1.5">
-                        <div className="-ml-1 flex shrink-0 flex-col">
-                          <button
-                            type="button"
-                            aria-label="Monter"
-                            onClick={() => moveItem(idx, -1)}
-                            className="px-1 text-ink-soft/40 disabled:opacity-25"
-                            disabled={idx === 0}
-                          >
-                            <ChevronUp className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="Descendre"
-                            onClick={() => moveItem(idx, 1)}
-                            className="px-1 text-ink-soft/40 disabled:opacity-25"
-                            disabled={idx === items.length - 1}
-                          >
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          aria-label={`Réordonner ${ex?.name ?? 'cet exercice'}`}
+                          {...drag.attributes}
+                          {...drag.listeners}
+                          className="-ml-1.5 flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </button>
                         <Select
                           bare
                           value={it.exerciseId}
@@ -602,10 +639,32 @@ export default function SessionForm() {
                       </div>
 
                       {category === 'muscu' && (
-                        <div className="mt-2 flex items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
-                          <MiniNum value={it.sets ?? 3} onChange={(v) => setItem(idx, { sets: v })} min={1} />
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
+                          <MiniNum
+                            value={it.sets ?? 3}
+                            onChange={(v) => {
+                              const patch: Partial<SessionItem> = { sets: v }
+                              if (it.targets) patch.targets = setTargetsOf({ ...it, sets: v })
+                              setItem(idx, patch)
+                            }}
+                            min={1}
+                            max={12}
+                          />
                           <span className="text-ink-soft/60">×</span>
-                          <MiniNum value={it.target ?? 10} onChange={(v) => setItem(idx, { target: v })} min={1} />
+                          {it.targets ? (
+                            setTargetsOf(it).map((t, s) => (
+                              <MiniNum
+                                key={s}
+                                value={t}
+                                onChange={(v) =>
+                                  setItem(idx, { targets: setTargetsOf(it).map((x, j) => (j === s ? v : x)) })
+                                }
+                                min={1}
+                              />
+                            ))
+                          ) : (
+                            <MiniNum value={it.target ?? 10} onChange={(v) => setItem(idx, { target: v })} min={1} />
+                          )}
                           <button
                             type="button"
                             title="Basculer répétitions / secondes"
@@ -613,6 +672,29 @@ export default function SessionForm() {
                             className="rounded-md bg-sage-100 px-2 py-1 text-[11px] font-extrabold text-sage-700 active:bg-sage-200"
                           >
                             {isSec ? 'sec' : 'reps'}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Varier les séries"
+                            title={
+                              it.targets
+                                ? 'Revenir à des séries identiques'
+                                : 'Varier l’objectif de chaque série (ex. 30 / 20 / 15)'
+                            }
+                            onClick={() =>
+                              setItem(
+                                idx,
+                                it.targets
+                                  ? { targets: undefined, target: setTargetsOf(it)[0] }
+                                  : { targets: setTargetsOf(it) },
+                              )
+                            }
+                            className={
+                              'rounded-md px-1.5 py-1 ' +
+                              (it.targets ? 'bg-sage-500 text-white' : 'bg-sage-100 text-sage-700 active:bg-sage-200')
+                            }
+                          >
+                            <SlidersHorizontal className="h-3.5 w-3.5" />
                           </button>
                           <span className="ml-auto flex items-center gap-1.5" title="Repos entre séries">
                             <Timer className="h-3.5 w-3.5 text-ink-soft/60" />
@@ -669,9 +751,15 @@ export default function SessionForm() {
                         )}
                       </div>
                     )}
-                  </div>
-                )
-              })}
+                          </div>
+                        )}
+                      </SortableItem>
+                    )
+                  })}
+                </div>
+              </SortableContext>
+            </DndContext>
+            <div className="mt-2 space-y-2">
               <Combobox
                 small
                 value={addQuery}

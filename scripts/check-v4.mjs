@@ -66,11 +66,13 @@ try {
   await page.waitForSelector('text=0 / 10')
   await page.screenshot({ path: 'screenshots/21-objectifs.png' })
 
-  // --- Compléter Full body : superset + palier 1 franchi (12 ≥ 10) → récompense
+  // --- Compléter Full body : palier 1 franchi (12 ≥ 10) → récompense
   await page.getByRole('link', { name: "Aujourd'hui" }).click()
   await page.click('text=Séance libre')
   await page.click('text=Full body')
-  await page.waitForSelector('text=Superset — enchaîner sans repos')
+  await page.waitForSelector('text=Entrer le résultat')
+  await page.click('text=Entrer le résultat')
+  await page.waitForSelector('text=Série 1')
   await page.click('text=Valider la séance ✓')
   await page.waitForSelector('text=Récompense débloquée : Glace')
   await page.screenshot({ path: 'screenshots/17-celebration.png' })

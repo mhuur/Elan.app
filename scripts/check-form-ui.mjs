@@ -38,6 +38,12 @@ try {
   await page.click('text=+ Créer « Dips sur chaise »')
   await page.waitForSelector('select:has-text("Dips sur chaise")')
 
+  // --- Séries variées : 3×12 devient 12/12/12 éditables, on passe la 1re à 30
+  await page.locator('[aria-label="Varier les séries"]').first().click()
+  await page.screenshot({ path: 'screenshots/38-series-variees.png' })
+  const firstCard = page.locator('div.rounded-2xl.bg-surface').filter({ hasText: 'reps' }).first()
+  await firstCard.locator('input[inputmode="numeric"]').nth(1).fill('30')
+
   // --- Section du planning : suggestions filtrées dans la combobox
   const groupBox = page.getByPlaceholder('Optionnel…')
   await groupBox.scrollIntoViewIfNeeded()
@@ -55,6 +61,10 @@ try {
   // Les champs retirés du formulaire sont préservés tels quels
   if (full.notes === undefined || full.metrics === undefined || full.links === undefined)
     throw new Error('notes/metrics/links devraient être conservés à la sauvegarde')
+  // Les séries variées sont enregistrées (1re série passée à 30)
+  if ((full.items[0].targets ?? []).join(',') !== '30,12,12')
+    throw new Error(`Les séries variées devraient être 30,12,12 — trouvé ${(full.items[0].targets ?? []).join(',')}`)
+  if (full.items.some((it) => 'uid' in it)) throw new Error("L'uid transitoire ne devrait pas être sauvegardé")
 
   // --- Nouvelle séance : écran épuré
   await page.click('text=+ Séance')

@@ -185,17 +185,17 @@ export default function Planning() {
 
   return (
     <div>
-      <PageHeader kicker="Semaine type" title="Planning" />
-      <p className="-mt-2 px-5 pb-4 text-xs font-semibold text-ink-soft">
-        Anneau = prévu · rond plein = fait. Touchez un rond pour valider / dévalider la séance ce jour-là ; la
-        planification se modifie dans la fiche de la séance. Glissez{' '}
-        <span className="inline-block align-middle text-ink-soft/60">⠿</span> pour réordonner ou changer de section.
-        {perWeek > 0 && (
-          <span className="ml-1 text-sage-600">
-            {perWeek} séance{perWeek > 1 ? 's' : ''} prévue{perWeek > 1 ? 's' : ''} cette semaine.
-          </span>
-        )}
-      </p>
+      <PageHeader
+        kicker="Semaine type"
+        title="Planning"
+        right={
+          perWeek > 0 ? (
+            <p className="text-xs font-extrabold text-sage-600">
+              {perWeek} séance{perWeek > 1 ? 's' : ''} / sem.
+            </p>
+          ) : undefined
+        }
+      />
 
       {sessions.length === 0 ? (
         <div className="px-5">
@@ -249,10 +249,6 @@ export default function Planning() {
             </SortableContext>
           </DndContext>
 
-          <p className="px-2 pt-4 text-center text-xs font-semibold text-ink-soft">
-            Votre semaine type se répète automatiquement. Touchez le nom d'une séance pour la modifier — la section se
-            choisit dans sa fiche (champ « Section du planning »).
-          </p>
         </div>
       )}
     </div>

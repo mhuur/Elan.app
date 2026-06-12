@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Lightbulb, Pause, Play, SkipForward, X } from 'lucide-react'
+import { Lightbulb, Pause, Play, SkipForward, Square, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, type Exercise, type Session } from '../types'
+import { CATEGORY_META, setTargetsOf, type Exercise, type Session } from '../types'
 import { todayStr } from '../lib/dates'
 import { mmss } from '../lib/format'
 import { muscuBlocks } from '../lib/blocks'
@@ -34,7 +34,13 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
     const rest = session.restSec ?? 15
     for (let r = 0; r < rounds; r++) {
       session.items.forEach((it, i) => {
-        steps.push({ type: 'work', label: nameOf(it.exerciseId), sec: it.durationSec ?? work, comment: it.comment })
+        steps.push({
+          type: 'work',
+          label: nameOf(it.exerciseId),
+          sec: it.durationSec ?? work,
+          comment: it.comment,
+          exerciseId: it.exerciseId,
+        })
         const isLast = r === rounds - 1 && i === session.items.length - 1
         if (!isLast && rest > 0) steps.push({ type: 'rest', label: 'Repos', sec: rest })
       })
@@ -48,7 +54,8 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
         b.items.forEach((it, ii) => {
           const ex = exercises.find((e) => e.id === it.exerciseId)
           const isSec = ex?.measure === 'sec'
-          const sets = Math.max(1, it.sets ?? 3)
+          const targets = setTargetsOf(it)
+          const sets = targets.length
           for (let s = 0; s < sets; s++) {
             const detail = [
               blocks.length > 1 ? `Bloc ${bi + 1}` : '',
@@ -61,7 +68,7 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
               steps.push({
                 type: 'work',
                 label: nameOf(it.exerciseId),
-                sec: it.target ?? 30,
+                sec: targets[s],
                 comment: it.comment,
                 detail,
                 exerciseId: it.exerciseId,
@@ -72,7 +79,7 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
                 label: nameOf(it.exerciseId),
                 sec: 45,
                 manual: true,
-                reps: it.target ?? 10,
+                reps: targets[s],
                 comment: it.comment,
                 detail,
                 exerciseId: it.exerciseId,
@@ -91,7 +98,13 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
   } else {
     const rest = session.restSec ?? 0
     session.items.forEach((it, i) => {
-      steps.push({ type: 'work', label: nameOf(it.exerciseId), sec: it.durationSec ?? 30, comment: it.comment })
+      steps.push({
+        type: 'work',
+        label: nameOf(it.exerciseId),
+        sec: it.durationSec ?? 30,
+        comment: it.comment,
+        exerciseId: it.exerciseId,
+      })
       if (rest > 0 && i < session.items.length - 1) steps.push({ type: 'rest', label: 'Transition', sec: rest })
     })
   }
@@ -271,14 +284,15 @@ export default function Player() {
   }
 
   const quit = () => {
-    if (phase === 'running') {
-      const partial = session.category === 'muscu' && Object.values(doneRef.current).some((s) => s.length > 0)
-      const msg = partial
-        ? 'Quitter ? Les séries déjà faites seront enregistrées.'
-        : 'Quitter la séance en cours ?'
-      if (!window.confirm(msg)) return
-      if (partial) logNow('Séance interrompue')
-    }
+    if (phase === 'running' && !window.confirm('Quitter sans enregistrer ?')) return
+    navigate(-1)
+  }
+
+  /** Arrêter ici : le réalisé (incomplet) est enregistré, avec un commentaire de l'utilisateur */
+  const stopAndSave = () => {
+    if (!window.confirm('Arrêter la séance ici ? Le réalisé sera enregistré.')) return
+    const comment = window.prompt('Un commentaire sur la séance ? (optionnel)') ?? ''
+    logNow(comment.trim() || 'Séance interrompue')
     navigate(-1)
   }
 
@@ -290,6 +304,14 @@ export default function Player() {
     }
     goTo(stepIdx + 1)
   }
+
+  // Démo vidéo de l'exercice en cours, si l'exercice en a une
+  const stepExercise = step?.exerciseId ? exercises.find((e) => e.id === step.exerciseId) : undefined
+  // Temps restant estimé (étapes manuelles comptées à leur durée forfaitaire)
+  const remainTotalSec = remaining + steps.slice(stepIdx + 1).reduce((a, s) => a + s.sec, 0)
+  // Rail de progression « ligne de métro » : un point par étape d'effort
+  const workIdx = steps.slice(0, stepIdx + 1).filter((s) => s.type === 'work').length - 1
+  const workCount = steps.filter((s) => s.type === 'work').length
 
   if (phase === 'ready') {
     return (
@@ -342,15 +364,37 @@ export default function Player() {
   const bgByType = step.type === 'work' ? meta.soft : step.type === 'rest' ? 'bg-velo/10' : 'bg-sand'
 
   return (
-    <div className={`flex min-h-dvh flex-col ${bgByType} transition-colors duration-500`}>
+    <div className={`relative flex min-h-dvh flex-col ${bgByType} transition-colors duration-500`}>
       <header className="flex items-center justify-between px-5 pt-6">
         <button type="button" onClick={quit} aria-label="Quitter" className="rounded-full bg-surface/80 p-2.5 shadow-sm">
           <X className="h-5 w-5" />
         </button>
-        <p className="text-sm font-extrabold text-ink-soft">
-          {steps.slice(0, stepIdx + 1).filter((s) => s.type === 'work').length}/{steps.filter((s) => s.type === 'work').length}
-        </p>
+        <div className="text-right">
+          <p className="text-sm font-extrabold text-ink-soft">
+            {workIdx + 1}/{workCount}
+          </p>
+          <p className="text-[11px] font-bold text-ink-soft/70">~{Math.max(1, Math.ceil(remainTotalSec / 60))} min restantes</p>
+        </div>
       </header>
+
+      {/* Rail de progression vertical : un point par effort, le point courant est marqué */}
+      <div className="pointer-events-none absolute inset-y-0 left-3 flex flex-col items-center justify-center">
+        <div className={'flex flex-col items-center ' + (workCount > 18 ? 'gap-1' : 'gap-1.5')}>
+          {Array.from({ length: workCount }, (_, i) => (
+            <span
+              key={i}
+              className={
+                'rounded-full transition-all ' +
+                (i < workIdx || (i === workIdx && step.type !== 'work')
+                  ? (workCount > 18 ? 'h-1.5 w-1.5 ' : 'h-2 w-2 ') + 'bg-sage-500'
+                  : i === workIdx
+                    ? 'h-3 w-3 bg-sage-600 ring-4 ring-sage-200'
+                    : (workCount > 18 ? 'h-1.5 w-1.5 ' : 'h-2 w-2 ') + 'bg-ink-soft/20')
+              }
+            />
+          ))}
+        </div>
+      </div>
 
       <main className="flex flex-1 flex-col items-center justify-center gap-2 px-8 text-center">
         <p className="text-xs font-extrabold uppercase tracking-widest text-ink-soft">
@@ -362,6 +406,16 @@ export default function Player() {
           <p className="flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
             <Lightbulb className="h-3.5 w-3.5 shrink-0" /> {step.comment}
           </p>
+        )}
+        {stepExercise?.videoUrl && (
+          <a
+            href={stepExercise.videoUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 rounded-full bg-surface/80 px-3.5 py-1.5 text-xs font-extrabold text-velo shadow-sm"
+          >
+            <Play className="h-3 w-3" /> démo
+          </a>
         )}
         {step.manual ? (
           <>
@@ -416,28 +470,32 @@ export default function Player() {
         <div className="mb-5 h-2 overflow-hidden rounded-full bg-surface/70">
           <div className="h-full rounded-full bg-sage-500 transition-all" style={{ width: `${progress * 100}%` }} />
         </div>
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-4">
           <button
             type="button"
-            onClick={() => setPaused((p) => !p)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-surface px-6 py-4 text-base font-extrabold shadow-md active:bg-sand"
+            aria-label="Arrêter et enregistrer"
+            title="Arrêter la séance ici (le réalisé est enregistré)"
+            onClick={stopAndSave}
+            className="flex h-13 w-13 items-center justify-center rounded-full bg-surface/70 text-hiit shadow-md active:bg-sand"
           >
-            {paused ? (
-              <>
-                <Play className="h-4 w-4" /> Reprendre
-              </>
-            ) : (
-              <>
-                <Pause className="h-4 w-4" /> Pause
-              </>
-            )}
+            <Square className="h-5 w-5" fill="currentColor" />
           </button>
           <button
             type="button"
-            onClick={skip}
-            className="flex items-center gap-2 rounded-2xl bg-surface/70 px-6 py-4 text-base font-extrabold text-ink-soft shadow-md active:bg-sand"
+            aria-label={paused ? 'Reprendre' : 'Pause'}
+            onClick={() => setPaused((p) => !p)}
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-surface shadow-md active:bg-sand"
           >
-            Passer <SkipForward className="h-4 w-4" />
+            {paused ? <Play className="h-7 w-7" /> : <Pause className="h-7 w-7" />}
+          </button>
+          <button
+            type="button"
+            aria-label="Passer"
+            title="Passer cette étape"
+            onClick={skip}
+            className="flex h-13 w-13 items-center justify-center rounded-full bg-surface/70 text-ink-soft shadow-md active:bg-sand"
+          >
+            <SkipForward className="h-5 w-5" />
           </button>
         </div>
       </footer>

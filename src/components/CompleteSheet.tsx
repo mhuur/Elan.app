@@ -1,81 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, LayoutGrid, Lightbulb, Link2, Play, Repeat, Timer } from 'lucide-react'
+import { Check, ClipboardList, Lightbulb, Link2, Play, Repeat } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, type Log, type MetricValue, type Session, type SessionItem } from '../types'
+import { CATEGORY_META, setTargetsOf, type Exercise, type Log, type MetricValue, type Session, type SessionItem } from '../types'
 import { todayStr } from '../lib/dates'
-import { mmss } from '../lib/format'
 import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { muscuBlocks } from '../lib/blocks'
-import { tone } from '../lib/audio'
 import { CategoryIcon, Field, GhostButton, NumInput, PrimaryButton, Sheet, Stepper, TextArea } from './ui'
 
-/** Compte à rebours (repos entre séries, ou effort pour le gainage), avec bip à la fin */
-function CountdownButton({ sec, label, color = 'velo' }: { sec: number; label: string; color?: 'velo' | 'muscu' }) {
-  const [left, setLeft] = useState<number | null>(null)
-  const audioRef = useRef<AudioContext | null>(null)
-  const endAtRef = useRef(0)
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current && audioRef.current.state !== 'closed') void audioRef.current.close()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (left == null) return
-    const iv = window.setInterval(() => {
-      const ms = endAtRef.current - Date.now()
-      if (ms <= 0) {
-        if (audioRef.current) tone(audioRef.current, 880, 0.5)
-        navigator.vibrate?.([150, 80, 150])
-        setLeft(null)
-      } else {
-        setLeft(Math.ceil(ms / 1000))
-      }
-    }, 200)
-    return () => window.clearInterval(iv)
-  }, [left])
-
-  const start = () => {
-    audioRef.current = audioRef.current ?? new AudioContext()
-    void audioRef.current.resume()
-    endAtRef.current = Date.now() + sec * 1000
-    setLeft(sec)
-  }
-
-  const idle = color === 'muscu' ? 'bg-muscu/10 text-muscu' : 'bg-velo/10 text-velo'
-  const run = color === 'muscu' ? 'bg-muscu' : 'bg-velo'
-  return left == null ? (
-    <button type="button" onClick={start} className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-extrabold ${idle}`}>
-      <Timer className="h-3 w-3" /> {label}
-    </button>
-  ) : (
-    <button
-      type="button"
-      onClick={() => setLeft(null)}
-      className={`rounded-full px-3 py-1.5 text-xs font-extrabold tabular-nums text-white ${run}`}
-    >
-      {mmss(left)} · stop
-    </button>
-  )
-}
-
-/** Groupes d'exercices : les items liés (superset) sont regroupés */
-function buildGroups(items: SessionItem[]): SessionItem[][] {
-  const groups: SessionItem[][] = []
-  let current: SessionItem[] = []
-  items.forEach((it, i) => {
-    current.push(it)
-    if (!(it.linkNext && i < items.length - 1)) {
-      groups.push(current)
-      current = []
-    }
-  })
-  return groups
-}
-
-/** Feuille de complétion d'une séance : formulaire adapté à chaque sport */
+/** Feuille d'une séance depuis Aujourd'hui : consulter le programme, lancer le minuteur, entrer le résultat */
 export default function CompleteSheet({
   session,
   onClose,
@@ -107,10 +40,19 @@ export default function CompleteSheet({
   )
 }
 
+/** Résumé du programme d'un exercice : « 3 × 20 reps » ou « 30 / 20 / 15 reps » */
+function itemSummary(it: SessionItem, ex?: Exercise): string {
+  const tgs = setTargetsOf(it)
+  const unit = ex?.measure === 'sec' ? 's' : 'reps'
+  const uniform = tgs.every((t) => t === tgs[0])
+  return uniform ? `${tgs.length} × ${tgs[0]} ${unit}` : `${tgs.join(' / ')} ${unit}`
+}
+
 function Inner({ session, onClose, date }: { session: Session; onClose: () => void; date?: string }) {
   const { addLog, logs, exercises } = useData()
   const navigate = useNavigate()
   const [note, setNote] = useState('')
+  const [entering, setEntering] = useState(false)
   const [celebrate, setCelebrate] = useState<{ text: string; reward?: string }[] | null>(null)
   const logDate = date ?? todayStr()
 
@@ -122,7 +64,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
     (session.category === 'hiit' || session.category === 'etirements' || isMuscu) &&
     session.items.length > 0 &&
     logDate === todayStr()
-  const hasForm = metrics.length > 0 || (isMuscu && session.items.length > 0)
+  const hasForm = metrics.length > 0
 
   // Dernière séance identique, pour préremplir (logs triés du plus récent au plus ancien)
   const lastLog = useMemo(() => logs.find((l) => l.sessionId === session.id), [logs, session.id])
@@ -134,24 +76,35 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
     return m
   })
 
-  // Muscu : répétitions réalisées par série (tours du bloc inclus)
+  // Muscu : réalisé par série, organisé blocs → tours → exercices → séries
   const exOf = (id: string) => exercises.find((e) => e.id === id)
   const blocks = useMemo(() => (isMuscu ? muscuBlocks(session) : []), [session, isMuscu])
   const roundsOf = (it: SessionItem) => blocks.find((b) => b.items.includes(it))?.rounds ?? 1
+  const flatTargets = (it: SessionItem): number[] => {
+    const tgs = setTargetsOf(it)
+    const flat: number[] = []
+    for (let r = 0; r < roundsOf(it); r++) flat.push(...tgs)
+    return flat
+  }
   const [values, setValues] = useState<Record<string, number[]>>(() => {
     const m: Record<string, number[]> = {}
     for (const it of session.items) {
+      const expected = flatTargets(it)
       const prev = lastLog?.results?.find((r) => r.exerciseId === it.exerciseId)
-      m[it.exerciseId] = prev
-        ? [...prev.sets]
-        : Array.from({ length: (it.sets ?? 3) * (isMuscu ? roundsOf(it) : 1) }, () => it.target ?? 10)
+      m[it.exerciseId] = prev && prev.sets.length === expected.length ? [...prev.sets] : expected
     }
+    return m
+  })
+  // Coches « série faite » : décocher indique où on s'est arrêté (pas d'édition de la séance)
+  const [done, setDone] = useState<Record<string, boolean[]>>(() => {
+    const m: Record<string, boolean[]> = {}
+    for (const it of session.items) m[it.exerciseId] = flatTargets(it).map(() => true)
     return m
   })
   const setRep = (exId: string, setIdx: number, v: number) =>
     setValues((p) => ({ ...p, [exId]: p[exId].map((r, i) => (i === setIdx ? v : r)) }))
-  const addSet = (exId: string) => setValues((p) => ({ ...p, [exId]: [...p[exId], p[exId].at(-1) ?? 10] }))
-  const removeSet = (exId: string) => setValues((p) => ({ ...p, [exId]: p[exId].slice(0, -1) }))
+  const toggleDone = (exId: string, setIdx: number) =>
+    setDone((p) => ({ ...p, [exId]: p[exId].map((d, i) => (i === setIdx ? !d : d)) }))
 
   const buildMetricValues = (): MetricValue[] => {
     const vals = { ...mvals }
@@ -191,34 +144,39 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
       })
     }
     if (isMuscu && session.items.length) {
-      extra.results = session.items.map((it) => {
-        const ex = exOf(it.exerciseId)
-        const sets = values[it.exerciseId] ?? []
-        // Paliers d'objectif nouvellement franchis ?
-        if (ex?.goal && sets.length) {
-          const metric = ex.goal.metric
-          const v = metric === 'best' ? Math.max(...sets) : sets.reduce((a, b) => a + b, 0)
-          let prevBest = 0
-          for (const l of logs) {
-            const r = l.results?.find((x) => x.exerciseId === it.exerciseId)
-            if (!r || !r.sets.length) continue
-            const pv = metric === 'best' ? Math.max(...r.sets) : r.sets.reduce((a, b) => a + b, 0)
-            if (pv > prevBest) prevBest = pv
-          }
-          const unit = ex.measure === 'sec' ? 's' : 'reps'
-          for (const lvl of goalLevels(ex.goal)) {
-            if (v >= lvl.value && prevBest < lvl.value) {
-              achieved.push({ text: `${ex.name} : ${v} ${unit} (palier ${lvl.value})`, reward: lvl.reward })
+      const seen = new Set<string>()
+      extra.results = session.items
+        .filter((it) => !seen.has(it.exerciseId) && (seen.add(it.exerciseId), true))
+        .map((it) => {
+          const ex = exOf(it.exerciseId)
+          // Seules les séries cochées comptent — décocher = « je me suis arrêté là »
+          const sets = (values[it.exerciseId] ?? []).filter((_, i) => done[it.exerciseId]?.[i] !== false)
+          // Paliers d'objectif nouvellement franchis ?
+          if (ex?.goal && sets.length) {
+            const metric = ex.goal.metric
+            const v = metric === 'best' ? Math.max(...sets) : sets.reduce((a, b) => a + b, 0)
+            let prevBest = 0
+            for (const l of logs) {
+              const r = l.results?.find((x) => x.exerciseId === it.exerciseId)
+              if (!r || !r.sets.length) continue
+              const pv = metric === 'best' ? Math.max(...r.sets) : r.sets.reduce((a, b) => a + b, 0)
+              if (pv > prevBest) prevBest = pv
+            }
+            const unit = ex.measure === 'sec' ? 's' : 'reps'
+            for (const lvl of goalLevels(ex.goal)) {
+              if (v >= lvl.value && prevBest < lvl.value) {
+                achieved.push({ text: `${ex.name} : ${v} ${unit} (palier ${lvl.value})`, reward: lvl.reward })
+              }
             }
           }
-        }
-        return {
-          exerciseId: it.exerciseId,
-          name: ex?.name ?? 'Exercice',
-          measure: ex?.measure ?? ('reps' as const),
-          sets,
-        }
-      })
+          return {
+            exerciseId: it.exerciseId,
+            name: ex?.name ?? 'Exercice',
+            measure: ex?.measure ?? ('reps' as const),
+            sets,
+          }
+        })
+        .filter((r) => r.sets.length > 0)
     }
     await addLog({
       date: logDate,
@@ -325,7 +283,47 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         </div>
       )}
 
-      {hasTimer && (
+      {/* Muscu — programme en lecture seule : les tours et le détail d'UN tour */}
+      {!entering && isMuscu && session.items.length > 0 && (
+        <div className="space-y-2">
+          {blocks.map((b, bi) => (
+            <div key={bi} className="overflow-hidden rounded-2xl bg-sage-50">
+              {(blocks.length > 1 || b.rounds > 1) && (
+                <p className="flex items-center gap-1.5 bg-muscu/10 px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
+                  <Repeat className="h-3 w-3" />
+                  {blocks.length > 1 ? `Bloc ${bi + 1}` : 'Circuit'}
+                  {b.rounds > 1 ? ` · × ${b.rounds} tours` : ''}
+                </p>
+              )}
+              {b.items.map((it, i) => {
+                const ex = exOf(it.exerciseId)
+                return (
+                  <div
+                    key={i}
+                    className={'flex items-center justify-between gap-2 px-4 py-2.5 ' + (i > 0 ? 'border-t border-surface' : '')}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-center gap-1.5 text-sm font-bold">
+                        <span className="min-w-0 truncate">{ex?.name ?? 'Exercice'}</span>
+                        {it.linkNext && <Link2 className="h-3 w-3 shrink-0 text-muscu" />}
+                      </p>
+                      {it.comment && (
+                        <p className="flex items-center gap-1 text-xs font-semibold text-ink-soft">
+                          <Lightbulb className="h-3 w-3 shrink-0" />
+                          <span className="min-w-0 truncate">{it.comment}</span>
+                        </p>
+                      )}
+                    </div>
+                    <span className="shrink-0 text-xs font-extrabold text-ink-soft">{itemSummary(it, ex)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!entering && hasTimer && (
         <PrimaryButton onClick={() => navigate(`/player/${session.id}`)}>
           <span className="flex items-center justify-center gap-2">
             <Play className="h-4 w-4" /> Lancer le minuteur guidé
@@ -333,104 +331,83 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         </PrimaryButton>
       )}
 
-      {(hasForm || isMuscu) && lastLog && (
-        <p className="text-xs font-semibold text-ink-soft">Prérempli avec votre dernière séance — ajustez en deux taps.</p>
+      {/* Muscu — saisie du résultat : tours détaillés, coches « série faite », pas d'édition de la séance */}
+      {!entering && isMuscu && session.items.length > 0 && (
+        <GhostButton onClick={() => setEntering(true)}>Entrer le résultat ✓</GhostButton>
       )}
 
-      {isMuscu && blocks.length === 1 && blocks[0].rounds > 1 && (
-        <p className="flex items-start gap-2 rounded-2xl bg-muscu/10 px-4 py-2.5 text-xs font-bold text-muscu">
-          <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>
-            Circuit × {blocks[0].rounds} tours : faites tous les exercices, puis recommencez. Les séries des tours sont
-            déjà comptées ci-dessous.
-          </span>
-        </p>
+      {entering && (
+        <>
+          <p className="text-xs font-semibold text-ink-soft">
+            {lastLog
+              ? 'Prérempli avec votre dernière séance — décochez les séries non faites et ajustez le réalisé.'
+              : 'Décochez les séries non faites et ajustez le réalisé.'}
+          </p>
+          {blocks.map((b, bi) => (
+            <div key={bi} className="space-y-2">
+              {Array.from({ length: b.rounds }, (_, r) => (
+                <div key={r} className="space-y-2">
+                  {(blocks.length > 1 || b.rounds > 1) && (
+                    <p className="rounded-xl bg-muscu/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
+                      {blocks.length > 1 ? `Bloc ${bi + 1}` : ''}
+                      {blocks.length > 1 && b.rounds > 1 ? ' · ' : ''}
+                      {b.rounds > 1 ? `Tour ${r + 1}/${b.rounds}` : ''}
+                    </p>
+                  )}
+                  {b.items.map((it) => {
+                    const ex = exOf(it.exerciseId)
+                    const tgs = setTargetsOf(it)
+                    const suffix = ex?.measure === 'sec' ? 's' : ''
+                    return (
+                      <div key={it.exerciseId + '-' + r} className="rounded-2xl bg-sage-50 p-3">
+                        <p className="text-sm font-extrabold">{ex?.name ?? 'Exercice'}</p>
+                        <div className="mt-1.5 space-y-1.5">
+                          {tgs.map((_, s) => {
+                            const fi = r * tgs.length + s
+                            const isDone = done[it.exerciseId]?.[fi] !== false
+                            return (
+                              <div key={s} className="flex items-center justify-between gap-2">
+                                <button
+                                  type="button"
+                                  aria-label={isDone ? `Série ${s + 1} non faite` : `Série ${s + 1} faite`}
+                                  onClick={() => toggleDone(it.exerciseId, fi)}
+                                  className={
+                                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full ' +
+                                    (isDone ? 'bg-sage-500 text-white' : 'border-2 border-sand text-transparent')
+                                  }
+                                >
+                                  <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                                </button>
+                                <span
+                                  className={
+                                    'shrink-0 text-xs font-bold ' + (isDone ? 'text-ink-soft' : 'text-ink-soft/40 line-through')
+                                  }
+                                >
+                                  Série {s + 1}
+                                </span>
+                                <div className={isDone ? '' : 'opacity-40'}>
+                                  <Stepper
+                                    value={values[it.exerciseId]?.[fi] ?? 0}
+                                    onChange={(v) => setRep(it.exerciseId, fi, v)}
+                                    suffix={suffix}
+                                    step={ex?.measure === 'sec' ? 5 : 1}
+                                  />
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          ))}
+        </>
       )}
 
-      {isMuscu &&
-        blocks.map((b, bi) => (
-          <div key={bi} className="space-y-3">
-            {blocks.length > 1 && (
-              <p className="flex items-center gap-1.5 rounded-xl bg-muscu/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
-                <LayoutGrid className="h-3.5 w-3.5" /> Bloc {bi + 1}
-                {b.rounds > 1 ? ` · × ${b.rounds} tours (séries déjà comptées)` : ''}
-              </p>
-            )}
-            {buildGroups(b.items).map((group, gi) => {
-          const renderItem = (it: SessionItem, showRest: boolean) => {
-            const ex = exOf(it.exerciseId)
-            const suffix = ex?.measure === 'sec' ? 's' : ''
-            return (
-              <div key={it.exerciseId} className="rounded-2xl bg-sage-50 p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-extrabold">{ex?.name ?? 'Exercice'}</p>
-                  {ex?.videoUrl && (
-                    <a
-                      href={ex.videoUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-xs font-bold text-velo"
-                    >
-                      <Play className="h-3 w-3" /> démo
-                    </a>
-                  )}
-                </div>
-                {it.comment && (
-                  <p className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-ink-soft">
-                    <Lightbulb className="h-3 w-3 shrink-0" />
-                    <span className="min-w-0 truncate">{it.comment}</span>
-                  </p>
-                )}
-                <div className="mt-2 space-y-1.5">
-                  {(values[it.exerciseId] ?? []).map((rep, i) => (
-                    <div key={i} className="flex items-center justify-between gap-2">
-                      <span className="shrink-0 text-xs font-bold text-ink-soft">Série {i + 1}</span>
-                      {ex?.measure === 'sec' && (
-                        <CountdownButton sec={rep} label={`chrono ${rep} s`} color="muscu" />
-                      )}
-                      <Stepper value={rep} onChange={(v) => setRep(it.exerciseId, i, v)} suffix={suffix} step={ex?.measure === 'sec' ? 5 : 1} />
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <div className="flex gap-3 text-xs font-bold">
-                    <button type="button" className="text-sage-600" onClick={() => addSet(it.exerciseId)}>
-                      + Ajouter une série
-                    </button>
-                    {(values[it.exerciseId]?.length ?? 0) > 1 && (
-                      <button type="button" className="text-ink-soft" onClick={() => removeSet(it.exerciseId)}>
-                        − Retirer
-                      </button>
-                    )}
-                  </div>
-                  {showRest && (it.restSec ?? 60) > 0 && (
-                    <CountdownButton sec={it.restSec ?? 60} label={`Repos ${it.restSec ?? 60} s`} />
-                  )}
-                </div>
-              </div>
-            )
-          }
-
-              if (group.length === 1) return <div key={gi}>{renderItem(group[0], true)}</div>
-              return (
-                <div key={gi} className="rounded-3xl border-2 border-muscu/30 p-1.5">
-                  <p className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
-                    <Link2 className="h-3.5 w-3.5" /> Superset — enchaîner sans repos
-                  </p>
-                  <div className="space-y-1.5">{group.map((it) => renderItem(it, false))}</div>
-                  {(group[0].restSec ?? 60) > 0 && (
-                    <div className="flex items-center justify-between px-2 py-2">
-                      <span className="text-xs font-bold text-ink-soft">Repos après le superset</span>
-                      <CountdownButton sec={group[0].restSec ?? 60} label={`Repos ${group[0].restSec ?? 60} s`} />
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        ))}
-
-      {metrics.length > 0 && (
+      {(!isMuscu || entering) && metrics.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
           {metrics.map((d) => (
             <Field key={d.key} label={d.label}>
@@ -445,25 +422,29 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         </div>
       )}
 
-      {hasForm && (
+      {(entering || (!isMuscu && hasForm)) && (
         <Field label="Note (optionnel)">
           <TextArea value={note} onChange={setNote} rows={2} placeholder="Ressenti, remarques…" />
         </Field>
       )}
 
-      {hasTimer && !isMuscu ? (
-        <GhostButton onClick={() => void save()}>Marquer comme faite ✓ (sans minuteur)</GhostButton>
-      ) : (
-        <PrimaryButton onClick={() => void save()}>
-          {hasForm ? 'Valider la séance ✓' : 'Marquer comme faite ✓'}
-        </PrimaryButton>
-      )}
+      {entering && <PrimaryButton onClick={() => void save()}>Valider la séance ✓</PrimaryButton>}
+
+      {!isMuscu &&
+        (hasTimer ? (
+          <GhostButton onClick={() => void save()}>Marquer comme faite ✓ (sans minuteur)</GhostButton>
+        ) : (
+          <PrimaryButton onClick={() => void save()}>
+            {hasForm ? 'Valider la séance ✓' : 'Marquer comme faite ✓'}
+          </PrimaryButton>
+        ))}
+
       <button
         type="button"
-        onClick={onClose}
+        onClick={() => (entering ? setEntering(false) : onClose())}
         className="w-full py-1 text-center text-sm font-bold text-ink-soft active:text-ink"
       >
-        Fermer sans valider
+        {entering ? '← Retour à la séance' : 'Fermer sans valider'}
       </button>
     </div>
   )

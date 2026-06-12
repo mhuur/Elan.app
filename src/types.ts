@@ -71,6 +71,8 @@ export interface SessionItem {
   sets?: number
   /** Muscu : objectif par série (reps ou secondes selon l'exercice) */
   target?: number
+  /** Muscu : objectifs par série quand elles diffèrent (ex. 30/20/15) — prime sur `target` */
+  targets?: number[]
   /** Étirements : durée de la posture en secondes */
   durationSec?: number
   /** Muscu : repos entre les séries, en secondes */
@@ -83,6 +85,13 @@ export interface SessionItem {
   blockRounds?: number
   /** Consigne libre affichée pendant la séance (tempo, posture…) */
   comment?: string
+}
+
+/** Objectif de chaque série d'un item muscu (gère séries uniformes ET variées) */
+export function setTargetsOf(it: SessionItem): number[] {
+  const n = Math.max(1, it.sets ?? 3)
+  const base = it.target ?? 10
+  return Array.from({ length: n }, (_, i) => it.targets?.[i] ?? it.targets?.[it.targets.length - 1] ?? base)
 }
 
 /** Planification par intervalle : « tous les X jours » depuis une date */
