@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ClipboardList, LayoutGrid, Lightbulb, Link2, Play, Repeat, Timer } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Log, type MetricValue, type Session, type SessionItem } from '../types'
 import { todayStr } from '../lib/dates'
@@ -7,7 +8,7 @@ import { mmss } from '../lib/format'
 import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { muscuBlocks } from '../lib/blocks'
 import { tone } from '../lib/audio'
-import { Field, GhostButton, NumInput, PrimaryButton, Sheet, Stepper, TextArea } from './ui'
+import { CategoryIcon, Field, GhostButton, NumInput, PrimaryButton, Sheet, Stepper, TextArea } from './ui'
 
 /** Compte à rebours (repos entre séries, ou effort pour le gainage), avec bip à la fin */
 function CountdownButton({ sec, label, color = 'velo' }: { sec: number; label: string; color?: 'velo' | 'muscu' }) {
@@ -46,8 +47,8 @@ function CountdownButton({ sec, label, color = 'velo' }: { sec: number; label: s
   const idle = color === 'muscu' ? 'bg-muscu/10 text-muscu' : 'bg-velo/10 text-velo'
   const run = color === 'muscu' ? 'bg-muscu' : 'bg-velo'
   return left == null ? (
-    <button type="button" onClick={start} className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${idle}`}>
-      {label}
+    <button type="button" onClick={start} className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-extrabold ${idle}`}>
+      <Timer className="h-3 w-3" /> {label}
     </button>
   ) : (
     <button
@@ -89,7 +90,17 @@ export default function CompleteSheet({
     <Sheet
       open={!!session}
       onClose={onClose}
-      title={session ? `${CATEGORY_META[session.category].emoji} ${session.name}` : undefined}
+      title={
+        session ? (
+          <span className="flex items-center gap-2">
+            <CategoryIcon
+              category={session.category}
+              className={`h-5 w-5 shrink-0 ${CATEGORY_META[session.category].text}`}
+            />
+            <span className="min-w-0 truncate">{session.name}</span>
+          </span>
+        ) : undefined
+      }
     >
       {session && <Inner key={session.id} session={session} onClose={onClose} date={date} />}
     </Sheet>
@@ -254,9 +265,9 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
       {session.notes && <p className="text-sm font-semibold text-ink-soft">{session.notes}</p>}
 
       {program.length > 0 && (
-        <p className="rounded-2xl bg-sage-50 px-4 py-2.5 text-sm font-bold">
-          📋 Programme :{' '}
-          {program.map((m) => `${m.label} ${m.target}${m.unit ? ' ' + m.unit : ''}`).join(' · ')}
+        <p className="flex items-center gap-2 rounded-2xl bg-sage-50 px-4 py-2.5 text-sm font-bold">
+          <ClipboardList className="h-4 w-4 shrink-0 text-sage-600" />
+          <span>Programme : {program.map((m) => `${m.label} ${m.target}${m.unit ? ' ' + m.unit : ''}`).join(' · ')}</span>
         </p>
       )}
 
@@ -268,9 +279,9 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
               href={l.url}
               target="_blank"
               rel="noreferrer"
-              className="rounded-full bg-velo/10 px-3.5 py-2 text-xs font-extrabold text-velo active:bg-velo/20"
+              className="flex items-center gap-1.5 rounded-full bg-velo/10 px-3.5 py-2 text-xs font-extrabold text-velo active:bg-velo/20"
             >
-              ▶ {l.label}
+              <Play className="h-3 w-3" /> {l.label}
             </a>
           ))}
         </div>
@@ -293,7 +304,12 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold">{ex?.name ?? 'Exercice'}</p>
-                  {it.comment && <p className="truncate text-xs font-semibold text-ink-soft">💡 {it.comment}</p>}
+                  {it.comment && (
+                    <p className="flex items-center gap-1 text-xs font-semibold text-ink-soft">
+                      <Lightbulb className="h-3 w-3 shrink-0" />
+                      <span className="min-w-0 truncate">{it.comment}</span>
+                    </p>
+                  )}
                 </div>
                 <span className="shrink-0 text-xs font-extrabold text-ink-soft">
                   {session.category === 'etirements' ? (it.durationSec ?? 30) : (session.workSec ?? 45)} s
@@ -309,16 +325,25 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         </div>
       )}
 
-      {hasTimer && <PrimaryButton onClick={() => navigate(`/player/${session.id}`)}>▶ Lancer le minuteur guidé</PrimaryButton>}
+      {hasTimer && (
+        <PrimaryButton onClick={() => navigate(`/player/${session.id}`)}>
+          <span className="flex items-center justify-center gap-2">
+            <Play className="h-4 w-4" /> Lancer le minuteur guidé
+          </span>
+        </PrimaryButton>
+      )}
 
       {(hasForm || isMuscu) && lastLog && (
         <p className="text-xs font-semibold text-ink-soft">Prérempli avec votre dernière séance — ajustez en deux taps.</p>
       )}
 
       {isMuscu && blocks.length === 1 && blocks[0].rounds > 1 && (
-        <p className="rounded-2xl bg-muscu/10 px-4 py-2.5 text-xs font-bold text-muscu">
-          🔁 Circuit × {blocks[0].rounds} tours : faites tous les exercices, puis recommencez. Les séries des tours
-          sont déjà comptées ci-dessous.
+        <p className="flex items-start gap-2 rounded-2xl bg-muscu/10 px-4 py-2.5 text-xs font-bold text-muscu">
+          <Repeat className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Circuit × {blocks[0].rounds} tours : faites tous les exercices, puis recommencez. Les séries des tours sont
+            déjà comptées ci-dessous.
+          </span>
         </p>
       )}
 
@@ -326,8 +351,8 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         blocks.map((b, bi) => (
           <div key={bi} className="space-y-3">
             {blocks.length > 1 && (
-              <p className="rounded-xl bg-muscu/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
-                ▦ Bloc {bi + 1}
+              <p className="flex items-center gap-1.5 rounded-xl bg-muscu/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
+                <LayoutGrid className="h-3.5 w-3.5" /> Bloc {bi + 1}
                 {b.rounds > 1 ? ` · × ${b.rounds} tours (séries déjà comptées)` : ''}
               </p>
             )}
@@ -340,18 +365,28 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-extrabold">{ex?.name ?? 'Exercice'}</p>
                   {ex?.videoUrl && (
-                    <a href={ex.videoUrl} target="_blank" rel="noreferrer" className="rounded-full bg-surface px-2.5 py-1 text-xs font-bold text-velo">
-                      ▶ démo
+                    <a
+                      href={ex.videoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-xs font-bold text-velo"
+                    >
+                      <Play className="h-3 w-3" /> démo
                     </a>
                   )}
                 </div>
-                {it.comment && <p className="mt-0.5 text-xs font-semibold text-ink-soft">💡 {it.comment}</p>}
+                {it.comment && (
+                  <p className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-ink-soft">
+                    <Lightbulb className="h-3 w-3 shrink-0" />
+                    <span className="min-w-0 truncate">{it.comment}</span>
+                  </p>
+                )}
                 <div className="mt-2 space-y-1.5">
                   {(values[it.exerciseId] ?? []).map((rep, i) => (
                     <div key={i} className="flex items-center justify-between gap-2">
                       <span className="shrink-0 text-xs font-bold text-ink-soft">Série {i + 1}</span>
                       {ex?.measure === 'sec' && (
-                        <CountdownButton sec={rep} label={`▶ chrono ${rep} s`} color="muscu" />
+                        <CountdownButton sec={rep} label={`chrono ${rep} s`} color="muscu" />
                       )}
                       <Stepper value={rep} onChange={(v) => setRep(it.exerciseId, i, v)} suffix={suffix} step={ex?.measure === 'sec' ? 5 : 1} />
                     </div>
@@ -369,7 +404,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
                     )}
                   </div>
                   {showRest && (it.restSec ?? 60) > 0 && (
-                    <CountdownButton sec={it.restSec ?? 60} label={`⏱ Repos ${it.restSec ?? 60} s`} />
+                    <CountdownButton sec={it.restSec ?? 60} label={`Repos ${it.restSec ?? 60} s`} />
                   )}
                 </div>
               </div>
@@ -379,14 +414,14 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
               if (group.length === 1) return <div key={gi}>{renderItem(group[0], true)}</div>
               return (
                 <div key={gi} className="rounded-3xl border-2 border-muscu/30 p-1.5">
-                  <p className="px-2 py-1 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
-                    🔗 Superset — enchaîner sans repos
+                  <p className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
+                    <Link2 className="h-3.5 w-3.5" /> Superset — enchaîner sans repos
                   </p>
                   <div className="space-y-1.5">{group.map((it) => renderItem(it, false))}</div>
                   {(group[0].restSec ?? 60) > 0 && (
                     <div className="flex items-center justify-between px-2 py-2">
                       <span className="text-xs font-bold text-ink-soft">Repos après le superset</span>
-                      <CountdownButton sec={group[0].restSec ?? 60} label={`⏱ Repos ${group[0].restSec ?? 60} s`} />
+                      <CountdownButton sec={group[0].restSec ?? 60} label={`Repos ${group[0].restSec ?? 60} s`} />
                     </div>
                   )}
                 </div>

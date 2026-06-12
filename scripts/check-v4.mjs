@@ -44,7 +44,7 @@ try {
   await page.getByRole('button', { name: 'Mes séances', exact: true }).click()
   await page.click('text=Full body')
   await page.waitForSelector('text=Tours du circuit')
-  await page.locator('button:has-text("+ lier en superset")').first().click()
+  await page.locator('button:has-text("superset")').first().click()
   await page.waitForSelector('text=Superset — enchaîné sans repos')
   await page.click('text=Enregistrer')
 
@@ -53,7 +53,7 @@ try {
   await page.waitForSelector('text=Cap sur la progression')
   await page.click('text=+ Objectif')
   await page.waitForSelector('text=Nouvel objectif')
-  await page.locator('select').first().selectOption({ label: '💪 Muscu — Full body' })
+  await page.locator('select').first().selectOption({ label: 'Muscu — Full body' })
   await page.waitForSelector("text=Type d'objectif")
   await page.locator('input[type="number"]').first().fill('10')
   await page.getByPlaceholder('🎁 Récompense (ex. lunettes de soleil)').first().fill('Glace')
@@ -61,7 +61,7 @@ try {
   await page.locator('input[type="number"]').nth(1).fill('20')
   await page.getByPlaceholder('🎁 Récompense (ex. lunettes de soleil)').nth(1).fill('Lunettes de soleil')
   await page.click("text=Créer l'objectif")
-  await page.waitForSelector('text=💪 Pompes')
+  await page.waitForSelector('p:has-text("Pompes")')
   await page.waitForSelector('text=2 paliers')
   await page.waitForSelector('text=0 / 10')
   await page.screenshot({ path: 'screenshots/21-objectifs.png' })
@@ -86,7 +86,7 @@ try {
   // --- Objectif multi-mesures sur le vélo : durée ≥ 25 min ET bpm ≥ 120
   await page.click('text=+ Objectif')
   await page.waitForSelector('text=Nouvel objectif')
-  await page.locator('select').first().selectOption({ label: '🚴 Vélo d’appartement' })
+  await page.locator('select').first().selectOption({ label: 'Vélo d’appartement' })
   await page.waitForSelector('text=remplissez une ou plusieurs mesures')
   const goalNums = page.locator('input[type="number"]')
   await goalNums.nth(1).fill('25') // durée

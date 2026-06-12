@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Bug, Check, Cloud, Download, Smartphone, Upload, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { todayStr } from '../lib/dates'
 import type { StoreData } from '../data/store'
@@ -43,23 +44,29 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
     <Sheet open={open} onClose={onClose} title="Réglages">
       <div className="space-y-3">
         {mode === 'cloud' ? (
-          <div className="rounded-2xl bg-sage-50 p-4 text-sm font-semibold text-ink-soft">
-            ☁️ Connecté en tant que <span className="text-ink">{user?.email}</span>
-            <br />
-            Vos données sont synchronisées sur tous vos appareils.
+          <div className="flex items-start gap-2.5 rounded-2xl bg-sage-50 p-4 text-sm font-semibold text-ink-soft">
+            <Cloud className="mt-0.5 h-4 w-4 shrink-0 text-sage-600" />
+            <span>
+              Connecté en tant que <span className="text-ink">{user?.email}</span>
+              <br />
+              Vos données sont synchronisées sur tous vos appareils.
+            </span>
           </div>
         ) : (
-          <div className="rounded-2xl bg-sage-50 p-4 text-sm font-semibold text-ink-soft">
-            📱 <span className="text-ink">Mode local</span> : vos données restent sur cet appareil.
-            <br />
-            Pour les synchroniser entre téléphone et ordinateur, configurez Firebase (guide dans le fichier README du
-            projet), ou utilisez l'export/import ci-dessous.
+          <div className="flex items-start gap-2.5 rounded-2xl bg-sage-50 p-4 text-sm font-semibold text-ink-soft">
+            <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-sage-600" />
+            <span>
+              <span className="text-ink">Mode local</span> : vos données restent sur cet appareil.
+              <br />
+              Pour les synchroniser entre téléphone et ordinateur, configurez Firebase (guide dans le fichier README du
+              projet), ou utilisez l'export/import ci-dessous.
+            </span>
           </div>
         )}
 
         <section className="rounded-2xl bg-sage-50 p-4">
-          <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
-            🐞 Bugs & idées d'amélioration
+          <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+            <Bug className="h-3.5 w-3.5" /> Bugs & idées d'amélioration
           </h3>
           <div className="flex items-center gap-2">
             <input
@@ -91,11 +98,11 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
                     aria-label={i.done ? 'Marquer à faire' : 'Marquer réglée'}
                     onClick={() => void updateIdea(i.id, { done: !i.done })}
                     className={
-                      'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ' +
+                      'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ' +
                       (i.done ? 'bg-sage-500 text-white' : 'border-2 border-sand text-transparent')
                     }
                   >
-                    ✓
+                    <Check className="h-3 w-3" strokeWidth={3} />
                   </button>
                   <p
                     className={
@@ -110,7 +117,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
                     onClick={() => void removeIdea(i.id)}
                     className="shrink-0 px-1 text-ink-soft/50 active:text-hiit"
                   >
-                    ✕
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
               ))}
@@ -118,8 +125,16 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
           )}
         </section>
 
-        <GhostButton onClick={() => void doExport()}>💾 Exporter mes données (JSON)</GhostButton>
-        <GhostButton onClick={() => fileRef.current?.click()}>📥 Importer une sauvegarde</GhostButton>
+        <GhostButton onClick={() => void doExport()}>
+          <span className="flex items-center justify-center gap-2">
+            <Download className="h-4 w-4" /> Exporter mes données (JSON)
+          </span>
+        </GhostButton>
+        <GhostButton onClick={() => fileRef.current?.click()}>
+          <span className="flex items-center justify-center gap-2">
+            <Upload className="h-4 w-4" /> Importer une sauvegarde
+          </span>
+        </GhostButton>
         <input
           ref={fileRef}
           type="file"

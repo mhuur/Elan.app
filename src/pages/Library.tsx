@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useData } from '../data/DataContext'
 import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, subtypesOf, type Exercise } from '../types'
+import { Play, Plus } from 'lucide-react'
 import { summarizeSession } from '../lib/format'
 import { describeSchedule } from '../lib/schedule'
-import { EmptyState, Fab, PageHeader, Seg } from '../components/ui'
+import { CategoryIcon, EmptyState, Fab, PageHeader, Seg } from '../components/ui'
 
 const norm = (s: string) =>
   s
@@ -67,8 +68,8 @@ export default function Library() {
             const meta = CATEGORY_META[cat]
             return (
               <section key={cat}>
-                <h2 className={`mb-2 text-[11px] font-extrabold uppercase tracking-wider ${meta.text}`}>
-                  {meta.emoji} {meta.label}
+                <h2 className={`mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider ${meta.text}`}>
+                  <CategoryIcon category={cat} className="h-3.5 w-3.5" /> {meta.label}
                 </h2>
                 <div className="space-y-3">
                   {list.map((s) => (
@@ -99,7 +100,7 @@ export default function Library() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="🔍 Rechercher un exercice ou un sous-type…"
+            placeholder="Rechercher un exercice ou un sous-type…"
             className="w-full rounded-2xl border border-sand bg-surface px-4 py-3 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink-soft/60 focus:border-sage-400"
           />
           {CATEGORIES.map((cat) => {
@@ -109,16 +110,16 @@ export default function Library() {
             return (
               <section key={cat}>
                 <div className="mb-2 flex items-center justify-between">
-                  <h2 className={`text-[11px] font-extrabold uppercase tracking-wider ${meta.text}`}>
-                    {meta.emoji} {meta.label}
+                  <h2 className={`flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider ${meta.text}`}>
+                    <CategoryIcon category={cat} className="h-3.5 w-3.5" /> {meta.label}
                   </h2>
                   <button
                     type="button"
                     aria-label={`Nouvel exercice ${meta.label}`}
                     onClick={() => navigate(`/exercise/new?cat=${cat}`)}
-                    className="flex h-6 w-6 items-center justify-center rounded-full bg-sage-100 text-sm font-extrabold text-sage-700 active:bg-sage-200"
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-sage-100 text-sage-700 active:bg-sage-200"
                   >
-                    +
+                    <Plus className="h-3.5 w-3.5" />
                   </button>
                 </div>
                 <div className="space-y-2.5">
@@ -133,9 +134,9 @@ export default function Library() {
                             type="button"
                             aria-label={`Nouvel exercice ${subtype}`}
                             onClick={() => navigate(`/exercise/new?cat=${cat}&st=${encodeURIComponent(subtype)}`)}
-                            className="flex h-5 w-5 items-center justify-center rounded-full bg-sage-50 text-xs font-extrabold text-sage-600 active:bg-sage-100"
+                            className="flex h-5 w-5 items-center justify-center rounded-full bg-sage-50 text-sage-600 active:bg-sage-100"
                           >
-                            +
+                            <Plus className="h-3 w-3" />
                           </button>
                         </div>
                       )}
@@ -162,9 +163,9 @@ export default function Library() {
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={(ev) => ev.stopPropagation()}
-                                className="shrink-0 rounded-full bg-velo/10 px-2.5 py-1 text-xs font-extrabold text-velo"
+                                className="flex shrink-0 items-center gap-1 rounded-full bg-velo/10 px-2.5 py-1 text-xs font-extrabold text-velo"
                               >
-                                ▶ démo
+                                <Play className="h-3 w-3" /> démo
                               </a>
                             )}
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-sage-300">

@@ -1,56 +1,12 @@
 import { NavLink } from 'react-router-dom'
+import { CalendarDays, Dumbbell, Sun, Target, TrendingUp } from 'lucide-react'
 
 const items = [
-  {
-    to: '/',
-    label: "Aujourd'hui",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-      </svg>
-    ),
-  },
-  {
-    to: '/planning',
-    label: 'Planning',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-        <rect x="3" y="4" width="18" height="17" rx="3" />
-        <path d="M16 2v4M8 2v4M3 10h18" />
-      </svg>
-    ),
-  },
-  {
-    to: '/library',
-    label: 'Exercices',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-        <path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11" />
-      </svg>
-    ),
-  },
-  {
-    to: '/goals',
-    label: 'Objectifs',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-        <circle cx="12" cy="12" r="9" />
-        <circle cx="12" cy="12" r="5" />
-        <circle cx="12" cy="12" r="1.2" fill="currentColor" />
-      </svg>
-    ),
-  },
-  {
-    to: '/progress',
-    label: 'Progrès',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-        <path d="M3 3v18h18" />
-        <path d="M7 15l4-4 3 3 5-6" />
-      </svg>
-    ),
-  },
+  { to: '/', label: "Aujourd'hui", icon: Sun },
+  { to: '/planning', label: 'Planning', icon: CalendarDays },
+  { to: '/library', label: 'Exercices', icon: Dumbbell },
+  { to: '/goals', label: 'Objectifs', icon: Target },
+  { to: '/progress', label: 'Progrès', icon: TrendingUp },
 ]
 
 export default function BottomNav() {
@@ -66,7 +22,7 @@ export default function BottomNav() {
               (isActive ? 'text-sage-600' : 'text-ink-soft/70')
             }
           >
-            {it.icon}
+            <it.icon className="h-6 w-6" strokeWidth={2} />
             {it.label}
           </NavLink>
         ))}

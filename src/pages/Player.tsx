@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Lightbulb, Pause, Play, SkipForward, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Exercise, type Session } from '../types'
 import { todayStr } from '../lib/dates'
 import { mmss } from '../lib/format'
 import { muscuBlocks } from '../lib/blocks'
 import { tone as playTone } from '../lib/audio'
+import { CategoryIcon } from '../components/ui'
 
 interface Step {
   type: 'prep' | 'work' | 'rest'
@@ -292,7 +294,9 @@ export default function Player() {
   if (phase === 'ready') {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-6 px-8 text-center">
-        <div className={`flex h-20 w-20 items-center justify-center rounded-3xl text-4xl ${meta.soft}`}>{meta.emoji}</div>
+        <div className={`flex h-20 w-20 items-center justify-center rounded-3xl ${meta.soft} ${meta.text}`}>
+          <CategoryIcon category={session.category} className="h-10 w-10" />
+        </div>
         <div>
           <h1 className="text-2xl font-extrabold">{session.name}</h1>
           <p className="mt-1 text-sm font-semibold text-ink-soft">
@@ -341,9 +345,7 @@ export default function Player() {
     <div className={`flex min-h-dvh flex-col ${bgByType} transition-colors duration-500`}>
       <header className="flex items-center justify-between px-5 pt-6">
         <button type="button" onClick={quit} aria-label="Quitter" className="rounded-full bg-surface/80 p-2.5 shadow-sm">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="h-5 w-5">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
+          <X className="h-5 w-5" />
         </button>
         <p className="text-sm font-extrabold text-ink-soft">
           {steps.slice(0, stepIdx + 1).filter((s) => s.type === 'work').length}/{steps.filter((s) => s.type === 'work').length}
@@ -356,7 +358,11 @@ export default function Player() {
         </p>
         <h1 className="text-3xl font-extrabold leading-tight">{step.label}</h1>
         {step.detail && <p className="text-sm font-extrabold text-ink-soft">{step.detail}</p>}
-        {step.comment && <p className="text-sm font-semibold text-ink-soft">💡 {step.comment}</p>}
+        {step.comment && (
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-ink-soft">
+            <Lightbulb className="h-3.5 w-3.5 shrink-0" /> {step.comment}
+          </p>
+        )}
         {step.manual ? (
           <>
             <div className="my-2 flex items-center gap-5">
@@ -414,16 +420,24 @@ export default function Player() {
           <button
             type="button"
             onClick={() => setPaused((p) => !p)}
-            className="flex-1 rounded-2xl bg-surface px-6 py-4 text-base font-extrabold shadow-md active:bg-sand"
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-surface px-6 py-4 text-base font-extrabold shadow-md active:bg-sand"
           >
-            {paused ? '▶ Reprendre' : '⏸ Pause'}
+            {paused ? (
+              <>
+                <Play className="h-4 w-4" /> Reprendre
+              </>
+            ) : (
+              <>
+                <Pause className="h-4 w-4" /> Pause
+              </>
+            )}
           </button>
           <button
             type="button"
             onClick={skip}
-            className="rounded-2xl bg-surface/70 px-6 py-4 text-base font-extrabold text-ink-soft shadow-md active:bg-sand"
+            className="flex items-center gap-2 rounded-2xl bg-surface/70 px-6 py-4 text-base font-extrabold text-ink-soft shadow-md active:bg-sand"
           >
-            Passer ⏭
+            Passer <SkipForward className="h-4 w-4" />
           </button>
         </div>
       </footer>

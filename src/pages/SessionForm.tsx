@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ChevronDown, ChevronUp, LayoutGrid, Link2, MessageSquarePlus, Plus, Repeat, Timer, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import {
   CATEGORIES,
@@ -12,7 +13,7 @@ import {
 } from '../types'
 import { DAY_LETTER, DAY_NAMES, todayStr } from '../lib/dates'
 import { canonicalCycles, cycleStepsOf, ownerOf } from '../lib/schedule'
-import { Combobox, Field, FormActions, PageHeader, Seg, Select, Stepper, TextInput } from '../components/ui'
+import { CategoryIcon, Combobox, Field, FormActions, PageHeader, Seg, Select, Stepper, TextInput } from '../components/ui'
 
 const smallInput =
   'rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
@@ -103,16 +104,20 @@ export default function SessionForm() {
     a.localeCompare(b, 'fr'),
   )
 
-  // --- Édition de la rotation
+  // --- Édition de la rotation (le sélecteur d'ajout n'apparaît qu'au tap sur +)
   const usedIds = new Set(steps.flat())
-  const hasRotation = steps.flat().some((id) => id !== selfKey)
-  const stepName = (id: string) =>
-    id === selfKey ? `${name.trim() || 'Cette séance'} ★` : (sessions.find((x) => x.id === id)?.name ?? '?')
+  const [addingDay, setAddingDay] = useState<number | null>(null)
   const addToStep = (si: number, id: string) => setSteps((p) => p.map((st, i) => (i === si ? [...st, id] : st)))
   const removeFromStep = (si: number, id: string) =>
     setSteps((p) => p.map((st, i) => (i === si ? st.filter((x) => x !== id) : st)).filter((st, i) => st.length > 0 || i !== si))
-  const addStep = () => setSteps((p) => [...p, []])
-  const removeStep = (si: number) => setSteps((p) => p.filter((_, i) => i !== si))
+  const addStep = () => {
+    setAddingDay(steps.length)
+    setSteps((p) => [...p, []])
+  }
+  const removeStep = (si: number) => {
+    setAddingDay(null)
+    setSteps((p) => p.filter((_, i) => i !== si))
+  }
 
   const catExercises = exercises.filter((e) => e.category === category)
   const exOf = (exId: string) => exercises.find((e) => e.id === exId)
@@ -306,7 +311,7 @@ export default function SessionForm() {
             <Select value={category} onChange={(v) => switchCategory(v as Category)}>
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
-                  {CATEGORY_META[c].emoji} {CATEGORY_META[c].label}
+                  {CATEGORY_META[c].label}
                 </option>
               ))}
             </Select>
@@ -350,103 +355,105 @@ export default function SessionForm() {
               ))}
             </div>
           ) : (
-            <div className="mt-2 space-y-3 rounded-2xl bg-sage-50 p-3.5">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold">Tous les</p>
-                <div className="flex items-center gap-1.5">
-                  <Stepper value={everyDays} onChange={setEveryDays} min={1} max={30} small />
-                  <span className="text-sm font-semibold">jour{everyDays > 1 ? 's' : ''}</span>
-                </div>
-              </div>
-              <label className="flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold">À partir du</span>
+            <div className="mt-3 space-y-3">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm font-semibold text-ink-soft">
+                <span>Tous les</span>
+                <MiniNum value={everyDays} onChange={setEveryDays} min={1} max={30} />
+                <span>jour{everyDays > 1 ? 's' : ''}, à partir du</span>
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value || todayStr())}
-                  className="rounded-xl border border-sand bg-surface px-3 py-2 text-sm font-bold outline-none focus:border-sage-400"
+                  className="rounded-lg border border-sand bg-surface px-2 py-1.5 text-xs font-bold text-ink outline-none focus:border-sage-400"
                 />
-              </label>
+              </div>
               <div>
-                <p className="mb-1 text-sm font-semibold">Rotation (optionnel) — composez vos jours</p>
-                <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-ink-soft">
+                    Rotation <span className="text-ink-soft/50">— on recommence après le dernier jour</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={addStep}
+                    className="flex items-center gap-0.5 text-xs font-extrabold text-sage-600 active:text-sage-700"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> jour
+                  </button>
+                </div>
+                <div className="mt-1.5 space-y-1.5">
                   {steps.map((st, si) => (
-                    <div key={si} className="rounded-xl bg-surface p-2.5">
-                      <div className="mb-1.5 flex items-center justify-between">
-                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
-                          Jour {si + 1}
-                        </p>
+                    <div key={si} className="rounded-xl bg-surface px-3 py-2 shadow-sm">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="w-6 shrink-0 text-[11px] font-extrabold uppercase text-ink-soft/60">
+                          J{si + 1}
+                        </span>
+                        {st.map((sid) => {
+                          if (sid === selfKey) {
+                            return (
+                              <span key={sid} className="rounded-full bg-sage-500 px-2.5 py-1 text-xs font-extrabold text-white">
+                                ★ {name.trim() || 'Cette séance'}
+                              </span>
+                            )
+                          }
+                          const x = sessions.find((q) => q.id === sid)
+                          if (!x) return null
+                          const meta = CATEGORY_META[x.category]
+                          return (
+                            <button
+                              key={sid}
+                              type="button"
+                              title="Retirer de ce jour"
+                              onClick={() => removeFromStep(si, sid)}
+                              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-extrabold ${meta.soft} ${meta.text}`}
+                            >
+                              <CategoryIcon category={x.category} className="h-3 w-3" /> {x.name}
+                              <X className="h-3 w-3 opacity-50" />
+                            </button>
+                          )
+                        })}
+                        <button
+                          type="button"
+                          aria-label={`Ajouter une séance au jour ${si + 1}`}
+                          onClick={() => setAddingDay(addingDay === si ? null : si)}
+                          className="flex h-6 w-6 items-center justify-center rounded-full bg-sage-100 text-sage-700 active:bg-sage-200"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
                         {!st.includes(selfKey) && steps.length > 1 && (
                           <button
                             type="button"
                             aria-label={`Retirer le jour ${si + 1}`}
                             onClick={() => removeStep(si)}
-                            className="px-1 text-ink-soft/50"
+                            className="ml-auto px-0.5 text-ink-soft/40"
                           >
-                            ✕
+                            <X className="h-4 w-4" />
                           </button>
                         )}
                       </div>
-                      {st.length > 0 && (
-                        <div className="mb-1.5 flex flex-wrap gap-1.5">
-                          {st.map((sid) => {
-                            if (sid === selfKey) {
-                              return (
-                                <span key={sid} className="rounded-full bg-sage-500 px-3 py-1.5 text-xs font-extrabold text-white">
-                                  ★ {name.trim() || 'Cette séance'}
-                                </span>
-                              )
-                            }
-                            const x = sessions.find((q) => q.id === sid)
-                            if (!x) return null
-                            const meta = CATEGORY_META[x.category]
-                            return (
-                              <button
-                                key={sid}
-                                type="button"
-                                title="Retirer de ce jour"
-                                onClick={() => removeFromStep(si, sid)}
-                                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-extrabold ${meta.soft} ${meta.text}`}
-                              >
-                                {meta.emoji} {x.name} <span className="opacity-50">✕</span>
-                              </button>
-                            )
-                          })}
+                      {addingDay === si && (
+                        <div className="mt-2">
+                          <Select
+                            value=""
+                            onChange={(v) => {
+                              if (v) {
+                                addToStep(si, v)
+                                setAddingDay(null)
+                              }
+                            }}
+                          >
+                            <option value="">Choisir une séance…</option>
+                            {sessions
+                              .filter((s) => s.id !== existing?.id && !usedIds.has(s.id))
+                              .map((s) => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name}
+                                </option>
+                              ))}
+                          </Select>
                         </div>
                       )}
-                      <Select value="" onChange={(v) => v && addToStep(si, v)}>
-                        <option value="">+ Ajouter une séance ce jour-là…</option>
-                        {sessions
-                          .filter((s) => s.id !== existing?.id && !usedIds.has(s.id))
-                          .map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {CATEGORY_META[s.category].emoji} {s.name}
-                            </option>
-                          ))}
-                      </Select>
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={addStep}
-                    className="w-full rounded-xl border-2 border-dashed border-sage-300 px-3 py-2 text-xs font-extrabold text-sage-600 active:bg-sage-100"
-                  >
-                    + Ajouter un jour d'alternance
-                  </button>
-                  {hasRotation && (
-                    <div className="rounded-xl bg-surface px-3 py-2.5">
-                      <p className="mb-1 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
-                        🔁 Rotation ({everyDays === 1 ? 'chaque jour' : `tous les ${everyDays} jours`})
-                      </p>
-                      <p className="text-xs font-extrabold leading-relaxed">
-                        {steps
-                          .filter((st) => st.length)
-                          .map((st) => st.map(stepName).join(' + '))
-                          .join('  →  ')}{' '}
-                        <span className="text-ink-soft">→ on recommence</span>
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -454,18 +461,18 @@ export default function SessionForm() {
         </Field>
 
         {category === 'hiit' && (
-          <div className="rounded-2xl bg-sage-50 p-3">
+          <div className="rounded-2xl bg-surface p-3.5 shadow-sm">
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
-                <p className="mb-1 text-xs font-semibold text-ink-soft">Effort</p>
+                <p className="mb-1 text-xs font-bold text-ink-soft">Effort</p>
                 <Stepper value={workSec} onChange={setWorkSec} min={5} step={5} suffix="s" small />
               </div>
               <div>
-                <p className="mb-1 text-xs font-semibold text-ink-soft">Repos</p>
+                <p className="mb-1 text-xs font-bold text-ink-soft">Repos</p>
                 <Stepper value={restSec} onChange={setRestSec} min={0} step={5} suffix="s" small />
               </div>
               <div>
-                <p className="mb-1 text-xs font-semibold text-ink-soft">Tours</p>
+                <p className="mb-1 text-xs font-bold text-ink-soft">Tours</p>
                 <Stepper value={rounds} onChange={setRounds} min={1} small />
               </div>
             </div>
@@ -473,23 +480,23 @@ export default function SessionForm() {
         )}
 
         {category === 'etirements' && (
-          <div className="rounded-2xl bg-sage-50 p-3.5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-ink-soft">Transition entre postures</p>
-              <Stepper value={stretchRest} onChange={setStretchRest} min={0} step={5} suffix="s" small />
-            </div>
+          <div className="flex items-center justify-between rounded-2xl bg-surface p-3.5 shadow-sm">
+            <p className="flex items-center gap-2 text-sm font-extrabold">
+              <Timer className="h-4 w-4 text-etirements" /> Transition entre postures
+            </p>
+            <Stepper value={stretchRest} onChange={setStretchRest} min={0} step={5} suffix="s" small />
           </div>
         )}
 
         {category === 'muscu' && !hasBreaks && (
-          <div className="rounded-2xl bg-sage-50 p-3.5">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold text-ink-soft">Tours du circuit</p>
-                <p className="text-[11px] font-semibold text-ink-soft">Refaire toute la série d'exercices</p>
-              </div>
-              <Stepper value={muscuRounds} onChange={setMuscuRounds} min={1} max={10} small />
-            </div>
+          <div className="flex items-center justify-between gap-2 rounded-2xl bg-surface p-3.5 shadow-sm">
+            <p
+              className="flex items-center gap-2 text-sm font-extrabold"
+              title="Refaire toute la liste d'exercices à la suite"
+            >
+              <Repeat className="h-4 w-4 text-muscu" /> Tours du circuit
+            </p>
+            <Stepper value={muscuRounds} onChange={setMuscuRounds} min={1} max={10} small />
           </div>
         )}
 
@@ -503,8 +510,8 @@ export default function SessionForm() {
                   <div key={idx}>
                     {category === 'muscu' && hasBreaks && (idx === 0 || it.blockBreak) && (
                       <div className="mb-1.5 flex items-center justify-between gap-2 rounded-xl bg-muscu/10 px-3 py-1.5">
-                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-muscu">
-                          ▦ Bloc {blockNumberAt(idx)} — tours
+                        <p className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
+                          <LayoutGrid className="h-3.5 w-3.5" /> Bloc {blockNumberAt(idx)} — tours
                         </p>
                         <div className="flex items-center gap-1.5">
                           <Stepper
@@ -522,7 +529,7 @@ export default function SessionForm() {
                               onClick={() => setItem(idx, { blockBreak: false })}
                               className="px-1 text-ink-soft/50"
                             >
-                              ✕
+                              <X className="h-4 w-4" />
                             </button>
                           )}
                         </div>
@@ -535,19 +542,19 @@ export default function SessionForm() {
                             type="button"
                             aria-label="Monter"
                             onClick={() => moveItem(idx, -1)}
-                            className="px-1.5 text-[10px] leading-tight text-ink-soft/50 disabled:opacity-25"
+                            className="px-1 text-ink-soft/40 disabled:opacity-25"
                             disabled={idx === 0}
                           >
-                            ▲
+                            <ChevronUp className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"
                             aria-label="Descendre"
                             onClick={() => moveItem(idx, 1)}
-                            className="px-1.5 text-[10px] leading-tight text-ink-soft/50 disabled:opacity-25"
+                            className="px-1 text-ink-soft/40 disabled:opacity-25"
                             disabled={idx === items.length - 1}
                           >
-                            ▼
+                            <ChevronDown className="h-3.5 w-3.5" />
                           </button>
                         </div>
                         <Select
@@ -574,18 +581,23 @@ export default function SessionForm() {
                           })}
                           {ex && ex.category !== category && <option value={ex.id}>{ex.name}</option>}
                         </Select>
+                        {ex && subtypesOf(ex)[0] && (
+                          <span className="max-w-24 shrink-0 truncate text-[11px] font-bold text-ink-soft/60">
+                            {subtypesOf(ex)[0]}
+                          </span>
+                        )}
                         {it.comment === undefined && (
                           <button
                             type="button"
                             aria-label="Ajouter un commentaire"
                             onClick={() => setItem(idx, { comment: '' })}
-                            className="px-0.5 text-sm text-ink-soft/50"
+                            className="px-0.5 text-ink-soft/40"
                           >
-                            💬
+                            <MessageSquarePlus className="h-4 w-4" />
                           </button>
                         )}
-                        <button type="button" aria-label="Retirer" onClick={() => removeItem(idx)} className="px-0.5 text-ink-soft/50">
-                          ✕
+                        <button type="button" aria-label="Retirer" onClick={() => removeItem(idx)} className="px-0.5 text-ink-soft/40">
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
 
@@ -603,7 +615,7 @@ export default function SessionForm() {
                             {isSec ? 'sec' : 'reps'}
                           </button>
                           <span className="ml-auto flex items-center gap-1.5" title="Repos entre séries">
-                            <span>⏱</span>
+                            <Timer className="h-3.5 w-3.5 text-ink-soft/60" />
                             <MiniNum value={it.restSec ?? 60} onChange={(v) => setItem(idx, { restSec: v })} max={600} />
                             <span>s</span>
                           </span>
@@ -635,11 +647,12 @@ export default function SessionForm() {
                           type="button"
                           onClick={() => setItem(idx, { linkNext: !it.linkNext })}
                           className={
-                            'relative z-10 rounded-full px-3 py-1 text-[11px] font-extrabold transition-colors ' +
+                            'relative z-10 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-extrabold transition-colors ' +
                             (it.linkNext ? 'bg-muscu text-white shadow-sm' : 'bg-sage-100 text-ink-soft')
                           }
                         >
-                          {it.linkNext ? '🔗 Superset — enchaîné sans repos' : '+ lier en superset'}
+                          <Link2 className="h-3 w-3" />
+                          {it.linkNext ? 'Superset — enchaîné sans repos' : 'superset'}
                         </button>
                         {!it.linkNext && (
                           <button
@@ -649,9 +662,9 @@ export default function SessionForm() {
                               setItem(idx + 1, { blockBreak: true, blockRounds: items[idx + 1].blockRounds ?? 1 })
                               setItem(idx, { linkNext: false })
                             }}
-                            className="relative z-10 rounded-full bg-sage-100 px-3 py-1 text-[11px] font-extrabold text-ink-soft"
+                            className="relative z-10 flex items-center gap-1 rounded-full bg-sage-100 px-3 py-1 text-[11px] font-extrabold text-ink-soft"
                           >
-                            ▦ nouveau bloc
+                            <LayoutGrid className="h-3 w-3" /> nouveau bloc
                           </button>
                         )}
                       </div>

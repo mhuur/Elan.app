@@ -43,14 +43,14 @@ try {
   await page.click('p:has-text("Vélo d’appartement")')
   await page.waitForSelector('text=Planification')
   await page.getByRole('button', { name: 'Tous les X jours', exact: true }).click()
-  await page.waitForSelector('text=À partir du')
-  // Le 1er sélecteur de la rotation (le sélecteur de catégorie est désormais avant dans le DOM)
-  await page.locator('select:has-text("Ajouter une séance ce jour-là")').first().selectOption({ label: '💪 Muscu — Full body' }) // même jour
+  await page.waitForSelector('text=à partir du')
+  // Le « + » du jour 1 ouvre le sélecteur ; Full body rejoint le même jour que le vélo
+  await page.click('[aria-label="Ajouter une séance au jour 1"]')
+  await page.locator('select:has-text("Choisir une séance")').selectOption({ label: 'Muscu — Full body' })
   await page.waitForSelector('button:has-text("Muscu — Full body")')
-  await page.click("text=+ Ajouter un jour d'alternance")
-  await page.locator('select').last().selectOption({ label: '🔥 HIIT — Cardio express' }) // jour 2
+  await page.getByRole('button', { name: 'jour', exact: true }).click()
+  await page.locator('select:has-text("Choisir une séance")').selectOption({ label: 'HIIT — Cardio express' }) // jour 2
   await page.waitForSelector('button:has-text("HIIT — Cardio express")')
-  await page.waitForSelector('text=on recommence')
   await page.screenshot({ path: 'screenshots/24-rotation-groupes.png' })
   await page.click('text=Enregistrer')
   await page.waitForSelector('text=en alternance avec HIIT')

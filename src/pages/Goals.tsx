@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
+import { Pencil, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Exercise, type GoalLevel, type ObjectiveLevel, type Session } from '../types'
 import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
-import { EmptyState, Fab, Field, NumInput, PageHeader, PrimaryButton, Seg, Select, Sheet } from '../components/ui'
+import { CategoryIcon, EmptyState, Fab, Field, NumInput, PageHeader, PrimaryButton, Seg, Select, Sheet } from '../components/ui'
 
 const inputSm =
   'w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
@@ -186,7 +187,10 @@ export default function Goals() {
             <div key={e.id} className="rounded-3xl bg-surface p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-base font-extrabold">💪 {e.name}</p>
+                  <p className="flex items-center gap-1.5 text-base font-extrabold">
+                    <CategoryIcon category="muscu" className="h-4 w-4 shrink-0 text-muscu" />
+                    <span className="min-w-0 truncate">{e.name}</span>
+                  </p>
                   <p className="text-xs font-semibold text-ink-soft">
                     {goal.metric === 'best' ? 'Meilleure série' : 'Volume sur une séance'} ·{' '}
                     {levels.length > 1 ? `${levels.length} paliers` : `objectif ${levels[0].value} ${unit}`}
@@ -199,7 +203,7 @@ export default function Goals() {
                     onClick={() => openEditExercise(e)}
                     className="px-1 text-ink-soft/50 active:text-sage-600"
                   >
-                    ✎
+                    <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
@@ -209,7 +213,7 @@ export default function Goals() {
                     }}
                     className="px-1 text-ink-soft/50 active:text-hiit"
                   >
-                    ✕
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -248,8 +252,9 @@ export default function Goals() {
             <div key={s.id} className="rounded-3xl bg-surface p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-base font-extrabold">
-                    {CATEGORY_META[s.category].emoji} {s.name}
+                  <p className="flex items-center gap-1.5 text-base font-extrabold">
+                    <CategoryIcon category={s.category} className={`h-4 w-4 shrink-0 ${CATEGORY_META[s.category].text}`} />
+                    <span className="min-w-0 truncate">{s.name}</span>
                   </p>
                   <p className="text-[11px] font-semibold text-ink-soft">
                     {levels.length > 1 ? `${levels.length} paliers — ` : ''}
@@ -263,7 +268,7 @@ export default function Goals() {
                     onClick={() => openEditSession(s)}
                     className="px-1 text-ink-soft/50 active:text-sage-600"
                   >
-                    ✎
+                    <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
@@ -273,7 +278,7 @@ export default function Goals() {
                     }}
                     className="px-1 text-ink-soft/50 active:text-hiit"
                   >
-                    ✕
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -322,7 +327,7 @@ export default function Goals() {
 
       <Fab label="+ Objectif" onClick={openCreate} />
 
-      <Sheet open={addOpen} onClose={() => setAddOpen(false)} title={editing ? '🎯 Modifier l’objectif' : '🎯 Nouvel objectif'}>
+      <Sheet open={addOpen} onClose={() => setAddOpen(false)} title={editing ? 'Modifier l’objectif' : 'Nouvel objectif'}>
         <div className="space-y-4">
           <Field label="Séance">
             <Select
@@ -335,7 +340,7 @@ export default function Goals() {
             >
               {sessions.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {CATEGORY_META[s.category].emoji} {s.name}
+                  {s.name}
                 </option>
               ))}
             </Select>
@@ -377,7 +382,7 @@ export default function Goals() {
                             onClick={() => setExDrafts((p) => p.filter((_, j) => j !== i))}
                             className="px-1 text-ink-soft/50"
                           >
-                            ✕
+                            <X className="h-4 w-4" />
                           </button>
                         )}
                       </div>
@@ -426,7 +431,7 @@ export default function Goals() {
                             onClick={() => setSessDrafts((p) => p.filter((_, j) => j !== i))}
                             className="px-1 text-ink-soft/50"
                           >
-                            ✕
+                            <X className="h-4 w-4" />
                           </button>
                         )}
                       </div>

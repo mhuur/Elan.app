@@ -14,9 +14,10 @@ import {
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Log, type MetricValue } from '../types'
 import { addDays, formatDayMonth, formatShortFr, startOfWeek, toDateStr, todayStr } from '../lib/dates'
+import { X } from 'lucide-react'
 import { logSummary } from '../lib/format'
 import { goalLevels } from '../lib/metrics'
-import { Chip, EmptyState, PageHeader, Select } from '../components/ui'
+import { CategoryIcon, Chip, EmptyState, PageHeader, Select } from '../components/ui'
 
 const HEAT_WEEKS = 16
 
@@ -227,7 +228,7 @@ export default function Progress() {
         )}
 
         {metricSessions.length > 0 && selectedSession && (
-          <ChartCard title="📈 Mesures par séance">
+          <ChartCard title="Mesures par séance">
             <Select
               value={selectedSession.id}
               onChange={(v) => {
@@ -238,7 +239,7 @@ export default function Progress() {
             >
               {metricSessions.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {CATEGORY_META[s.category].emoji} {s.name}
+                  {s.name}
                 </option>
               ))}
             </Select>
@@ -276,7 +277,7 @@ export default function Progress() {
         )}
 
         {exosWithLogs.length > 0 && (
-          <ChartCard title={`${CATEGORY_META.muscu.emoji} Par exercice`}>
+          <ChartCard title="Par exercice">
             <Select value={selectedEx?.id ?? ''} onChange={setExId} className="mb-3 w-full">
               {exosWithLogs.map((e) => (
                 <option key={e.id} value={e.id}>
@@ -332,7 +333,7 @@ export default function Progress() {
         )}
 
         {logs.length > 0 && (
-          <ChartCard title="🗓️ Historique">
+          <ChartCard title="Historique">
             <p className="mb-2 text-xs font-semibold text-ink-soft">
               Une séance oubliée ? Naviguez vers une date passée depuis l'écran Aujourd'hui (flèche ‹).
             </p>
@@ -341,8 +342,12 @@ export default function Progress() {
                 <div key={l.id} className="flex items-center gap-2 border-b border-cream py-2 last:border-0">
                   <span className="w-14 shrink-0 text-xs font-bold text-ink-soft">{formatShortFr(l.date)}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-extrabold">
-                      {CATEGORY_META[l.category].emoji} {l.sessionName}
+                    <p className="flex items-center gap-1.5 text-sm font-extrabold">
+                      <CategoryIcon
+                        category={l.category}
+                        className={`h-3.5 w-3.5 shrink-0 ${CATEGORY_META[l.category].text}`}
+                      />
+                      <span className="min-w-0 truncate">{l.sessionName}</span>
                     </p>
                     <p className="truncate text-xs font-semibold text-ink-soft">{logSummary(l)}</p>
                   </div>
@@ -352,7 +357,7 @@ export default function Progress() {
                     onClick={() => deleteLog(l)}
                     className="shrink-0 px-1.5 text-ink-soft/50 active:text-hiit"
                   >
-                    ✕
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
               ))}

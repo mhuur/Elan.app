@@ -223,17 +223,17 @@ export const CATEGORIES: Category[] = ['running', 'velo', 'muscu', 'hiit', 'etir
 
 export interface CategoryMeta {
   label: string
-  emoji: string
   text: string
   bg: string
   soft: string
   hex: string
 }
 
+/** L'icône Lucide de chaque catégorie vit dans `components/ui.tsx` (CategoryIcon) */
 export const CATEGORY_META: Record<Category, CategoryMeta> = {
-  running: { label: 'Running', emoji: '🏃', text: 'text-running', bg: 'bg-running', soft: 'bg-running/10', hex: '#c2773e' },
-  velo: { label: 'Vélo', emoji: '🚴', text: 'text-velo', bg: 'bg-velo', soft: 'bg-velo/10', hex: '#5b89ad' },
-  muscu: { label: 'Muscu', emoji: '💪', text: 'text-muscu', bg: 'bg-muscu', soft: 'bg-muscu/10', hex: '#8d6ba0' },
-  hiit: { label: 'HIIT', emoji: '🔥', text: 'text-hiit', bg: 'bg-hiit', soft: 'bg-hiit/10', hex: '#cf6151' },
-  etirements: { label: 'Étirements', emoji: '🧘', text: 'text-etirements', bg: 'bg-etirements', soft: 'bg-etirements/10', hex: '#5f8862' },
+  running: { label: 'Running', text: 'text-running', bg: 'bg-running', soft: 'bg-running/10', hex: '#c2773e' },
+  velo: { label: 'Vélo', text: 'text-velo', bg: 'bg-velo', soft: 'bg-velo/10', hex: '#5b89ad' },
+  muscu: { label: 'Muscu', text: 'text-muscu', bg: 'bg-muscu', soft: 'bg-muscu/10', hex: '#8d6ba0' },
+  hiit: { label: 'HIIT', text: 'text-hiit', bg: 'bg-hiit', soft: 'bg-hiit/10', hex: '#cf6151' },
+  etirements: { label: 'Étirements', text: 'text-etirements', bg: 'bg-etirements', soft: 'bg-etirements/10', hex: '#5f8862' },
 }

@@ -33,7 +33,7 @@ try {
   await page.waitForSelector("text=C'est parti")
   await page.click("text=C'est parti")
   await page.waitForSelector('text=Préparation')
-  await page.click('text=Passer ⏭')
+  await page.click('text=Passer')
   await page.waitForSelector('text=Série faite ✓')
   await page.click('[aria-label="Une répétition de plus"]')
   await page.click('[aria-label="Une répétition de plus"]')

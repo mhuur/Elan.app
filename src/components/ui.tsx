@@ -1,4 +1,20 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Bike, Copy, Dumbbell, Flame, Footprints, StretchHorizontal, Trash2, type LucideIcon } from 'lucide-react'
+import type { Category } from '../types'
+
+const CATEGORY_ICONS: Record<Category, LucideIcon> = {
+  running: Footprints,
+  velo: Bike,
+  muscu: Dumbbell,
+  hiit: Flame,
+  etirements: StretchHorizontal,
+}
+
+/** Icône Lucide d'une catégorie — la couleur vient du parent (classe `text-*` de CATEGORY_META) */
+export function CategoryIcon({ category, className }: { category: Category; className?: string }) {
+  const Icon = CATEGORY_ICONS[category]
+  return <Icon className={className ?? 'h-4 w-4'} strokeWidth={2.25} />
+}
 
 export function PageHeader({ kicker, title, right, onBack }: { kicker?: string; title: string; right?: ReactNode; onBack?: () => void }) {
   return (
@@ -23,7 +39,7 @@ export function PageHeader({ kicker, title, right, onBack }: { kicker?: string; 
   )
 }
 
-export function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title?: string; children: ReactNode }) {
+export function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title?: ReactNode; children: ReactNode }) {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true">
@@ -162,7 +178,7 @@ export function Combobox({
             {filtered.slice(0, 40).map((o, i, arr) => (
               <Fragment key={o.id}>
                 {o.group && o.group !== arr[i - 1]?.group && (
-                  <p className="px-4 pb-1 pt-2.5 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+                  <p className="bg-sage-50 px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-widest text-sage-700">
                     {o.group}
                   </p>
                 )}
@@ -365,12 +381,12 @@ export function FormActions({
       <div className="mx-auto flex max-w-lg items-center gap-2 px-5 py-2.5">
         {onDelete && (
           <button type="button" aria-label="Supprimer" title="Supprimer" onClick={onDelete} className={iconBtn}>
-            🗑️
+            <Trash2 className="h-5 w-5 text-ink-soft" />
           </button>
         )}
         {onDuplicate && (
           <button type="button" aria-label="Dupliquer" title="Dupliquer" onClick={onDuplicate} className={iconBtn}>
-            📋
+            <Copy className="h-5 w-5 text-ink-soft" />
           </button>
         )}
         <button

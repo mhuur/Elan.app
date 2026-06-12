@@ -11,11 +11,12 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { GripVertical } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Session } from '../types'
 import { DAY_LETTER, DAY_NAMES, addDays, formatShortFr, mondayIndex, startOfWeek, toDateStr, todayStr } from '../lib/dates'
 import { describeSchedule, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
-import { EmptyState, PageHeader } from '../components/ui'
+import { CategoryIcon, EmptyState, PageHeader } from '../components/ui'
 
 /** Grille commune : poignée · nom · 7 jours */
 const GRID = 'grid grid-cols-[1rem_minmax(0,1fr)_repeat(7,1.85rem)] items-center gap-x-0.5'
@@ -59,18 +60,12 @@ function Row({
         {...listeners}
         className="flex h-9 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
       >
-        <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-          <circle cx="9" cy="6" r="1.7" />
-          <circle cx="15" cy="6" r="1.7" />
-          <circle cx="9" cy="12" r="1.7" />
-          <circle cx="15" cy="12" r="1.7" />
-          <circle cx="9" cy="18" r="1.7" />
-          <circle cx="15" cy="18" r="1.7" />
-        </svg>
+        <GripVertical className="h-4 w-4" />
       </button>
       <button type="button" onClick={onEdit} className="min-w-0 px-1 py-1 text-left">
-        <span className="block truncate text-xs font-extrabold">
-          {meta.emoji} {session.name}
+        <span className="flex items-center gap-1 text-xs font-extrabold">
+          <CategoryIcon category={session.category} className={`h-3.5 w-3.5 shrink-0 ${meta.text}`} />
+          <span className="min-w-0 truncate">{session.name}</span>
         </span>
         {sublabel && <span className="block truncate text-[11px] font-bold text-ink-soft">↻ {sublabel}</span>}
       </button>

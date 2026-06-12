@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Play, Search, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, subtypesOf, type Category, type Measure } from '../types'
 import { youtubeSearch } from '../lib/format'
@@ -79,7 +80,7 @@ export default function ExerciseForm() {
             <Select value={category} onChange={(v) => setCategory(v as Category)}>
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
-                  {CATEGORY_META[c].emoji} {CATEGORY_META[c].label}
+                  {CATEGORY_META[c].label}
                 </option>
               ))}
             </Select>
@@ -107,7 +108,7 @@ export default function ExerciseForm() {
                   onClick={() => removeSubtype(st)}
                   className="flex items-center gap-1.5 rounded-full bg-sage-500 px-3 py-1.5 text-xs font-extrabold text-white"
                 >
-                  {st} <span className="opacity-60">✕</span>
+                  {st} <X className="h-3 w-3 opacity-60" />
                 </button>
               ))}
             </div>
@@ -131,17 +132,22 @@ export default function ExerciseForm() {
           <TextInput value={videoUrl} onChange={setVideoUrl} placeholder="Lien YouTube ou autre" />
           <div className="mt-2 flex gap-2 text-xs font-bold empty:hidden">
             {videoUrl.trim() && (
-              <a href={videoUrl.trim()} target="_blank" rel="noreferrer" className="rounded-full bg-velo/10 px-3 py-1.5 text-velo">
-                ▶ Tester le lien
+              <a
+                href={videoUrl.trim()}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 rounded-full bg-velo/10 px-3 py-1.5 text-velo"
+              >
+                <Play className="h-3 w-3" /> Tester le lien
               </a>
             )}
             {!videoUrl.trim() && name.trim() && (
               <button
                 type="button"
-                className="rounded-full bg-sage-100 px-3 py-1.5 text-sage-700"
+                className="flex items-center gap-1.5 rounded-full bg-sage-100 px-3 py-1.5 text-sage-700"
                 onClick={() => setVideoUrl(youtubeSearch(name.trim()))}
               >
-                🔍 Utiliser une recherche YouTube
+                <Search className="h-3 w-3" /> Utiliser une recherche YouTube
               </button>
             )}
           </div>
