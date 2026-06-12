@@ -314,7 +314,11 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
                       )}
                     </div>
                     <span className="shrink-0 text-xs font-extrabold text-ink-soft">
-                      {isMuscu ? itemSummary(it, ex) : `${it.durationSec ?? 30} s`}
+                      {isMuscu
+                        ? itemSummary(it, ex)
+                        : ex?.measure === 'reps'
+                          ? `${it.target ?? 10} reps`
+                          : `${it.durationSec ?? 30} s`}
                     </span>
                   </div>
                 )

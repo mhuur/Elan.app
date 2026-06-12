@@ -59,7 +59,8 @@ export function buildSeed(): { exercises: Exercise[]; sessions: Session[] } {
     id: crypto.randomUUID(),
     name: e.name,
     category: e.category,
-    measure: e.measure ?? 'reps',
+    // Les postures d'étirements se tiennent en secondes, le reste se compte en répétitions
+    measure: e.measure ?? (e.category === 'etirements' ? 'sec' : 'reps'),
     videoUrl: youtubeSearch(e.name),
     createdAt: now + i,
     ...(e.subtype ? { subtypes: [e.subtype] } : {}),

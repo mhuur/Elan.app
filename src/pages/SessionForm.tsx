@@ -162,8 +162,21 @@ export default function SessionForm() {
   // Blocs (muscu ET étirements) : découpage de la séance en groupes répétés indépendamment
   const canBlocks = category === 'muscu' || category === 'etirements'
   const hasBreaks = canBlocks && items.some((it, i) => i > 0 && it.blockBreak)
-  const blockNumberAt = (idx: number) => 1 + items.slice(1, idx + 1).filter((x) => x.blockBreak).length
   const catMeta = CATEGORY_META[category]
+  // Groupes de blocs pour l'affichage et le drag & drop (un seul bloc si pas de découpage)
+  const blocksArr: DraftItem[][] = []
+  items.forEach((it, i) => {
+    if (i === 0 || (hasBreaks && it.blockBreak)) blocksArr.push([])
+    blocksArr[blocksArr.length - 1].push(it)
+  })
+  const blockStarts: number[] = []
+  {
+    let acc = 0
+    for (const b of blocksArr) {
+      blockStarts.push(acc)
+      acc += b.length
+    }
+  }
 
   const switchCategory = (c: Category) => {
     if (c === category) return
@@ -183,7 +196,11 @@ export default function SessionForm() {
       base.target = exOf(exId)?.measure === 'sec' ? 30 : 10
       base.restSec = 60
     }
-    if (category === 'etirements') base.durationSec = 30
+    if (category === 'etirements') {
+      // Posture tenue (sec) ou mouvement compté (reps), selon la mesure de l'exercice
+      if (exOf(exId)?.measure === 'reps') base.target = 10
+      else base.durationSec = 30
+    }
     setItems((p) => [...p, base])
   }
 
@@ -195,7 +212,8 @@ export default function SessionForm() {
       category,
       subtypes: [],
       subtype: '',
-      measure: 'reps',
+      // Une posture d'étirement se mesure en secondes par défaut
+      measure: category === 'etirements' ? 'sec' : 'reps',
       description: '',
       videoUrl: '',
       createdAt: Date.now(),
@@ -215,11 +233,46 @@ export default function SessionForm() {
   const onDragEnd = (e: DragEndEvent) => {
     const { active, over } = e
     if (!over || active.id === over.id) return
+    const aId = String(active.id)
+    const oId = String(over.id)
+    if (aId.startsWith('blk-')) {
+      // Déplacer un bloc entier (glissé par son en-tête)
+      setItems((p) => {
+        const bl: DraftItem[][] = []
+        p.forEach((it, i) => {
+          if (i === 0 || it.blockBreak) bl.push([])
+          bl[bl.length - 1].push(it)
+        })
+        const from = bl.findIndex((b) => 'blk-' + b[0].uid === aId)
+        let to = bl.findIndex((b) => 'blk-' + b[0].uid === oId)
+        if (to === -1) to = bl.findIndex((b) => b.some((x) => x.uid === oId))
+        if (from === -1 || to === -1 || from === to) return p
+        return arrayMove(bl, from, to).flatMap((b, bi) =>
+          b.map((it, i) =>
+            i === 0 ? { ...it, blockBreak: bi > 0, blockRounds: Math.max(1, it.blockRounds ?? 1) } : it,
+          ),
+        )
+      })
+      return
+    }
+    // Déplacer un exercice — si c'était la tête d'un bloc, le suivant hérite du bloc
     setItems((p) => {
-      const from = p.findIndex((x) => x.uid === active.id)
-      const to = p.findIndex((x) => x.uid === over.id)
+      const from = p.findIndex((x) => x.uid === aId)
+      let to = p.findIndex((x) => x.uid === oId)
+      if (to === -1 && oId.startsWith('blk-')) to = p.findIndex((x) => 'blk-' + x.uid === oId)
       if (from === -1 || to === -1) return p
-      return arrayMove(p, from, to)
+      let list = [...p]
+      const moved = list[from]
+      if (moved.blockBreak || from === 0) {
+        const next = list[from + 1]
+        if (next && !next.blockBreak) {
+          list[from + 1] = { ...next, blockBreak: from > 0, blockRounds: moved.blockRounds ?? 1 }
+        }
+        list[from] = { ...moved, blockBreak: false, blockRounds: undefined }
+      }
+      list = arrayMove(list, from, to)
+      if (list[0]?.blockBreak) list[0] = { ...list[0], blockBreak: false }
+      return list
     })
   }
 
@@ -560,42 +613,58 @@ export default function SessionForm() {
         {hasItems && (
           <Field label={category === 'etirements' ? 'Postures de la routine' : 'Exercices de la séance'}>
             <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-              <SortableContext items={items.map((x) => x.uid)} strategy={verticalListSortingStrategy}>
+              <SortableContext items={blocksArr.map((b) => 'blk-' + b[0].uid)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-2">
-                  {items.map((it, idx) => {
-                    const ex = exOf(it.exerciseId)
-                    const isSec = ex?.measure === 'sec'
-                    return (
-                      <SortableItem key={it.uid} uid={it.uid}>
-                        {(drag) => (
-                          <div>
-                    {hasBreaks && (idx === 0 || it.blockBreak) && (
-                      <div className={`mb-1.5 flex items-center justify-between gap-2 rounded-xl px-3 py-1.5 ${catMeta.soft}`}>
-                        <p className={`flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider ${catMeta.text}`}>
-                          <LayoutGrid className="h-3.5 w-3.5" /> Bloc {blockNumberAt(idx)} — tours
-                        </p>
-                        <div className="flex items-center gap-1.5">
-                          <Stepper
-                            small
-                            value={it.blockRounds ?? 1}
-                            onChange={(v) => setItem(idx, { blockRounds: v })}
-                            min={1}
-                            max={10}
-                          />
-                          {idx > 0 && (
-                            <button
-                              type="button"
-                              aria-label="Fusionner avec le bloc précédent"
-                              title="Fusionner avec le bloc précédent"
-                              onClick={() => setItem(idx, { blockBreak: false })}
-                              className="px-1 text-ink-soft/50"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
+                  {blocksArr.map((blk, bi) => (
+                    <SortableItem key={'blk-' + blk[0].uid} uid={'blk-' + blk[0].uid}>
+                      {(blockDrag) => (
+                        <div className="space-y-2">
+                          {hasBreaks && (
+                            <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-1.5 ${catMeta.soft}`}>
+                              <p className={`flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider ${catMeta.text}`}>
+                                <button
+                                  type="button"
+                                  aria-label={`Déplacer le bloc ${bi + 1}`}
+                                  {...blockDrag.attributes}
+                                  {...blockDrag.listeners}
+                                  className="-ml-1 cursor-grab touch-none active:cursor-grabbing"
+                                >
+                                  <GripVertical className="h-3.5 w-3.5" />
+                                </button>
+                                <LayoutGrid className="h-3.5 w-3.5" /> Bloc {bi + 1} — tours
+                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <Stepper
+                                  small
+                                  value={items[blockStarts[bi]]?.blockRounds ?? 1}
+                                  onChange={(v) => setItem(blockStarts[bi], { blockRounds: v })}
+                                  min={1}
+                                  max={10}
+                                />
+                                {bi > 0 && (
+                                  <button
+                                    type="button"
+                                    aria-label="Fusionner avec le bloc précédent"
+                                    title="Fusionner avec le bloc précédent"
+                                    onClick={() => setItem(blockStarts[bi], { blockBreak: false })}
+                                    className="px-1 text-ink-soft/50"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           )}
-                        </div>
-                      </div>
-                    )}
+                          <SortableContext items={blk.map((x) => x.uid)} strategy={verticalListSortingStrategy}>
+                            <div className="space-y-2">
+                              {blk.map((it, ii) => {
+                                const idx = blockStarts[bi] + ii
+                                const ex = exOf(it.exerciseId)
+                                const isSec = ex?.measure === 'sec'
+                                return (
+                                  <SortableItem key={it.uid} uid={it.uid}>
+                                    {(drag) => (
+                                      <div>
                     <div className="rounded-2xl bg-surface p-3 shadow-sm">
                       <div className="flex items-center gap-1.5">
                         <button
@@ -719,9 +788,30 @@ export default function SessionForm() {
 
                       {category === 'etirements' && (
                         <div className="mt-2 flex items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
-                          <span>Durée</span>
-                          <MiniNum value={it.durationSec ?? 30} onChange={(v) => setItem(idx, { durationSec: v })} min={5} />
-                          <span>s</span>
+                          {!ex || isSec ? (
+                            <>
+                              <span>Durée</span>
+                              <MiniNum
+                                value={it.durationSec ?? 30}
+                                onChange={(v) => setItem(idx, { durationSec: v })}
+                                min={5}
+                              />
+                              <span>s</span>
+                            </>
+                          ) : (
+                            <>
+                              <MiniNum value={it.target ?? 10} onChange={(v) => setItem(idx, { target: v })} min={1} />
+                              <span>répétitions</span>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            title="Basculer secondes / répétitions (modifie l'exercice)"
+                            onClick={() => ex && void updateExercise(ex.id, { measure: isSec ? 'reps' : 'sec' })}
+                            className="ml-auto rounded-md bg-sage-100 px-2 py-1 text-[11px] font-extrabold text-sage-700 active:bg-sage-200"
+                          >
+                            {isSec ? 'sec' : 'reps'}
+                          </button>
                         </div>
                       )}
 
@@ -766,11 +856,17 @@ export default function SessionForm() {
                         )}
                       </div>
                     )}
-                          </div>
-                        )}
-                      </SortableItem>
-                    )
-                  })}
+                                      </div>
+                                    )}
+                                  </SortableItem>
+                                )
+                              })}
+                            </div>
+                          </SortableContext>
+                        </div>
+                      )}
+                    </SortableItem>
+                  ))}
                 </div>
               </SortableContext>
             </DndContext>

@@ -25,7 +25,9 @@ export default function ExerciseForm() {
     existing ? subtypesOf(existing) : presetSubtype ? [presetSubtype] : [],
   )
   const [subtypeQuery, setSubtypeQuery] = useState('')
-  const [measure, setMeasure] = useState<Measure>(existing?.measure ?? 'reps')
+  const [measure, setMeasure] = useState<Measure>(
+    existing?.measure ?? (presetCat === 'etirements' ? 'sec' : 'reps'),
+  )
   const [description, setDescription] = useState(existing?.description ?? '')
   const [videoUrl, setVideoUrl] = useState(existing?.videoUrl ?? '')
 
