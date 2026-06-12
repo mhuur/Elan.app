@@ -493,6 +493,16 @@ export default function Progress() {
           </>
         )}
 
+        {hasAnyLog && !hasTrackers && (
+          <ChartCard title="Mes suivis">
+            <p className="py-1 text-sm font-semibold text-ink-soft">
+              Vos courbes par exercice apparaîtront ici dès qu'une séance muscu, HIIT ou vélo aura été validée avec
+              son réalisé (minuteur guidé ou « Entrer le résultat ✓ »). Les sorties running, elles, se cochent
+              simplement.
+            </p>
+          </ChartCard>
+        )}
+
         {hasTrackers && (
           <ChartCard title="Mes suivis">
             <div>
