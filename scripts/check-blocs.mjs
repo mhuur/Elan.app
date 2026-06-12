@@ -48,13 +48,17 @@ try {
   await page.screenshot({ path: 'screenshots/28-blocs-completion.png' })
   await page.click('text=← Retour à la séance')
 
-  // --- Minuteur guidé : la 1re étape annonce la série du bloc 1
+  // --- Minuteur guidé : série courante au centre, structure (blocs/tours/exos) dans la colonne programme
   await page.click('text=Lancer le minuteur')
   await page.waitForSelector("text=C'est parti")
   await page.click("text=C'est parti")
   await page.waitForSelector('text=Préparation')
   await page.click('[aria-label="Passer"]')
-  await page.waitForSelector('text=Bloc 1 · Série 1/3')
+  await page.waitForSelector('text=Série 1/3')
+  await page.click('[aria-label="Programme"]') // déplie le tiroir programme
+  await page.waitForSelector('aside >> text=Bloc 1') // tiroir : bloc courant
+  await page.waitForSelector('aside >> text=×2') // tiroir : tours du bloc 2 à venir
+  await page.waitForSelector('aside >> text=Squats') // tiroir : exos du bloc à venir listés
   await page.waitForSelector('text=Série faite ✓')
   await page.click('[aria-label="Quitter"]')
   await page.waitForSelector('text=Séance libre')

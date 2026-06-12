@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, ClipboardList, Lightbulb, Link2, Play, Repeat } from 'lucide-react'
+import { Check, ClipboardList, Lightbulb, Link2, Play, Repeat, TriangleAlert } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, setTargetsOf, type Exercise, type Log, type MetricValue, type Session, type SessionItem } from '../types'
 import { todayStr } from '../lib/dates'
 import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { muscuBlocks } from '../lib/blocks'
-import { CategoryIcon, Field, GhostButton, NumInput, PrimaryButton, Sheet, Stepper, TextArea } from './ui'
+import { CategoryIcon, Field, GhostButton, NumInput, PrimaryButton, Sheet, TextArea } from './ui'
 
 /** Feuille d'une séance depuis Aujourd'hui : consulter le programme, lancer le minuteur, entrer le résultat */
 export default function CompleteSheet({
@@ -48,6 +48,18 @@ function itemSummary(it: SessionItem, ex?: Exercise): string {
   return uniform ? `${tgs.length} × ${tgs[0]} ${unit}` : `${tgs.join(' / ')} ${unit}`
 }
 
+/** État d'une série dans la timeline de saisie : faite / mal réalisée (compte quand même) / non faite */
+type SetStatus = 'ok' | 'flag' | 'no'
+
+/** Une série de la timeline, dans l'ordre réel d'exécution */
+interface SetRow {
+  exId: string
+  name: string
+  setLabel: string
+  value: number
+  unit: string
+}
+
 function Inner({ session, onClose, date }: { session: Session; onClose: () => void; date?: string }) {
   const { addLog, logs, exercises } = useData()
   const navigate = useNavigate()
@@ -59,6 +71,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
   const metrics = useMemo(() => effectiveMetrics(session), [session])
   const links = session.links ?? []
   const isMuscu = session.category === 'muscu'
+  const isHiit = session.category === 'hiit'
   const isStretch = session.category === 'etirements'
   // Le minuteur guidé n'a de sens que pour la journée en cours
   const hasTimer =
@@ -80,32 +93,71 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
   // Muscu/étirements : structure blocs → tours → exercices (→ séries pour la muscu)
   const exOf = (id: string) => exercises.find((e) => e.id === id)
   const blocks = useMemo(() => (isMuscu || isStretch ? muscuBlocks(session) : []), [session, isMuscu, isStretch])
-  const roundsOf = (it: SessionItem) => blocks.find((b) => b.items.includes(it))?.rounds ?? 1
-  const flatTargets = (it: SessionItem): number[] => {
-    const tgs = setTargetsOf(it)
-    const flat: number[] = []
-    for (let r = 0; r < roundsOf(it); r++) flat.push(...tgs)
-    return flat
-  }
-  const [values, setValues] = useState<Record<string, number[]>>(() => {
-    const m: Record<string, number[]> = {}
-    for (const it of session.items) {
-      const expected = flatTargets(it)
-      const prev = lastLog?.results?.find((r) => r.exerciseId === it.exerciseId)
-      m[it.exerciseId] = prev && prev.sets.length === expected.length ? [...prev.sets] : expected
+
+  // Timeline de saisie (muscu et HIIT) : toutes les séries dans l'ordre réel, groupées par bloc/tour
+  const timeline = useMemo(() => {
+    const groups: { header: string; rows: SetRow[] }[] = []
+    if (isMuscu) {
+      blocks.forEach((b, bi) => {
+        for (let r = 0; r < b.rounds; r++) {
+          const header = [blocks.length > 1 ? `Bloc ${bi + 1}` : '', b.rounds > 1 ? `Tour ${r + 1}/${b.rounds}` : '']
+            .filter(Boolean)
+            .join(' · ')
+          const rows: SetRow[] = []
+          b.items.forEach((it) => {
+            const ex = exOf(it.exerciseId)
+            setTargetsOf(it).forEach((v, s) =>
+              rows.push({
+                exId: it.exerciseId,
+                name: ex?.name ?? 'Exercice',
+                setLabel: `Série ${s + 1}`,
+                value: v,
+                unit: ex?.measure === 'sec' ? 's' : 'reps',
+              }),
+            )
+          })
+          groups.push({ header, rows })
+        }
+      })
+    } else if (isHiit) {
+      const rounds = session.rounds ?? 1
+      for (let r = 0; r < rounds; r++) {
+        groups.push({
+          header: rounds > 1 ? `Tour ${r + 1}/${rounds}` : '',
+          rows: session.items.map((it) => ({
+            exId: it.exerciseId,
+            name: exOf(it.exerciseId)?.name ?? 'Exercice',
+            setLabel: '',
+            value: it.durationSec ?? session.workSec ?? 45,
+            unit: 's',
+          })),
+        })
+      }
     }
-    return m
-  })
-  // Coches « série faite » : décocher indique où on s'est arrêté (pas d'édition de la séance)
-  const [done, setDone] = useState<Record<string, boolean[]>>(() => {
-    const m: Record<string, boolean[]> = {}
-    for (const it of session.items) m[it.exerciseId] = flatTargets(it).map(() => true)
-    return m
-  })
-  const setRep = (exId: string, setIdx: number, v: number) =>
-    setValues((p) => ({ ...p, [exId]: p[exId].map((r, i) => (i === setIdx ? v : r)) }))
-  const toggleDone = (exId: string, setIdx: number) =>
-    setDone((p) => ({ ...p, [exId]: p[exId].map((d, i) => (i === setIdx ? !d : d)) }))
+    return groups
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks, session, exercises, isMuscu, isHiit])
+  // Index global de la première série de chaque groupe (la timeline se parcourt à plat)
+  const groupOffsets = useMemo(() => {
+    const offs: number[] = []
+    let acc = 0
+    for (const g of timeline) {
+      offs.push(acc)
+      acc += g.rows.length
+    }
+    return offs
+  }, [timeline])
+  const [status, setStatus] = useState<SetStatus[]>(() => timeline.flatMap((g) => g.rows).map(() => 'ok'))
+
+  // Tap = curseur « je me suis arrêté ici » : la série et toutes les suivantes passent en non faites ;
+  // re-tap sur une non-faite la refait (et requalifie tout ce qui précède)
+  const tapRow = (gi: number) =>
+    setStatus((p) =>
+      p[gi] === 'no'
+        ? p.map((s, i) => (i === gi ? 'ok' : i < gi && s === 'no' ? 'ok' : s))
+        : p.map((s, i) => (i >= gi ? 'no' : s)),
+    )
+  const flagRow = (gi: number) => setStatus((p) => p.map((s, i) => (i === gi ? (s === 'flag' ? 'ok' : 'flag') : s)))
 
   const buildMetricValues = (): MetricValue[] => {
     const vals = { ...mvals }
@@ -144,16 +196,23 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         reward: lv.reward,
       })
     }
-    if (isMuscu && session.items.length) {
+    if ((isMuscu || isHiit) && session.items.length) {
       const seen = new Set<string>()
+      const flatRows = timeline.flatMap((g) => g.rows)
       extra.results = session.items
         .filter((it) => !seen.has(it.exerciseId) && (seen.add(it.exerciseId), true))
         .map((it) => {
           const ex = exOf(it.exerciseId)
-          // Seules les séries cochées comptent — décocher = « je me suis arrêté là »
-          const sets = (values[it.exerciseId] ?? []).filter((_, i) => done[it.exerciseId]?.[i] !== false)
-          // Paliers d'objectif nouvellement franchis ?
-          if (ex?.goal && sets.length) {
+          // Les séries « non faites » sont exclues ; ⚠ mal réalisée = annotation, la valeur compte
+          const sets: number[] = []
+          const flags: number[] = []
+          flatRows.forEach((row, gi) => {
+            if (row.exId !== it.exerciseId || status[gi] === 'no') return
+            if (status[gi] === 'flag') flags.push(sets.length)
+            sets.push(row.value)
+          })
+          // Paliers d'objectif nouvellement franchis ? (muscu)
+          if (isMuscu && ex?.goal && sets.length) {
             const metric = ex.goal.metric
             const v = metric === 'best' ? Math.max(...sets) : sets.reduce((a, b) => a + b, 0)
             let prevBest = 0
@@ -173,8 +232,9 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
           return {
             exerciseId: it.exerciseId,
             name: ex?.name ?? 'Exercice',
-            measure: ex?.measure ?? ('reps' as const),
+            measure: isHiit ? ('sec' as const) : ex?.measure ?? ('reps' as const),
             sets,
+            ...(flags.length ? { flagged: flags } : {}),
           }
         })
         .filter((r) => r.sets.length > 0)
@@ -336,77 +396,85 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         </PrimaryButton>
       )}
 
-      {/* Muscu — saisie du résultat : tours détaillés, coches « série faite », pas d'édition de la séance */}
-      {!entering && isMuscu && session.items.length > 0 && (
+      {/* Muscu/HIIT — saisie du résultat : timeline à curseur (un tap marque où on s'est arrêté) */}
+      {!entering && (isMuscu || isHiit) && session.items.length > 0 && (
         <GhostButton onClick={() => setEntering(true)}>Entrer le résultat ✓</GhostButton>
       )}
 
       {entering && (
         <>
           <p className="text-xs font-semibold text-ink-soft">
-            {lastLog
-              ? 'Prérempli avec votre dernière séance — décochez les séries non faites et ajustez le réalisé.'
-              : 'Décochez les séries non faites et ajustez le réalisé.'}
+            Tapez la série où vous vous êtes arrêté : elle et les suivantes passent en « non faite ». L'icône à
+            droite marque une série faite mais mal réalisée.
           </p>
-          {blocks.map((b, bi) => (
-            <div key={bi} className="space-y-2">
-              {Array.from({ length: b.rounds }, (_, r) => (
-                <div key={r} className="space-y-2">
-                  {(blocks.length > 1 || b.rounds > 1) && (
-                    <p className="rounded-xl bg-muscu/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
-                      {blocks.length > 1 ? `Bloc ${bi + 1}` : ''}
-                      {blocks.length > 1 && b.rounds > 1 ? ' · ' : ''}
-                      {b.rounds > 1 ? `Tour ${r + 1}/${b.rounds}` : ''}
-                    </p>
-                  )}
-                  {b.items.map((it) => {
-                    const ex = exOf(it.exerciseId)
-                    const tgs = setTargetsOf(it)
-                    const suffix = ex?.measure === 'sec' ? 's' : ''
-                    return (
-                      <div key={it.exerciseId + '-' + r} className="rounded-2xl bg-sage-50 p-3">
-                        <p className="text-sm font-extrabold">{ex?.name ?? 'Exercice'}</p>
-                        <div className="mt-1.5 space-y-1.5">
-                          {tgs.map((_, s) => {
-                            const fi = r * tgs.length + s
-                            const isDone = done[it.exerciseId]?.[fi] !== false
-                            return (
-                              <div key={s} className="flex items-center justify-between gap-2">
-                                <button
-                                  type="button"
-                                  aria-label={isDone ? `Série ${s + 1} non faite` : `Série ${s + 1} faite`}
-                                  onClick={() => toggleDone(it.exerciseId, fi)}
-                                  className={
-                                    'flex h-6 w-6 shrink-0 items-center justify-center rounded-full ' +
-                                    (isDone ? 'bg-sage-500 text-white' : 'border-2 border-sand text-transparent')
-                                  }
-                                >
-                                  <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                                </button>
-                                <span
-                                  className={
-                                    'shrink-0 text-xs font-bold ' + (isDone ? 'text-ink-soft' : 'text-ink-soft/40 line-through')
-                                  }
-                                >
-                                  Série {s + 1}
-                                </span>
-                                <div className={isDone ? '' : 'opacity-40'}>
-                                  <Stepper
-                                    value={values[it.exerciseId]?.[fi] ?? 0}
-                                    onChange={(v) => setRep(it.exerciseId, fi, v)}
-                                    suffix={suffix}
-                                    step={ex?.measure === 'sec' ? 5 : 1}
-                                  />
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
+          {timeline.map((g, giIdx) => (
+            <div key={giIdx} className="overflow-hidden rounded-2xl bg-sage-50">
+              {g.header && (
+                <p
+                  className={`px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-wider ${CATEGORY_META[session.category].soft} ${CATEGORY_META[session.category].text}`}
+                >
+                  {g.header}
+                </p>
+              )}
+              {g.rows.map((row, ri) => {
+                const gi = groupOffsets[giIdx] + ri
+                const st = status[gi]
+                return (
+                  <div
+                    key={ri}
+                    className={'flex items-center gap-1 pr-2 ' + (ri > 0 || g.header ? 'border-t border-surface' : '')}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => tapRow(gi)}
+                      className="flex min-w-0 flex-1 items-center gap-2.5 px-4 py-2.5 text-left"
+                    >
+                      <span
+                        className={
+                          'flex h-6 w-6 shrink-0 items-center justify-center rounded-full ' +
+                          (st === 'ok'
+                            ? 'bg-sage-500 text-white'
+                            : st === 'flag'
+                              ? 'bg-amber-400 text-white'
+                              : 'border-2 border-sand text-transparent')
+                        }
+                      >
+                        {st === 'flag' ? (
+                          <TriangleAlert className="h-3.5 w-3.5" strokeWidth={3} />
+                        ) : (
+                          <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                        )}
+                      </span>
+                      <span
+                        className={`min-w-0 flex-1 truncate text-sm font-bold ${st === 'no' ? 'text-ink-soft/40 line-through' : ''}`}
+                      >
+                        {row.name}
+                        {row.setLabel && (
+                          <span className={st === 'no' ? '' : 'font-semibold text-ink-soft'}> · {row.setLabel}</span>
+                        )}
+                      </span>
+                      <span
+                        className={`shrink-0 text-xs font-extrabold ${
+                          st === 'no' ? 'text-ink-soft/40' : st === 'flag' ? 'text-amber-600' : 'text-ink-soft'
+                        }`}
+                      >
+                        {st === 'no' ? 'non faite' : st === 'flag' ? 'mal réalisée' : `${row.value} ${row.unit}`}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={st === 'flag' ? 'Annuler mal réalisée' : 'Marquer mal réalisée'}
+                      onClick={() => flagRow(gi)}
+                      disabled={st === 'no'}
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                        st === 'flag' ? 'text-amber-500' : st === 'no' ? 'text-ink-soft/15' : 'text-ink-soft/35 active:text-amber-500'
+                      }`}
+                    >
+                      <TriangleAlert className="h-4 w-4" />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           ))}
         </>
@@ -436,6 +504,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
       {entering && <PrimaryButton onClick={() => void save()}>Valider la séance ✓</PrimaryButton>}
 
       {!isMuscu &&
+        !entering &&
         (hasTimer ? (
           <GhostButton onClick={() => void save()}>Marquer comme faite ✓ (sans minuteur)</GhostButton>
         ) : (

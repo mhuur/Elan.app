@@ -51,7 +51,8 @@ export function logSummary(l: Log): string {
   }
   if (l.results?.length) {
     const totalSets = l.results.reduce((a, r) => a + r.sets.length, 0)
-    return `${l.results.length} exercices · ${totalSets} séries`
+    const flaggedCount = l.results.reduce((a, r) => a + (r.flagged?.length ?? 0), 0)
+    return `${l.results.length} exercices · ${totalSets} séries${flaggedCount ? ` · ${flaggedCount} mal réalisée${flaggedCount > 1 ? 's' : ''}` : ''}`
   }
   return l.note || 'Bien joué !'
 }

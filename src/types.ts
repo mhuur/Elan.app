@@ -201,6 +201,8 @@ export interface ExerciseResult {
   measure: Measure
   /** Réalisé par série (reps ou secondes) */
   sets: number[]
+  /** Indices (dans `sets`) des séries « mal réalisées » — annotation, compte quand même dans les stats */
+  flagged?: number[]
 }
 
 /** Hérité (anciens logs vélo) : conservé pour l'affichage */
