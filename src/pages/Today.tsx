@@ -7,13 +7,16 @@ import { logSummary, summarizeSession } from '../lib/format'
 import { plannedSessionIdsOn } from '../lib/schedule'
 import { CategoryIcon, EmptyState, Sheet } from '../components/ui'
 import CompleteSheet from '../components/CompleteSheet'
+import LogSheet from '../components/LogSheet'
 import SettingsSheet from '../components/SettingsSheet'
 
 export default function Today() {
-  const { sessions, logs, removeLog } = useData()
+  const { sessions, logs } = useData()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [completing, setCompleting] = useState<Session | null>(null)
+  // Fiche d'une séance terminée (consulter / corriger / supprimer)
+  const [viewing, setViewing] = useState<Log | null>(null)
   // Date affichée : on peut revenir en arrière pour valider des séances oubliées
   const [viewDate, setViewDate] = useState(() => new Date())
 
@@ -26,10 +29,6 @@ export default function Today() {
   const todayLogs = logs.filter((l) => l.date === dStr)
   const doneIds = new Set(todayLogs.map((l) => l.sessionId))
   const toDo = planned.filter((s) => !doneIds.has(s.id))
-
-  const cancelLog = (l: Log) => {
-    if (window.confirm(`Annuler « ${l.sessionName} » ?`)) void removeLog(l.id)
-  }
 
   return (
     <div>
@@ -137,7 +136,12 @@ export default function Today() {
             {todayLogs.map((l) => {
               const meta = CATEGORY_META[l.category]
               return (
-                <div key={l.id} className="flex items-center gap-3 rounded-3xl bg-surface/70 p-4 shadow-sm">
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => setViewing(l)}
+                  className="flex w-full items-center gap-3 rounded-3xl bg-surface/70 p-4 text-left shadow-sm transition-transform active:scale-[0.985]"
+                >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage-500 text-white">
                     <Check className="h-4 w-4" strokeWidth={3} />
                   </div>
@@ -148,10 +152,8 @@ export default function Today() {
                     </p>
                     <p className="truncate text-xs font-semibold text-ink-soft">{logSummary(l)}</p>
                   </div>
-                  <button type="button" onClick={() => cancelLog(l)} className="shrink-0 text-xs font-bold text-ink-soft active:text-hiit">
-                    annuler
-                  </button>
-                </div>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-sage-400" />
+                </button>
               )
             })}
           </div>
@@ -160,6 +162,7 @@ export default function Today() {
 
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <CompleteSheet session={completing} date={dStr} onClose={() => setCompleting(null)} />
+      <LogSheet log={viewing} onClose={() => setViewing(null)} />
 
       <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="Choisir une séance">
         <div className="space-y-4">

@@ -37,6 +37,7 @@ interface DataCtx {
   updateSession(id: string, patch: Partial<Session>): Promise<void>
   removeSession(id: string): Promise<void>
   addLog(l: Omit<Log, 'id'>): Promise<string>
+  updateLog(id: string, patch: Partial<Log>): Promise<void>
   removeLog(id: string): Promise<void>
   addIdea(i: Omit<Idea, 'id'>): Promise<string>
   updateIdea(id: string, patch: Partial<Idea>): Promise<void>
@@ -192,6 +193,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       updateSession: (id, patch) => need().update('sessions', id, patch as Record<string, unknown>),
       removeSession: (id) => need().remove('sessions', id),
       addLog: (l) => need().add('logs', l as unknown as Record<string, unknown>),
+      updateLog: (id, patch) => need().update('logs', id, patch as Record<string, unknown>),
       removeLog: (id) => need().remove('logs', id),
       addIdea: (i) => need().add('ideas', i as unknown as Record<string, unknown>),
       updateIdea: (id, patch) => need().update('ideas', id, patch as Record<string, unknown>),

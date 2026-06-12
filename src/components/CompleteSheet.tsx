@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, ClipboardList, Lightbulb, Link2, Play, Repeat, TriangleAlert } from 'lucide-react'
+import { ClipboardList, Lightbulb, Link2, Play, Repeat } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, setTargetsOf, type Exercise, type Log, type MetricValue, type Session, type SessionItem } from '../types'
 import { todayStr } from '../lib/dates'
 import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { muscuBlocks } from '../lib/blocks'
+import { buildTimeline, collectSets, type SetStatus } from '../lib/timeline'
 import { CategoryIcon, Field, GhostButton, NumInput, PrimaryButton, Sheet, TextArea } from './ui'
+import ResultTimeline from './ResultTimeline'
 
 /** Feuille d'une séance depuis Aujourd'hui : consulter le programme, lancer le minuteur, entrer le résultat */
 export default function CompleteSheet({
@@ -48,17 +50,6 @@ function itemSummary(it: SessionItem, ex?: Exercise): string {
   return uniform ? `${tgs.length} × ${tgs[0]} ${unit}` : `${tgs.join(' / ')} ${unit}`
 }
 
-/** État d'une série dans la timeline de saisie : faite / mal réalisée (compte quand même) / non faite */
-type SetStatus = 'ok' | 'flag' | 'no'
-
-/** Une série de la timeline, dans l'ordre réel d'exécution */
-interface SetRow {
-  exId: string
-  name: string
-  setLabel: string
-  value: number
-  unit: string
-}
 
 function Inner({ session, onClose, date }: { session: Session; onClose: () => void; date?: string }) {
   const { addLog, logs, exercises } = useData()
@@ -95,58 +86,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
   const blocks = useMemo(() => (isMuscu || isStretch ? muscuBlocks(session) : []), [session, isMuscu, isStretch])
 
   // Timeline de saisie (muscu et HIIT) : toutes les séries dans l'ordre réel, groupées par bloc/tour
-  const timeline = useMemo(() => {
-    const groups: { header: string; rows: SetRow[] }[] = []
-    if (isMuscu) {
-      blocks.forEach((b, bi) => {
-        for (let r = 0; r < b.rounds; r++) {
-          const header = [blocks.length > 1 ? `Bloc ${bi + 1}` : '', b.rounds > 1 ? `Tour ${r + 1}/${b.rounds}` : '']
-            .filter(Boolean)
-            .join(' · ')
-          const rows: SetRow[] = []
-          b.items.forEach((it) => {
-            const ex = exOf(it.exerciseId)
-            setTargetsOf(it).forEach((v, s) =>
-              rows.push({
-                exId: it.exerciseId,
-                name: ex?.name ?? 'Exercice',
-                setLabel: `Série ${s + 1}`,
-                value: v,
-                unit: ex?.measure === 'sec' ? 's' : 'reps',
-              }),
-            )
-          })
-          groups.push({ header, rows })
-        }
-      })
-    } else if (isHiit) {
-      const rounds = session.rounds ?? 1
-      for (let r = 0; r < rounds; r++) {
-        groups.push({
-          header: rounds > 1 ? `Tour ${r + 1}/${rounds}` : '',
-          rows: session.items.map((it) => ({
-            exId: it.exerciseId,
-            name: exOf(it.exerciseId)?.name ?? 'Exercice',
-            setLabel: '',
-            value: it.durationSec ?? session.workSec ?? 45,
-            unit: 's',
-          })),
-        })
-      }
-    }
-    return groups
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocks, session, exercises, isMuscu, isHiit])
-  // Index global de la première série de chaque groupe (la timeline se parcourt à plat)
-  const groupOffsets = useMemo(() => {
-    const offs: number[] = []
-    let acc = 0
-    for (const g of timeline) {
-      offs.push(acc)
-      acc += g.rows.length
-    }
-    return offs
-  }, [timeline])
+  const timeline = useMemo(() => buildTimeline(session, exercises), [session, exercises])
   const [status, setStatus] = useState<SetStatus[]>(() => timeline.flatMap((g) => g.rows).map(() => 'ok'))
 
   // Tap = curseur « je me suis arrêté ici » : la série et toutes les suivantes passent en non faites ;
@@ -204,13 +144,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         .map((it) => {
           const ex = exOf(it.exerciseId)
           // Les séries « non faites » sont exclues ; ⚠ mal réalisée = annotation, la valeur compte
-          const sets: number[] = []
-          const flags: number[] = []
-          flatRows.forEach((row, gi) => {
-            if (row.exId !== it.exerciseId || status[gi] === 'no') return
-            if (status[gi] === 'flag') flags.push(sets.length)
-            sets.push(row.value)
-          })
+          const { sets, flags } = collectSets(flatRows, status, it.exerciseId)
           // Paliers d'objectif nouvellement franchis ? (muscu)
           if (isMuscu && ex?.goal && sets.length) {
             const metric = ex.goal.metric
@@ -407,76 +341,13 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
             Tapez la série où vous vous êtes arrêté : elle et les suivantes passent en « non faite ». L'icône à
             droite marque une série faite mais mal réalisée.
           </p>
-          {timeline.map((g, giIdx) => (
-            <div key={giIdx} className="overflow-hidden rounded-2xl bg-sage-50">
-              {g.header && (
-                <p
-                  className={`px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-wider ${CATEGORY_META[session.category].soft} ${CATEGORY_META[session.category].text}`}
-                >
-                  {g.header}
-                </p>
-              )}
-              {g.rows.map((row, ri) => {
-                const gi = groupOffsets[giIdx] + ri
-                const st = status[gi]
-                return (
-                  <div
-                    key={ri}
-                    className={'flex items-center gap-1 pr-2 ' + (ri > 0 || g.header ? 'border-t border-surface' : '')}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => tapRow(gi)}
-                      className="flex min-w-0 flex-1 items-center gap-2.5 px-4 py-2.5 text-left"
-                    >
-                      <span
-                        className={
-                          'flex h-6 w-6 shrink-0 items-center justify-center rounded-full ' +
-                          (st === 'ok'
-                            ? 'bg-sage-500 text-white'
-                            : st === 'flag'
-                              ? 'bg-amber-400 text-white'
-                              : 'border-2 border-sand text-transparent')
-                        }
-                      >
-                        {st === 'flag' ? (
-                          <TriangleAlert className="h-3.5 w-3.5" strokeWidth={3} />
-                        ) : (
-                          <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                        )}
-                      </span>
-                      <span
-                        className={`min-w-0 flex-1 truncate text-sm font-bold ${st === 'no' ? 'text-ink-soft/40 line-through' : ''}`}
-                      >
-                        {row.name}
-                        {row.setLabel && (
-                          <span className={st === 'no' ? '' : 'font-semibold text-ink-soft'}> · {row.setLabel}</span>
-                        )}
-                      </span>
-                      <span
-                        className={`shrink-0 text-xs font-extrabold ${
-                          st === 'no' ? 'text-ink-soft/40' : st === 'flag' ? 'text-amber-600' : 'text-ink-soft'
-                        }`}
-                      >
-                        {st === 'no' ? 'non faite' : st === 'flag' ? 'mal réalisée' : `${row.value} ${row.unit}`}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={st === 'flag' ? 'Annuler mal réalisée' : 'Marquer mal réalisée'}
-                      onClick={() => flagRow(gi)}
-                      disabled={st === 'no'}
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                        st === 'flag' ? 'text-amber-500' : st === 'no' ? 'text-ink-soft/15' : 'text-ink-soft/35 active:text-amber-500'
-                      }`}
-                    >
-                      <TriangleAlert className="h-4 w-4" />
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          ))}
+          <ResultTimeline
+            groups={timeline}
+            status={status}
+            category={session.category}
+            onTap={tapRow}
+            onFlag={flagRow}
+          />
         </>
       )}
 
