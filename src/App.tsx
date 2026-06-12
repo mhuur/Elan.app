@@ -6,6 +6,7 @@ import Planning from './pages/Planning'
 import Library from './pages/Library'
 import Progress from './pages/Progress'
 import Goals from './pages/Goals'
+import Plan from './pages/Plan'
 import ExerciseForm from './pages/ExerciseForm'
 import SessionForm from './pages/SessionForm'
 import Player from './pages/Player'
@@ -43,6 +44,7 @@ function Shell() {
           <Route path="/exercise/:id" element={<ExerciseForm />} />
           <Route path="/session/new" element={<SessionForm />} />
           <Route path="/session/:id" element={<SessionForm />} />
+          <Route path="/plan" element={<Plan />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/progress" element={<Progress />} />
           <Route path="/player/:id" element={<Player />} />

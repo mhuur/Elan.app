@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { CalendarDays, Dumbbell, Sun, Target, TrendingUp } from 'lucide-react'
+import { CalendarDays, Dumbbell, Route, Sun, Target, TrendingUp } from 'lucide-react'
 
 const items = [
   { to: '/', label: "Aujourd'hui", icon: Sun },
   { to: '/planning', label: 'Planning', icon: CalendarDays },
+  { to: '/plan', label: 'Plan', icon: Route },
   { to: '/library', label: 'Exercices', icon: Dumbbell },
   { to: '/goals', label: 'Objectifs', icon: Target },
   { to: '/progress', label: 'Progrès', icon: TrendingUp },
