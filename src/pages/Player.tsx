@@ -96,16 +96,28 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
       }
     })
   } else {
+    // Étirements : mêmes blocs/tours que la muscu, transitions entre postures
     const rest = session.restSec ?? 0
-    session.items.forEach((it, i) => {
-      steps.push({
-        type: 'work',
-        label: nameOf(it.exerciseId),
-        sec: it.durationSec ?? 30,
-        comment: it.comment,
-        exerciseId: it.exerciseId,
-      })
-      if (rest > 0 && i < session.items.length - 1) steps.push({ type: 'rest', label: 'Transition', sec: rest })
+    const blocks = muscuBlocks(session)
+    blocks.forEach((b, bi) => {
+      for (let r = 0; r < b.rounds; r++) {
+        b.items.forEach((it, i) => {
+          const detail =
+            [blocks.length > 1 ? `Bloc ${bi + 1}` : '', b.rounds > 1 ? `Tour ${r + 1}/${b.rounds}` : '']
+              .filter(Boolean)
+              .join(' · ') || undefined
+          steps.push({
+            type: 'work',
+            label: nameOf(it.exerciseId),
+            sec: it.durationSec ?? 30,
+            comment: it.comment,
+            exerciseId: it.exerciseId,
+            detail,
+          })
+          const veryLast = bi === blocks.length - 1 && r === b.rounds - 1 && i === b.items.length - 1
+          if (rest > 0 && !veryLast) steps.push({ type: 'rest', label: 'Transition', sec: rest })
+        })
+      }
     })
   }
   return steps

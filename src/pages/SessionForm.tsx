@@ -131,6 +131,7 @@ export default function SessionForm() {
   const [restSec, setRestSec] = useState(existing?.restSec ?? 15)
   const [rounds, setRounds] = useState(existing?.rounds ?? 2)
   const [stretchRest, setStretchRest] = useState(existing?.category === 'etirements' ? (existing.restSec ?? 0) : 5)
+  const [stretchRounds, setStretchRounds] = useState(existing?.category === 'etirements' ? (existing.rounds ?? 1) : 1)
   const [muscuRounds, setMuscuRounds] = useState(existing?.category === 'muscu' ? (existing.rounds ?? 1) : 1)
   const [group, setGroup] = useState(existing?.group ?? '')
   const [addQuery, setAddQuery] = useState('')
@@ -158,9 +159,11 @@ export default function SessionForm() {
   const catExercises = exercises.filter((e) => e.category === category)
   const exOf = (exId: string) => exercises.find((e) => e.id === exId)
   const hasItems = category === 'muscu' || category === 'hiit' || category === 'etirements'
-  // Blocs muscu : découpage de la séance en groupes répétés indépendamment
-  const hasBreaks = category === 'muscu' && items.some((it, i) => i > 0 && it.blockBreak)
+  // Blocs (muscu ET étirements) : découpage de la séance en groupes répétés indépendamment
+  const canBlocks = category === 'muscu' || category === 'etirements'
+  const hasBreaks = canBlocks && items.some((it, i) => i > 0 && it.blockBreak)
   const blockNumberAt = (idx: number) => 1 + items.slice(1, idx + 1).filter((x) => x.blockBreak).length
+  const catMeta = CATEGORY_META[category]
 
   const switchCategory = (c: Category) => {
     if (c === category) return
@@ -305,7 +308,7 @@ export default function SessionForm() {
       sortOrder: existing?.sortOrder ?? maxOrder + 1,
       createdAt: existing?.createdAt ?? Date.now(),
       ...(category === 'hiit' ? { workSec, restSec, rounds } : {}),
-      ...(category === 'etirements' ? { restSec: stretchRest } : {}),
+      ...(category === 'etirements' ? { restSec: stretchRest, rounds: stretchRounds } : {}),
       ...(category === 'muscu' ? { rounds: muscuRounds } : {}),
     }
     let selfId: string
@@ -524,11 +527,21 @@ export default function SessionForm() {
         )}
 
         {category === 'etirements' && (
-          <div className="flex items-center justify-between rounded-2xl bg-surface p-3.5 shadow-sm">
-            <p className="flex items-center gap-2 text-sm font-extrabold">
-              <Timer className="h-4 w-4 text-etirements" /> Transition entre postures
-            </p>
-            <Stepper value={stretchRest} onChange={setStretchRest} min={0} step={5} suffix="s" small />
+          <div className="space-y-3 rounded-2xl bg-surface p-3.5 shadow-sm">
+            {!hasBreaks && (
+              <div className="flex items-center justify-between gap-2">
+                <p className="flex items-center gap-2 text-sm font-extrabold" title="Refaire toute la routine à la suite">
+                  <Repeat className="h-4 w-4 text-etirements" /> Tours de la routine
+                </p>
+                <Stepper value={stretchRounds} onChange={setStretchRounds} min={1} max={10} small />
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-2 text-sm font-extrabold">
+                <Timer className="h-4 w-4 text-etirements" /> Transition entre postures
+              </p>
+              <Stepper value={stretchRest} onChange={setStretchRest} min={0} step={5} suffix="s" small />
+            </div>
           </div>
         )}
 
@@ -556,9 +569,9 @@ export default function SessionForm() {
                       <SortableItem key={it.uid} uid={it.uid}>
                         {(drag) => (
                           <div>
-                    {category === 'muscu' && hasBreaks && (idx === 0 || it.blockBreak) && (
-                      <div className="mb-1.5 flex items-center justify-between gap-2 rounded-xl bg-muscu/10 px-3 py-1.5">
-                        <p className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
+                    {hasBreaks && (idx === 0 || it.blockBreak) && (
+                      <div className={`mb-1.5 flex items-center justify-between gap-2 rounded-xl px-3 py-1.5 ${catMeta.soft}`}>
+                        <p className={`flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider ${catMeta.text}`}>
                           <LayoutGrid className="h-3.5 w-3.5" /> Bloc {blockNumberAt(idx)} — tours
                         </p>
                         <div className="flex items-center gap-1.5">
@@ -723,19 +736,21 @@ export default function SessionForm() {
                       )}
                     </div>
 
-                    {category === 'muscu' && idx < items.length - 1 && !items[idx + 1].blockBreak && (
+                    {canBlocks && idx < items.length - 1 && !items[idx + 1].blockBreak && (
                       <div className="-my-0.5 flex justify-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setItem(idx, { linkNext: !it.linkNext })}
-                          className={
-                            'relative z-10 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-extrabold transition-colors ' +
-                            (it.linkNext ? 'bg-muscu text-white shadow-sm' : 'bg-sage-100 text-ink-soft')
-                          }
-                        >
-                          <Link2 className="h-3 w-3" />
-                          {it.linkNext ? 'Superset — enchaîné sans repos' : 'superset'}
-                        </button>
+                        {category === 'muscu' && (
+                          <button
+                            type="button"
+                            onClick={() => setItem(idx, { linkNext: !it.linkNext })}
+                            className={
+                              'relative z-10 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-extrabold transition-colors ' +
+                              (it.linkNext ? 'bg-muscu text-white shadow-sm' : 'bg-sage-100 text-ink-soft')
+                            }
+                          >
+                            <Link2 className="h-3 w-3" />
+                            {it.linkNext ? 'Superset — enchaîné sans repos' : 'superset'}
+                          </button>
+                        )}
                         {!it.linkNext && (
                           <button
                             type="button"

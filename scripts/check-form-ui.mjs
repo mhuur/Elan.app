@@ -66,6 +66,26 @@ try {
     throw new Error(`Les séries variées devraient être 30,12,12 — trouvé ${(full.items[0].targets ?? []).join(',')}`)
   if (full.items.some((it) => 'uid' in it)) throw new Error("L'uid transitoire ne devrait pas être sauvegardé")
 
+  // --- Étirements : blocs disponibles aussi (découpage + tours par bloc)
+  await page.click('text=Routine matinale')
+  await page.waitForSelector('text=Planification')
+  await page.waitForSelector('text=Tours de la routine')
+  await page.locator('button:has-text("nouveau bloc")').first().click()
+  await page.waitForSelector('text=Bloc 2 — tours')
+  await page.click('text=Enregistrer')
+  await page.waitForSelector('text=Bibliothèque')
+  const d2 = await page.evaluate(() => JSON.parse(localStorage.getItem('elan-data-v1')))
+  const rout = d2.sessions.find((s) => s.name === 'Routine matinale')
+  if (!rout.items[1].blockBreak) throw new Error('La routine étirements devrait avoir un 2e bloc')
+  // La feuille Aujourd'hui montre la routine structurée en blocs
+  await page.getByRole('link', { name: "Aujourd'hui" }).click()
+  await page.click('text=Routine matinale')
+  await page.waitForSelector('text=Bloc 2')
+  await page.screenshot({ path: 'screenshots/39-etirements-blocs.png' })
+  await page.click('text=Fermer sans valider')
+  await page.getByRole('link', { name: 'Exercices' }).click()
+  await page.waitForSelector('text=Bibliothèque')
+
   // --- Nouvelle séance : écran épuré
   await page.click('text=+ Séance')
   await page.waitForSelector('text=Nouvelle séance')

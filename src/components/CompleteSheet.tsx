@@ -59,6 +59,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
   const metrics = useMemo(() => effectiveMetrics(session), [session])
   const links = session.links ?? []
   const isMuscu = session.category === 'muscu'
+  const isStretch = session.category === 'etirements'
   // Le minuteur guidé n'a de sens que pour la journée en cours
   const hasTimer =
     (session.category === 'hiit' || session.category === 'etirements' || isMuscu) &&
@@ -76,9 +77,9 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
     return m
   })
 
-  // Muscu : réalisé par série, organisé blocs → tours → exercices → séries
+  // Muscu/étirements : structure blocs → tours → exercices (→ séries pour la muscu)
   const exOf = (id: string) => exercises.find((e) => e.id === id)
-  const blocks = useMemo(() => (isMuscu ? muscuBlocks(session) : []), [session, isMuscu])
+  const blocks = useMemo(() => (isMuscu || isStretch ? muscuBlocks(session) : []), [session, isMuscu, isStretch])
   const roundsOf = (it: SessionItem) => blocks.find((b) => b.items.includes(it))?.rounds ?? 1
   const flatTargets = (it: SessionItem): number[] => {
     const tgs = setTargetsOf(it)
@@ -251,7 +252,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         </p>
       )}
 
-      {(session.category === 'etirements' || session.category === 'hiit') && session.items.length > 0 && (
+      {session.category === 'hiit' && session.items.length > 0 && (
         <div className="overflow-hidden rounded-2xl bg-sage-50">
           {session.items.map((it, i) => {
             const ex = exOf(it.exerciseId)
@@ -269,27 +270,25 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
                     </p>
                   )}
                 </div>
-                <span className="shrink-0 text-xs font-extrabold text-ink-soft">
-                  {session.category === 'etirements' ? (it.durationSec ?? 30) : (session.workSec ?? 45)} s
-                </span>
+                <span className="shrink-0 text-xs font-extrabold text-ink-soft">{it.durationSec ?? session.workSec ?? 45} s</span>
               </div>
             )
           })}
-          {session.category === 'hiit' && (
-            <p className="border-t border-surface px-4 py-2 text-xs font-extrabold text-ink-soft">
-              × {session.rounds ?? 1} tour{(session.rounds ?? 1) > 1 ? 's' : ''} · {session.restSec ?? 15} s de repos
-            </p>
-          )}
+          <p className="border-t border-surface px-4 py-2 text-xs font-extrabold text-ink-soft">
+            × {session.rounds ?? 1} tour{(session.rounds ?? 1) > 1 ? 's' : ''} · {session.restSec ?? 15} s de repos
+          </p>
         </div>
       )}
 
-      {/* Muscu — programme en lecture seule : les tours et le détail d'UN tour */}
-      {!entering && isMuscu && session.items.length > 0 && (
+      {/* Muscu / étirements — programme en lecture seule : les tours et le détail d'UN tour */}
+      {!entering && (isMuscu || isStretch) && session.items.length > 0 && (
         <div className="space-y-2">
           {blocks.map((b, bi) => (
             <div key={bi} className="overflow-hidden rounded-2xl bg-sage-50">
               {(blocks.length > 1 || b.rounds > 1) && (
-                <p className="flex items-center gap-1.5 bg-muscu/10 px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-muscu">
+                <p
+                  className={`flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-wider ${CATEGORY_META[session.category].soft} ${CATEGORY_META[session.category].text}`}
+                >
                   <Repeat className="h-3 w-3" />
                   {blocks.length > 1 ? `Bloc ${bi + 1}` : 'Circuit'}
                   {b.rounds > 1 ? ` · × ${b.rounds} tours` : ''}
@@ -314,7 +313,9 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
                         </p>
                       )}
                     </div>
-                    <span className="shrink-0 text-xs font-extrabold text-ink-soft">{itemSummary(it, ex)}</span>
+                    <span className="shrink-0 text-xs font-extrabold text-ink-soft">
+                      {isMuscu ? itemSummary(it, ex) : `${it.durationSec ?? 30} s`}
+                    </span>
                   </div>
                 )
               })}

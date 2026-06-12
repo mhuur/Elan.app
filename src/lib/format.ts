@@ -1,5 +1,6 @@
 import type { Log, Session } from '../types'
 import { effectiveMetrics } from './metrics'
+import { muscuBlocks } from './blocks'
 
 /** « 12:05 » à partir de secondes */
 export function mmss(totalSec: number): string {
@@ -23,9 +24,12 @@ export function hiitTotalSec(s: Session): number {
   return n * work + (n - 1) * rest
 }
 
-/** Durée totale d'une routine d'étirements en secondes */
+/** Durée totale d'une routine d'étirements en secondes (blocs et tours compris) */
 export function stretchTotalSec(s: Session): number {
-  return s.items.reduce((acc, it) => acc + (it.durationSec ?? 30), 0)
+  return muscuBlocks(s).reduce(
+    (acc, b) => acc + b.rounds * b.items.reduce((a, it) => a + (it.durationSec ?? 30), 0),
+    0,
+  )
 }
 
 /** Petit résumé d'un log (séance complétée) pour les listes */
