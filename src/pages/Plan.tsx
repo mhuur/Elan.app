@@ -256,7 +256,7 @@ export default function Plan() {
               ))}
             </div>
             <p className="mt-3 text-[11px] leading-snug text-ink-soft/80">
-              Zones contiguës (Réserve FC) : toute allure a sa zone. VMA = plus rapide que l'allure semi, fractions visées 4:35–4:50. FC max confirmée (pic réel 183 bpm).
+              La <strong>FC</strong> définit la zone (contiguë, méthode Réserve FC comme ta montre) ; l'<strong>allure</strong> en face est celle visée dans ce type de séance. FC max confirmée (pic réel 183 bpm).
             </p>
           </div>
         )}
