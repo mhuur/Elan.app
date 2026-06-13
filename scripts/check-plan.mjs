@@ -1,5 +1,5 @@
-// Vérifie la page Plan (plan semi 16 semaines) : allures repères, phases, semaines
-// dépliables, séance cochée via un log running du jour.
+// Vérifie la page Plan (semi 16 semaines) en vue semaine par semaine : navigation par
+// flèches, aperçu hebdo, cartes de séance, et viewer type Campus à l'ouverture d'une séance.
 // Prérequis : `npm run dev:demo` lancé.
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
@@ -20,30 +20,43 @@ try {
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
-  // --- Onglet Plan : en-tête, compte à rebours, allures, phases
+  // --- Onglet Plan : en-tête, navigateur de semaines, aperçu hebdo, cartes de séance
   await page.getByRole('link', { name: 'Plan', exact: true }).click()
   await page.waitForSelector('text=Tout Rennes Court')
-  await page.waitForSelector('text=Allures repères')
+  await page.waitForSelector('text=Ton aperçu hebdomadaire')
+  await page.waitForSelector('text=Semaine 1')
+  await page.waitForSelector('text=1 sur 16')
+  await page.waitForSelector('text=Séance 1/4')
   await page.waitForSelector('text=Allure semi')
-  await page.waitForSelector('text=Base · 4 semaines')
-  await page.waitForSelector('text=Affûtage · 2 semaines')
   await page.screenshot({ path: `${DIR}/40-plan.png` })
 
-  // --- Déplier la semaine de course : le semi est bien là
-  await page.click('text=semaine de course')
+  // --- Navigation par flèches jusqu'à la semaine 13 (pic de volume)
+  for (let i = 0; i < 12; i++) {
+    await page.click('[aria-label="Semaine suivante"]')
+  }
+  await page.waitForSelector('text=Semaine 13')
+  await page.waitForSelector('text=pic de volume')
+  await page.waitForSelector('text=VMA 4×1200 m')
+
+  // --- Affichage type Campus : ouvrir la séance VMA → séquences détaillées
+  await page.click('text=VMA 4×1200 m')
+  await page.waitForSelector('[role="dialog"] >> text=Échauffement')
+  await page.waitForSelector('[role="dialog"] >> text=1200 m')
+  await page.waitForSelector('[role="dialog"] >> text=4:48')
+  await page.waitForSelector('[role="dialog"] >> text=Récupération')
+  await page.screenshot({ path: `${DIR}/42-plan-seance.png` })
+  await page.mouse.click(195, 30) // clic sur le fond pour fermer la feuille
+  await page.waitForSelector('[role="dialog"]', { state: 'detached' })
+
+  // --- Dernière semaine : le semi est bien là
+  for (let i = 0; i < 3; i++) {
+    await page.click('[aria-label="Semaine suivante"]')
+  }
+  await page.waitForSelector('text=Semaine 16')
   await page.waitForSelector('text=Semi-marathon — 21,1 km')
   await page.screenshot({ path: `${DIR}/41-plan-course.png` })
 
-  // --- Une seule semaine ouverte à la fois (accordéon)
-  await page.click('text=pic de volume')
-  await page.waitForSelector('text=6 km continu allure semi')
-  const stillOpen = await page.locator('text=Semi-marathon — 21,1 km').count()
-  if (stillOpen) throw new Error('accordéon : la semaine de course est restée ouverte')
-
-  // --- Volume hebdo affiché sur les semaines repliées
-  await page.waitForSelector('text=31 km')
-
-  console.log('PLAN OK — allures, phases, accordéon des semaines, séance de course affichée')
+  console.log('PLAN OK — vue semaine par semaine, navigation, aperçu hebdo, cartes, viewer type Campus')
   if (errors.length) {
     console.error('ERREURS DÉTECTÉES :')
     for (const e of errors) console.error(' -', e)

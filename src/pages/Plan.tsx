@@ -1,75 +1,138 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Flag } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ArrowLeft, ArrowRight, ChevronRight, Footprints, Zap } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { PageHeader } from '../components/ui'
-import { DAY_SHORT, addDays, formatShortFr, toDateStr, todayStr } from '../lib/dates'
+import WorkoutSheet from '../components/WorkoutSheet'
+import { DAY_NAMES, addDays, formatShortFr, toDateStr, todayStr } from '../lib/dates'
 import {
   PLAN_ALLURES,
   PLAN_SEMI,
+  TYPE_DIFFICULTY,
   currentWeekIndex,
   daysToRace,
   seanceDateStr,
+  workoutStats,
   type PlanSeance,
   type PlanWeek,
 } from '../data/plan'
 
-function StatusIcon({ s, date, runDates, today }: { s: PlanSeance; date: string; runDates: Set<string>; today: string }) {
-  const done = runDates.has(date)
-  if (s.type === 'course' && !done)
-    return (
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-running/10 text-running">
-        <Flag className="h-3.5 w-3.5" strokeWidth={2.5} />
-      </span>
-    )
-  if (done)
-    return (
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sage-500 text-white">
-        <Check className="h-3.5 w-3.5" strokeWidth={3} />
-      </span>
-    )
-  // Passée sans log = légèrement estompée, à venir = anneau simple
-  return <span className={'h-6 w-6 shrink-0 rounded-full border-2 border-sand ' + (date < today ? 'bg-sand/60' : '')} />
+const fmtDur = (sec: number) => {
+  const h = Math.floor(sec / 3600)
+  const m = Math.round((sec % 3600) / 60)
+  return h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m}`
+}
+const fmtKm = (m: number) => (Math.round(m / 100) / 10).toFixed(1)
+
+type Status = 'done' | 'today' | 'missed' | 'todo'
+function statusOf(date: string, runDates: Set<string>, today: string): Status {
+  if (runDates.has(date)) return 'done'
+  if (date === today) return 'today'
+  if (date < today) return 'missed'
+  return 'todo'
+}
+const STATUS_META: Record<Status, { label: string; cls: string }> = {
+  done: { label: 'Validée', cls: 'bg-sage-100 text-sage-700' },
+  today: { label: "Aujourd'hui", cls: 'bg-sage-500 text-white' },
+  missed: { label: 'Non faite', cls: 'bg-sand text-ink-soft' },
+  todo: { label: 'À venir', cls: 'bg-sand/60 text-ink-soft' },
 }
 
-function SeanceRow({ week, s, runDates, today }: { week: PlanWeek; s: PlanSeance; runDates: Set<string>; today: string }) {
-  const date = seanceDateStr(week, s)
-  const race = s.type === 'course'
+function Metric({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
-    <div className="flex items-start gap-3 px-4 py-2.5">
-      <span className="w-9 pt-0.5 text-xs font-bold text-ink-soft">{DAY_SHORT[s.day]}</span>
-      <div className="min-w-0 flex-1">
-        <p className={'text-sm font-bold ' + (race ? 'text-running' : 'text-ink')}>{s.title}</p>
-        {s.detail && <p className="mt-0.5 text-xs font-semibold text-ink-soft">{s.detail}</p>}
-      </div>
-      <StatusIcon s={s} date={date} runDates={runDates} today={today} />
+    <div>
+      <p className="text-xs font-semibold text-ink-soft">{label}</p>
+      <p className="mt-0.5 text-lg font-extrabold tabular-nums leading-none">
+        {value}
+        {unit && <span className="ml-0.5 text-xs font-bold text-ink-soft">{unit}</span>}
+      </p>
     </div>
+  )
+}
+
+function Difficulty({ n }: { n: number }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-ink-soft">Difficulté</p>
+      <div className="mt-1 flex gap-0.5">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Zap key={i} className={'h-4 w-4 ' + (i <= n ? 'fill-running text-running' : 'fill-ink-soft/15 text-ink-soft/15')} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SeanceCard({
+  week,
+  s,
+  idx,
+  total,
+  runDates,
+  today,
+  onOpen,
+}: {
+  week: PlanWeek
+  s: PlanSeance
+  idx: number
+  total: number
+  runDates: Set<string>
+  today: string
+  onOpen: () => void
+}) {
+  const date = seanceDateStr(week, s)
+  const st = STATUS_META[statusOf(date, runDates, today)]
+  const { sec, distM } = workoutStats(s.workout)
+  const diff = TYPE_DIFFICULTY[s.type]
+  const tile = diff >= 4 ? 'bg-running/15 text-running' : diff === 3 ? 'bg-running/10 text-running' : 'bg-sage-100 text-sage-600'
+  return (
+    <button type="button" onClick={onOpen} className="w-full rounded-2xl bg-surface text-left shadow-sm active:bg-sage-50/50">
+      <div className="flex items-center gap-3 px-4 pt-3.5">
+        <span className={'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ' + tile}>
+          <Footprints className="h-6 w-6" strokeWidth={2.25} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className={'rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ' + st.cls}>{st.label}</span>
+            <span className="text-xs font-bold text-ink-soft">
+              Séance {idx + 1}/{total} · {DAY_NAMES[s.day]}
+            </span>
+          </div>
+          <p className="mt-0.5 truncate text-base font-extrabold">{s.title}</p>
+        </div>
+        <ChevronRight className="h-5 w-5 shrink-0 text-ink-soft/40" />
+      </div>
+      <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-sand/60 px-4 py-3">
+        <Metric label="Durée" value={fmtDur(sec)} unit="min" />
+        <Metric label="Distance" value={fmtKm(distM)} unit="km" />
+        <Difficulty n={diff} />
+      </div>
+    </button>
   )
 }
 
 export default function Plan() {
   const { logs } = useData()
   const today = todayStr()
+  const weeks = PLAN_SEMI.weeks
   const cur = currentWeekIndex(today)
-  const [open, setOpen] = useState<number | null>(cur >= 0 && cur < PLAN_SEMI.weeks.length ? cur : 0)
-  const curRef = useRef<HTMLDivElement>(null)
+  const clampedCur = Math.min(weeks.length - 1, Math.max(0, cur))
+  const [weekIdx, setWeekIdx] = useState(clampedCur)
+  const [sheet, setSheet] = useState<PlanSeance | null>(null)
 
-  const runDates = useMemo(
-    () => new Set(logs.filter((l) => l.category === 'running').map((l) => l.date)),
-    [logs],
-  )
+  const runDates = useMemo(() => new Set(logs.filter((l) => l.category === 'running').map((l) => l.date)), [logs])
 
-  useEffect(() => {
-    if (cur > 0) curRef.current?.scrollIntoView({ block: 'center' })
-  }, [cur])
-
-  const groups = useMemo(() => {
-    const g: { phase: string; weeks: { week: PlanWeek; idx: number }[] }[] = []
-    PLAN_SEMI.weeks.forEach((week, idx) => {
-      if (!g.length || g[g.length - 1].phase !== week.phase) g.push({ phase: week.phase, weeks: [] })
-      g[g.length - 1].weeks.push({ week, idx })
-    })
-    return g
-  }, [])
+  const week = weeks[weekIdx]
+  const end = toDateStr(addDays(new Date(week.start + 'T12:00:00'), 6))
+  const totals = useMemo(() => {
+    let sec = 0
+    let distM = 0
+    for (const s of week.seances) {
+      const st = workoutStats(s.workout)
+      sec += st.sec
+      distM += st.distM
+    }
+    return { sec, distM }
+  }, [week])
 
   const dtr = daysToRace(today)
 
@@ -88,9 +151,71 @@ export default function Plan() {
         }
       />
 
-      <section className="rounded-2xl bg-surface px-4 py-3 shadow-sm">
-        <p className="text-[11px] font-extrabold uppercase tracking-widest text-sage-500">Allures repères</p>
-        <div className="mt-2 space-y-1.5">
+      {/* Navigation semaine par semaine */}
+      <div className="flex items-center justify-between gap-3 pb-3 pt-1">
+        <button
+          type="button"
+          aria-label="Semaine précédente"
+          disabled={weekIdx === 0}
+          onClick={() => setWeekIdx((i) => Math.max(0, i - 1))}
+          className="rounded-full bg-surface p-2.5 shadow-sm active:bg-sage-50 disabled:opacity-30"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <div className="text-center">
+          <p className="text-base font-extrabold">{weekIdx === cur ? 'Cette semaine' : `Semaine ${weekIdx + 1}`}</p>
+          <p className="text-xs font-bold text-ink-soft">{weekIdx + 1} sur {weeks.length}</p>
+        </div>
+        <button
+          type="button"
+          aria-label="Semaine suivante"
+          disabled={weekIdx === weeks.length - 1}
+          onClick={() => setWeekIdx((i) => Math.min(weeks.length - 1, i + 1))}
+          className="rounded-full bg-surface p-2.5 shadow-sm active:bg-sage-50 disabled:opacity-30"
+        >
+          <ArrowRight className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Aperçu hebdomadaire */}
+      <section className="rounded-2xl bg-surface px-4 py-3.5 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-base font-extrabold">Ton aperçu hebdomadaire</p>
+          <span className="shrink-0 rounded-full bg-sage-50 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-sage-700">
+            {week.phase}
+          </span>
+        </div>
+        <p className="mt-0.5 text-xs font-semibold text-ink-soft">
+          {formatShortFr(week.start)} – {formatShortFr(end)}
+          {week.label && <span className="text-ink-soft"> · {week.label}</span>}
+        </p>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <Metric label="Activités" value={String(week.seances.length)} />
+          <Metric label="Durée" value={fmtDur(totals.sec)} unit="min" />
+          <Metric label="Distance" value={fmtKm(totals.distM)} unit="km" />
+        </div>
+      </section>
+
+      {/* Séances de la semaine */}
+      <div className="mt-3 space-y-3">
+        {week.seances.map((s, i) => (
+          <SeanceCard
+            key={s.day}
+            week={week}
+            s={s}
+            idx={i}
+            total={week.seances.length}
+            runDates={runDates}
+            today={today}
+            onOpen={() => setSheet(s)}
+          />
+        ))}
+      </div>
+
+      {/* Allures repères, en pied de page */}
+      <section className="mt-4 rounded-2xl bg-sage-50 px-4 py-3">
+        <p className="text-[11px] font-extrabold uppercase tracking-widest text-sage-600">Allures repères</p>
+        <div className="mt-2 space-y-1">
           {PLAN_ALLURES.map((a) => (
             <div key={a.label} className="flex items-baseline justify-between gap-3">
               <span className="text-sm font-semibold text-ink-soft">{a.label}</span>
@@ -100,69 +225,7 @@ export default function Plan() {
         </div>
       </section>
 
-      {cur === -1 && (
-        <p className="mt-4 px-1 text-sm font-semibold text-ink-soft">
-          Le plan démarre le lundi {formatShortFr(PLAN_SEMI.weeks[0].start)} — d'ici là, on continue tranquillement.
-        </p>
-      )}
-
-      {groups.map((g) => (
-        <section key={g.phase}>
-          <h2 className="px-1 pt-5 pb-2 text-[11px] font-extrabold uppercase tracking-widest text-sage-500">
-            {g.phase} · {g.weeks.length} semaine{g.weeks.length > 1 ? 's' : ''}
-          </h2>
-          <div className="space-y-2">
-            {g.weeks.map(({ week, idx }) => {
-              const isOpen = open === idx
-              const isCur = idx === cur
-              const end = toDateStr(addDays(new Date(week.start + 'T12:00:00'), 6))
-              const doneCount = week.seances.filter((s) => runDates.has(seanceDateStr(week, s))).length
-              const complete = doneCount === week.seances.length
-              return (
-                <div key={week.start} ref={isCur ? curRef : undefined} className="rounded-2xl bg-surface shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setOpen(isOpen ? null : idx)}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-                  >
-                    <div>
-                      <p className={'text-sm font-extrabold ' + (isCur ? 'text-sage-600' : 'text-ink')}>
-                        Semaine {idx + 1}
-                        {week.label && <span className="font-bold text-ink-soft"> · {week.label}</span>}
-                      </p>
-                      <p className="text-[11px] font-semibold text-ink-soft">
-                        {formatShortFr(week.start)} – {formatShortFr(end)}
-                        {isCur && <span className="font-extrabold text-sage-600"> · en cours</span>}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {complete ? (
-                        <Check className="h-4 w-4 text-sage-500" strokeWidth={3} />
-                      ) : (
-                        <span className="text-xs font-bold text-ink-soft">{week.km} km</span>
-                      )}
-                      <ChevronDown
-                        className={'h-4 w-4 text-ink-soft/60 transition-transform ' + (isOpen ? 'rotate-180' : '')}
-                      />
-                    </div>
-                  </button>
-                  {isOpen && (
-                    <div className="divide-y divide-sand/60 border-t border-sand/60 pb-1">
-                      {week.seances.map((s) => (
-                        <SeanceRow key={s.day} week={week} s={s} runDates={runDates} today={today} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      ))}
-
-      <p className="mt-5 px-1 text-xs font-semibold text-ink-soft">
-        Allures calibrées sur l'objectif 1h50 — elles seront affinées avec tes données COROS.
-      </p>
+      <WorkoutSheet seance={sheet} weekIdx={weekIdx} onClose={() => setSheet(null)} />
     </div>
   )
 }
