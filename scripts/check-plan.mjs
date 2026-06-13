@@ -28,7 +28,11 @@ try {
   await page.waitForSelector('text=1 sur 17')
   await page.waitForSelector('text=Séance 1/1') // S1 = reprise : une seule sortie longue
   await page.waitForSelector('text=Sortie longue 8 km')
-  await page.waitForSelector('text=Allure semi')
+  // Panneau « Mes allures & zones » : replié par défaut, déplié au tap (constantes + 5 zones)
+  await page.waitForSelector('text=Mes allures & zones')
+  await page.click('text=Mes allures & zones')
+  await page.waitForSelector('text=VO2max')
+  await page.waitForSelector('text=Endurance fondamentale')
   await page.screenshot({ path: `${DIR}/40-plan.png` })
 
   // --- Navigation par flèches jusqu'à la semaine 14 (pic de volume)

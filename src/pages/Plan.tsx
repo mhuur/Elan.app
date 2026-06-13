@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, ChevronRight, Footprints, Zap } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Footprints, Zap } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { PageHeader } from '../components/ui'
 import WorkoutSheet from '../components/WorkoutSheet'
 import { DAY_NAMES, addDays, formatShortFr, toDateStr, todayStr } from '../lib/dates'
 import {
-  PLAN_ALLURES,
+  PLAN_METRICS,
+  PLAN_ZONES,
   PLAN_SEMI,
   TYPE_DIFFICULTY,
   TYPE_META,
@@ -124,6 +125,7 @@ export default function Plan() {
   const clampedCur = Math.min(weeks.length - 1, Math.max(0, cur))
   const [weekIdx, setWeekIdx] = useState(clampedCur)
   const [sheet, setSheet] = useState<PlanSeance | null>(null)
+  const [zonesOpen, setZonesOpen] = useState(false)
 
   const runDates = useMemo(() => new Set(logs.filter((l) => l.category === 'running').map((l) => l.date)), [logs])
   const validatedRefs = useMemo(() => new Set(logs.filter((l) => l.planRef).map((l) => l.planRef as string)), [logs])
@@ -220,17 +222,44 @@ export default function Plan() {
         ))}
       </div>
 
-      {/* Allures repères, en pied de page */}
-      <section className="mt-4 rounded-2xl bg-sage-50 px-4 py-3">
-        <p className="text-[11px] font-extrabold uppercase tracking-widest text-sage-600">Allures repères</p>
-        <div className="mt-2 space-y-1">
-          {PLAN_ALLURES.map((a) => (
-            <div key={a.label} className="flex items-baseline justify-between gap-3">
-              <span className="text-sm font-semibold text-ink-soft">{a.label}</span>
-              <span className="shrink-0 text-sm font-bold text-ink">{a.value}</span>
+      {/* Mes allures & zones — dépliable, calculé sur les données COROS */}
+      <section className="mt-4 overflow-hidden rounded-2xl bg-sage-50">
+        <button
+          type="button"
+          onClick={() => setZonesOpen((o) => !o)}
+          className="flex w-full items-center justify-between px-4 py-3 active:bg-sage-100/50"
+        >
+          <span className="text-[11px] font-extrabold uppercase tracking-widest text-sage-600">Mes allures &amp; zones</span>
+          <ChevronDown className={'h-4 w-4 text-sage-600 transition-transform ' + (zonesOpen ? 'rotate-180' : '')} />
+        </button>
+        {zonesOpen && (
+          <div className="px-4 pb-3.5">
+            <div className="grid grid-cols-3 gap-2 border-t border-sage-200/70 pt-3">
+              <Metric label="VO2max" value={String(PLAN_METRICS.vo2max)} />
+              <Metric label="FC max" value={String(PLAN_METRICS.fcMax)} unit="bpm" />
+              <Metric label="FC repos" value={String(PLAN_METRICS.fcRest)} unit="bpm" />
             </div>
-          ))}
-        </div>
+            <div className="mt-3.5 flex items-center gap-2.5">
+              <span className="h-2.5 w-2.5 shrink-0" />
+              <span className="flex-1 text-[10px] font-bold uppercase tracking-wide text-ink-soft/60">Zone</span>
+              <span className="text-[10px] font-bold uppercase tracking-wide text-ink-soft/60">Allure /km</span>
+              <span className="w-12 text-right text-[10px] font-bold uppercase tracking-wide text-ink-soft/60">FC</span>
+            </div>
+            <div className="mt-1.5 space-y-2">
+              {PLAN_ZONES.map((z) => (
+                <div key={z.label} className="flex items-center gap-2.5">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: z.hex }} />
+                  <span className="flex-1 truncate text-sm font-semibold text-ink-soft">{z.label}</span>
+                  <span className="shrink-0 text-sm font-bold tabular-nums text-ink">{z.pace}</span>
+                  <span className="w-12 shrink-0 text-right text-xs font-bold tabular-nums text-ink-soft">{z.hr}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[11px] leading-snug text-ink-soft/80">
+              Calculé sur tes données COROS (méthode Réserve FC). FC max estimée — à confirmer par un test à bloc.
+            </p>
+          </div>
+        )}
       </section>
 
       <WorkoutSheet

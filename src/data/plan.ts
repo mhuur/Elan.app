@@ -68,18 +68,30 @@ export interface PlanWeek {
   seances: PlanSeance[]
 }
 
-export interface PlanAllure {
-  label: string
-  value: string
+/**
+ * Repères physio déterminés sur les données COROS (tout l'historique pour la FC max, forme
+ * récente pour le reste). FC max = réglage COROS, à confirmer par un test à bloc.
+ * Mis à jour à chaque re-analyse COROS (l'app ne lit pas COROS en direct — CORS).
+ */
+export const PLAN_METRICS = {
+  vo2max: 49,
+  fcMax: 186,
+  fcRest: 52,
 }
 
-/** Allures repères, calibrées sur tes données COROS (seuil 5:24) et l'objectif (5:13) */
-export const PLAN_ALLURES: PlanAllure[] = [
-  { label: 'Endurance fondamentale (EF)', value: '6:20 – 6:40 /km' },
-  { label: 'Sortie longue', value: '6:20 – 6:40 /km' },
-  { label: 'Seuil (tempo)', value: '5:18 → 5:05 /km' },
-  { label: 'Allure semi (objectif)', value: '5:08 – 5:13 /km' },
-  { label: 'VMA (intervalles)', value: '4:35 – 4:50 /km' },
+/** Zones d'entraînement (méthode Réserve FC / Karvonen, comme la montre) : allure + FC */
+export interface PlanZone {
+  label: string
+  pace: string
+  hr: string
+  hex: string
+}
+export const PLAN_ZONES: PlanZone[] = [
+  { label: 'Endurance fondamentale', pace: '6:20–6:40', hr: '138–153', hex: '#5f8862' },
+  { label: 'Endurance active', pace: '5:55–6:10', hr: '153–160', hex: '#5b89ad' },
+  { label: 'Seuil', pace: '5:18→5:05', hr: '165–170', hex: '#c2773e' },
+  { label: 'Allure semi (cible)', pace: '5:08–5:13', hr: '163–170', hex: '#d4541c' },
+  { label: 'VMA', pace: '4:35–4:50', hr: '175–186', hex: '#cf6151' },
 ]
 
 // ----- Allures & FC de référence -----
