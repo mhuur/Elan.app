@@ -205,8 +205,8 @@ export const PLAN_SEMI = {
   raceDate: '2026-10-04',
   goal: '1h50 · 5:13/km',
   weeks: [
-    { start: '2026-06-08', phase: 'Fondation', label: 'reprise', km: 7, seances: [
-      mk(6, 'sl', 'Sortie longue 7 km', '7 km en EF · reprise en douceur', longRun(7, 'démarrage du plan, tout en aisance')),
+    { start: '2026-06-08', phase: 'Fondation', label: 'reprise', km: 8, seances: [
+      mk(6, 'sl', 'Sortie longue 8 km', '8 km en EF · reprise en douceur', longRun(8, 'démarrage du plan, tout en aisance')),
     ] },
     { start: '2026-06-15', phase: 'Fondation', km: 26, seances: [
       mk(1, 'ef', 'Footing 6 km', '6 km en EF · 5 lignes droites', footing(6, 5)),

@@ -27,7 +27,7 @@ try {
   await page.waitForSelector('text=Cette semaine') // S1 = reprise = la semaine en cours (départ 14 juin)
   await page.waitForSelector('text=1 sur 17')
   await page.waitForSelector('text=Séance 1/1') // S1 = reprise : une seule sortie longue
-  await page.waitForSelector('text=Sortie longue 7 km')
+  await page.waitForSelector('text=Sortie longue 8 km')
   await page.waitForSelector('text=Allure semi')
   await page.screenshot({ path: `${DIR}/40-plan.png` })
 
