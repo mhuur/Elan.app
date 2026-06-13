@@ -154,6 +154,20 @@ export const TYPE_LABEL: Record<PlanType, string> = {
 /** Difficulté ressentie 1–5 (éclairs affichés sur la carte) */
 export const TYPE_DIFFICULTY: Record<PlanType, number> = { ef: 1, sl: 2, seuil: 3, as: 4, vma: 4, course: 5 }
 
+/** Identité visuelle courte d'un type d'effort (libellé + couleur) pour différencier les séances dans le planning */
+export interface PlanTypeMeta {
+  short: string
+  hex: string
+}
+export const TYPE_META: Record<PlanType, PlanTypeMeta> = {
+  ef: { short: 'Footing', hex: '#5f8862' }, // endurance — vert sauge
+  sl: { short: 'Sortie longue', hex: '#5b89ad' }, // long & régulier — bleu
+  seuil: { short: 'Seuil', hex: '#c2773e' }, // tempo — ambre
+  as: { short: 'Allure semi', hex: '#d4541c' }, // spécifique — orange
+  vma: { short: 'Fractionné', hex: '#cf6151' }, // intervalles — corail
+  course: { short: 'Course', hex: '#8d6ba0' }, // jour J — violet
+}
+
 /** Allure « m:ss » → secondes par km */
 export function paceToSec(mmss: string): number {
   const [m, s] = mmss.split(':').map(Number)

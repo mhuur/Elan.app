@@ -90,7 +90,7 @@ try {
 
   // --- Planning : toucher un rond valide / dévalide la séance ce jour-là (lundi passé)
   await page.click('text=Planning')
-  await page.waitForSelector('text=Semaine type')
+  await page.waitForSelector('text=Cette semaine')
   await page.click('[aria-label="HIIT — Cardio express — Lundi"]')
   await page.waitForSelector('[aria-label="HIIT — Cardio express — Lundi"][aria-pressed="true"]')
   await shot('08-planning')

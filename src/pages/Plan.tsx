@@ -8,6 +8,7 @@ import {
   PLAN_ALLURES,
   PLAN_SEMI,
   TYPE_DIFFICULTY,
+  TYPE_META,
   currentWeekIndex,
   daysToRace,
   seanceDateStr,
@@ -87,11 +88,11 @@ function SeanceCard({
   const st = STATUS_META[status]
   const { sec, distM } = workoutStats(s.workout)
   const diff = TYPE_DIFFICULTY[s.type]
-  const tile = diff >= 4 ? 'bg-running/15 text-running' : diff === 3 ? 'bg-running/10 text-running' : 'bg-sage-100 text-sage-600'
+  const t = TYPE_META[s.type]
   return (
     <button type="button" onClick={onOpen} className="w-full rounded-2xl bg-surface text-left shadow-sm active:bg-sage-50/50">
       <div className="flex items-center gap-3 px-4 pt-3.5">
-        <span className={'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ' + tile}>
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: t.hex + '22', color: t.hex }}>
           <Footprints className="h-6 w-6" strokeWidth={2.25} />
         </span>
         <div className="min-w-0 flex-1">
@@ -102,6 +103,7 @@ function SeanceCard({
             </span>
           </div>
           <p className="mt-0.5 truncate text-base font-extrabold">{s.title}</p>
+          <p className="text-[11px] font-bold" style={{ color: t.hex }}>{t.short}</p>
         </div>
         <ChevronRight className="h-5 w-5 shrink-0 text-ink-soft/40" />
       </div>
