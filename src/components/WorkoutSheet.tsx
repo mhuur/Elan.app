@@ -120,34 +120,43 @@ const fmtPaceSec = (sec?: number) => (sec ? `${Math.floor(sec / 60)}:${String(se
 const activityLine = (a: Activity) =>
   `${a.distanceKm.toFixed(1)} km · ${Math.round(a.durationSec / 60)} min${a.paceSec ? ` · ${fmtPaceSec(a.paceSec)}` : ''}`
 
-/** Valider une séance du plan : la relier à une vraie sortie COROS, ou la cocher sans course */
+/** Valider une séance du plan : la relier à une vraie sortie COROS (ou non), en confirmant la date faite */
 function Validation({ title, planRef, plannedDate, onClose }: { title: string; planRef: string; plannedDate: string; onClose: () => void }) {
   const { activities, logs, addLog, removeLog } = useData()
-  const [picking, setPicking] = useState(false)
+  const [step, setStep] = useState<'idle' | 'picking' | 'confirm'>('idle')
+  const [chosen, setChosen] = useState<Activity | null>(null)
+  const [date, setDate] = useState(plannedDate)
   const existing = logs.find((l) => l.planRef === planRef)
   const assoc = existing?.activityId ? activities.find((a) => a.id === existing.activityId) : undefined
   const recent = activities.slice(0, 12)
 
-  const validate = (a?: Activity) => {
+  // Sélection d'une sortie (ou « sans sortie ») → on passe à la confirmation de date,
+  // pré-remplie avec la date de la sortie COROS (ou le jour prévu).
+  const pick = (a: Activity | null) => {
+    setChosen(a)
+    setDate(a?.date ?? plannedDate)
+    setStep('confirm')
+  }
+  const validate = () => {
     void addLog({
-      date: a?.date ?? plannedDate,
+      date,
       sessionId: '',
       sessionName: title,
       category: 'running',
       planRef,
-      ...(a ? { activityId: a.id } : {}),
-      ...(a
+      ...(chosen ? { activityId: chosen.id } : {}),
+      ...(chosen
         ? {
             metrics: [
-              { key: 'distance', label: 'Distance', unit: 'km', value: a.distanceKm },
-              { key: 'duration', label: 'Durée', unit: 'min', value: Math.round(a.durationSec / 60) },
+              { key: 'distance', label: 'Distance', unit: 'km', value: chosen.distanceKm },
+              { key: 'duration', label: 'Durée', unit: 'min', value: Math.round(chosen.durationSec / 60) },
             ],
           }
         : {}),
       note: '',
       createdAt: Date.now(),
     })
-    setPicking(false)
+    setStep('idle')
     onClose()
   }
 
@@ -156,7 +165,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
       <div className="flex items-center justify-between gap-3 rounded-2xl bg-sage-50 px-4 py-3">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-sm font-extrabold text-sage-700">
-            <Check className="h-4 w-4" strokeWidth={3} /> Séance validée
+            <Check className="h-4 w-4" strokeWidth={3} /> Validée le {formatShortFr(existing.date)}
           </p>
           {assoc && <p className="mt-0.5 truncate text-xs font-semibold text-ink-soft">{activityLine(assoc)}</p>}
         </div>
@@ -167,7 +176,38 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
     )
   }
 
-  if (picking) {
+  if (step === 'confirm') {
+    return (
+      <div className="space-y-3">
+        <p className="text-xs font-bold text-ink-soft">Quel jour as-tu fait cette séance ?</p>
+        {chosen && (
+          <div className="rounded-2xl border border-sand bg-surface px-4 py-2.5">
+            <p className="text-sm font-bold first-letter:uppercase">{formatShortFr(chosen.date)}</p>
+            <p className="text-xs font-semibold text-ink-soft">{activityLine(chosen)}</p>
+          </div>
+        )}
+        <input
+          type="date"
+          aria-label="Date de la séance"
+          value={date}
+          onChange={(e) => setDate(e.target.value || plannedDate)}
+          className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold text-ink outline-none focus:border-sage-400"
+        />
+        <button
+          type="button"
+          onClick={validate}
+          className="w-full rounded-2xl bg-sage-500 px-5 py-3.5 text-base font-extrabold text-white shadow-md shadow-sage-500/25 active:bg-sage-600"
+        >
+          Valider ✓
+        </button>
+        <button type="button" onClick={() => setStep('picking')} className="w-full py-1 text-center text-xs font-bold text-ink-soft">
+          Retour
+        </button>
+      </div>
+    )
+  }
+
+  if (step === 'picking') {
     return (
       <div className="space-y-2">
         <p className="text-xs font-bold text-ink-soft">Quelle sortie COROS correspond à cette séance ?</p>
@@ -180,7 +220,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
           <button
             key={a.id}
             type="button"
-            onClick={() => validate(a)}
+            onClick={() => pick(a)}
             className="flex w-full items-center justify-between gap-3 rounded-2xl border border-sand bg-surface px-4 py-2.5 text-left active:bg-sage-50"
           >
             <span className="text-sm font-bold first-letter:uppercase">{formatShortFr(a.date)}</span>
@@ -189,12 +229,12 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
         ))}
         <button
           type="button"
-          onClick={() => validate(undefined)}
+          onClick={() => pick(null)}
           className="w-full rounded-2xl bg-sage-100 px-4 py-2.5 text-sm font-bold text-sage-700 active:bg-sage-200"
         >
           Valider sans associer de sortie
         </button>
-        <button type="button" onClick={() => setPicking(false)} className="w-full py-1 text-center text-xs font-bold text-ink-soft">
+        <button type="button" onClick={() => setStep('idle')} className="w-full py-1 text-center text-xs font-bold text-ink-soft">
           Annuler
         </button>
       </div>
@@ -204,7 +244,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
   return (
     <button
       type="button"
-      onClick={() => setPicking(true)}
+      onClick={() => setStep('picking')}
       className="w-full rounded-2xl bg-sage-500 px-5 py-3.5 text-base font-extrabold text-white shadow-md shadow-sage-500/25 active:bg-sage-600"
     >
       Valider ma séance ✓

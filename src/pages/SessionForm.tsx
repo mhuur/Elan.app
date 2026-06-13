@@ -123,6 +123,9 @@ export default function SessionForm() {
   const [scheduleMode, setScheduleMode] = useState<'weekly' | 'interval'>(cycleOwner ? 'interval' : 'weekly')
   const [everyDays, setEveryDays] = useState(cycleOwner?.repeat?.everyDays ?? 2)
   const [startDate, setStartDate] = useState(cycleOwner?.repeat?.startDate ?? todayStr())
+  // Cadence du cycle d'alternance : « tous les X jours » ou sur des jours de semaine fixes
+  const [intervalKind, setIntervalKind] = useState<'every' | 'weekdays'>(cycleOwner?.repeat?.onDays?.length ? 'weekdays' : 'every')
+  const [onDays, setOnDays] = useState<number[]>(cycleOwner?.repeat?.onDays ?? [])
   // Rotation en cours d'édition : un tableau de « jours », chacun regroupant
   // les séances faites ensemble ce jour-là (selfKey = cette séance).
   const [steps, setSteps] = useState<string[][]>(() => (ownerSteps.length ? ownerSteps : [[selfKey]]))
@@ -187,6 +190,8 @@ export default function SessionForm() {
 
   const toggleDay = (d: number) =>
     setDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d].sort((a, b) => a - b)))
+  const toggleOnDay = (d: number) =>
+    setOnDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d].sort((a, b) => a - b)))
 
   /** Ajoute un exercice existant à la séance avec les réglages par défaut de la catégorie */
   const appendItem = (exId: string) => {
@@ -295,6 +300,7 @@ export default function SessionForm() {
           repeat: {
             everyDays: cycleOwner.repeat.everyDays,
             startDate: cycleOwner.repeat.startDate,
+            ...(cycleOwner.repeat.onDays?.length ? { onDays: cycleOwner.repeat.onDays } : {}),
             steps: rest.map((ids) => ({ ids })),
           },
         })
@@ -320,7 +326,14 @@ export default function SessionForm() {
       .filter((st) => st.length)
     const allIds = cleanSteps.flat()
     const ownerId = cleanSteps[0][0]
-    await updateSession(ownerId, { repeat: { everyDays, startDate, steps: cleanSteps.map((ids) => ({ ids })) } })
+    await updateSession(ownerId, {
+      repeat: {
+        everyDays,
+        startDate,
+        ...(intervalKind === 'weekdays' && onDays.length ? { onDays: [...onDays].sort((a, b) => a - b) } : {}),
+        steps: cleanSteps.map((ids) => ({ ids })),
+      },
+    })
     // Les membres sont pilotés par la rotation : ni repeat propre, ni jours fixes
     for (const mid of allIds) {
       if (mid === ownerId || mid === selfId) continue // la sauvegarde du formulaire nettoie déjà selfId
@@ -338,7 +351,12 @@ export default function SessionForm() {
       const kept = oSteps.map((st) => st.filter((x) => !allIds.includes(x))).filter((st) => st.length)
       if (kept.flat().length !== oSteps.flat().length) {
         await updateSession(s.id, {
-          repeat: { everyDays: s.repeat.everyDays, startDate: s.repeat.startDate, steps: kept.map((ids) => ({ ids })) },
+          repeat: {
+            everyDays: s.repeat.everyDays,
+            startDate: s.repeat.startDate,
+            ...(s.repeat.onDays?.length ? { onDays: s.repeat.onDays } : {}),
+            steps: kept.map((ids) => ({ ids })),
+          },
         })
       }
     }
@@ -456,12 +474,48 @@ export default function SessionForm() {
             </div>
           ) : (
             <div className="mt-3 space-y-3">
+              <Seg
+                options={[
+                  { value: 'every' as const, label: 'Tous les X jours' },
+                  { value: 'weekdays' as const, label: 'Jours de semaine' },
+                ]}
+                value={intervalKind}
+                onChange={setIntervalKind}
+              />
+              {intervalKind === 'every' ? (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm font-semibold text-ink-soft">
+                  <span>Tous les</span>
+                  <MiniNum value={everyDays} onChange={setEveryDays} min={1} max={30} />
+                  <span>jour{everyDays > 1 ? 's' : ''}</span>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex gap-1.5">
+                    {DAY_LETTER.map((letter, d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        title={DAY_NAMES[d]}
+                        onClick={() => toggleOnDay(d)}
+                        className={
+                          'h-10 flex-1 rounded-xl text-sm font-extrabold transition-colors ' +
+                          (onDays.includes(d) ? 'bg-sage-500 text-white shadow-sm' : 'bg-sage-100 text-sage-700')
+                        }
+                      >
+                        {letter}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-xs font-semibold text-ink-soft/70">
+                    L'alternance se pose sur ces jours — pratique pour éviter les jours de course.
+                  </p>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm font-semibold text-ink-soft">
-                <span>Tous les</span>
-                <MiniNum value={everyDays} onChange={setEveryDays} min={1} max={30} />
-                <span>jour{everyDays > 1 ? 's' : ''}, à partir du</span>
+                <span>À partir du</span>
                 <input
                   type="date"
+                  aria-label="Date de départ du cycle"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value || todayStr())}
                   className="rounded-lg border border-sand bg-surface px-2 py-1.5 text-xs font-bold text-ink outline-none focus:border-sage-400"

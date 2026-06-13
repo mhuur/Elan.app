@@ -109,11 +109,14 @@ function PlanRow({
   s,
   todayIdx,
   done,
+  doneCol,
   onOpen,
 }: {
   s: PlanSeance
   todayIdx: number
   done: boolean
+  /** Colonne où afficher le rond « fait » = jour réellement effectué (peut différer du jour prévu), -1 si pas fait */
+  doneCol: number
   onOpen: () => void
 }) {
   const t = TYPE_META[s.type]
@@ -131,24 +134,33 @@ function PlanRow({
           {t.short}
         </span>
       </button>
-      {Array.from({ length: 7 }, (_, d) => (
-        <button
-          key={d}
-          type="button"
-          aria-label={`${s.title} — ${DAY_NAMES[s.day]}`}
-          onClick={onOpen}
-          className={'flex h-10 items-center justify-center rounded-lg ' + (d === todayIdx ? 'bg-sage-50' : '')}
-        >
-          {d === s.day ? (
-            <span
-              className={'rounded-full transition-all ' + (done ? 'h-4 w-4 shadow-sm' : 'h-4 w-4 border-[3px] bg-surface')}
-              style={done ? { backgroundColor: t.hex } : { borderColor: t.hex }}
-            />
-          ) : (
-            <span className="h-2 w-2 rounded-full bg-sand" />
-          )}
-        </button>
-      ))}
+      {Array.from({ length: 7 }, (_, d) => {
+        // Rond plein le jour réellement fait ; anneau « prévu » le jour du plan (pâli si la
+        // séance a été faite un autre jour) ; petit point sable ailleurs.
+        const isDone = done && d === doneCol
+        const isPlanned = d === s.day
+        const plannedMoved = done && isPlanned && doneCol !== s.day
+        return (
+          <button
+            key={d}
+            type="button"
+            aria-label={`${s.title} — ${DAY_NAMES[s.day]}`}
+            onClick={onOpen}
+            className={'flex h-10 items-center justify-center rounded-lg ' + (d === todayIdx ? 'bg-sage-50' : '')}
+          >
+            {isDone ? (
+              <span className="h-4 w-4 rounded-full shadow-sm transition-all" style={{ backgroundColor: t.hex }} />
+            ) : isPlanned ? (
+              <span
+                className={'h-4 w-4 rounded-full border-[3px] bg-surface transition-all ' + (plannedMoved ? 'opacity-40' : '')}
+                style={{ borderColor: t.hex }}
+              />
+            ) : (
+              <span className="h-2 w-2 rounded-full bg-sand" />
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -239,7 +251,6 @@ export default function Planning() {
   )
   const showStartHint = !planWeek && weekDates[0] < firstStart
   const runDates = useMemo(() => new Set(logs.filter((l) => l.category === 'running').map((l) => l.date)), [logs])
-  const validatedRefs = useMemo(() => new Set(logs.filter((l) => l.planRef).map((l) => l.planRef as string)), [logs])
   const [sheet, setSheet] = useState<PlanSeance | null>(null)
 
   // Sections personnalisées (Session.group) : ordre d'apparition, « Autres » à la fin
@@ -465,8 +476,22 @@ export default function Planning() {
                       {isRun &&
                         planWeek.seances.map((s) => {
                           const date = seanceDateStr(planWeek, s)
-                          const done = validatedRefs.has('elan-' + date) || runDates.has(date)
-                          return <PlanRow key={'plan-' + s.day} s={s} todayIdx={todayIdx} done={done} onOpen={() => setSheet(s)} />
+                          // La séance peut avoir été faite un autre jour : le rond « fait » suit la date du log
+                          const planLog = logs.find((l) => l.planRef === 'elan-' + date)
+                          const done = !!planLog || runDates.has(date)
+                          const doneDate = planLog?.date ?? date
+                          const inWeek = weekDates.indexOf(doneDate)
+                          const doneCol = !done ? -1 : inWeek >= 0 ? inWeek : s.day
+                          return (
+                            <PlanRow
+                              key={'plan-' + s.day}
+                              s={s}
+                              todayIdx={todayIdx}
+                              done={done}
+                              doneCol={doneCol}
+                              onOpen={() => setSheet(s)}
+                            />
+                          )
                         })}
                       <SortableContext items={list.map((s) => s.id)} strategy={verticalListSortingStrategy}>
                         {list.map((s) => (

@@ -97,9 +97,11 @@ function Inner({ log, onClose }: { log: Log; onClose: () => void }) {
     Object.fromEntries((log.metrics ?? []).map((m) => [m.key, m.value])),
   )
   const [note, setNote] = useState(log.note ?? '')
+  // Date à laquelle la séance a été faite — éditable (ex. validée un autre jour que prévu)
+  const [logDate, setLogDate] = useState(log.date)
 
   const save = async () => {
-    const patch: Partial<Log> = { note: note.trim() }
+    const patch: Partial<Log> = { note: note.trim(), date: logDate }
     if (log.metrics?.length) {
       patch.metrics = log.metrics.map((m) => ({ ...m, value: mvals[m.key] ?? m.value }))
     }
@@ -132,10 +134,21 @@ function Inner({ log, onClose }: { log: Log; onClose: () => void }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm font-semibold text-ink-soft">
-        Faite le {shortFr(log.date)} · enregistrée à{' '}
-        {new Date(log.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <label className="flex items-center gap-2 text-sm font-semibold text-ink-soft">
+          Faite le
+          <input
+            type="date"
+            aria-label="Date de la séance"
+            value={logDate}
+            onChange={(e) => setLogDate(e.target.value || log.date)}
+            className="rounded-lg border border-sand bg-surface px-2 py-1 text-sm font-bold text-ink outline-none focus:border-sage-400"
+          />
+        </label>
+        <span className="shrink-0 text-xs font-semibold text-ink-soft/70">
+          enregistrée à {new Date(log.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+        </span>
+      </div>
 
       {hasTimeline && timeline.length > 0 && (
         <>

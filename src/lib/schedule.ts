@@ -9,6 +9,23 @@ export function diffDays(fromStr: string, toStr: string): number {
 }
 
 /**
+ * Nombre de jours de [startStr, endStr) (départ inclus, fin exclue) dont le jour de
+ * semaine appartient à `days` — sert d'indice d'occurrence pour une rotation posée sur
+ * des jours de semaine fixes (ex. lun/jeu/sam).
+ */
+function countWeekdays(startStr: string, endStr: string, days: number[]): number {
+  const n = diffDays(startStr, endStr)
+  if (n <= 0) return 0
+  const startWd = mondayIndex(new Date(startStr + 'T12:00:00'))
+  let total = 0
+  for (const w of days) {
+    const off = (w - startWd + 7) % 7
+    if (off < n) total += Math.floor((n - 1 - off) / 7) + 1
+  }
+  return total
+}
+
+/**
  * Étapes de rotation d'une séance propriétaire : chaque étape = les séances
  * d'un même jour. Gère les anciens formats (`alternates` / `alternateWith`),
  * où chaque séance constituait sa propre étape.
@@ -72,9 +89,17 @@ export function plannedSessionIdsOn(date: Date, sessions: Session[]): Set<string
   for (const [ownerId, steps] of cycles) {
     const owner = sessions.find((x) => x.id === ownerId)
     if (!owner?.repeat) continue
-    const diff = diffDays(owner.repeat.startDate, dStr)
-    if (diff < 0 || diff % owner.repeat.everyDays !== 0) continue
-    const occurrence = diff / owner.repeat.everyDays
+    const r = owner.repeat
+    let occurrence: number
+    if (r.onDays && r.onDays.length) {
+      // Cycle posé sur des jours de semaine choisis : occurrence = nb de ces jours déjà passés
+      if (!r.onDays.includes(dayIdx) || diffDays(r.startDate, dStr) < 0) continue
+      occurrence = countWeekdays(r.startDate, dStr, r.onDays)
+    } else {
+      const diff = diffDays(r.startDate, dStr)
+      if (diff < 0 || diff % r.everyDays !== 0) continue
+      occurrence = diff / r.everyDays
+    }
     for (const id of steps[occurrence % steps.length]) ids.add(id)
   }
   for (const s of sessions) {
@@ -88,8 +113,14 @@ export function describeSchedule(s: Session, all: Session[]): string {
   const nameOf = (id: string) => all.find((x) => x.id === id)?.name ?? '?'
   const owner = ownerOf(s.id, all)
   if (owner?.repeat) {
+    const r = owner.repeat
     const steps = canonicalCycles(all).get(owner.id) ?? []
-    const base = owner.repeat.everyDays === 1 ? 'Tous les jours' : `Tous les ${owner.repeat.everyDays} jours`
+    const base =
+      r.onDays && r.onDays.length
+        ? r.onDays.slice().sort((a, b) => a - b).map((d) => DAY_SHORT[d]).join(' · ')
+        : r.everyDays === 1
+          ? 'Tous les jours'
+          : `Tous les ${r.everyDays} jours`
     const myStep = steps.find((st) => st.includes(s.id)) ?? []
     const sameDay = myStep.filter((id) => id !== s.id).map(nameOf)
     const others = steps.filter((st) => st !== myStep).map((st) => st.map(nameOf).join(' + '))

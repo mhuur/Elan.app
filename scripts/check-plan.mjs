@@ -46,10 +46,12 @@ try {
   await page.waitForSelector('[role="dialog"] >> text=Récupération')
   await page.screenshot({ path: `${DIR}/42-plan-seance.png` })
 
-  // --- Validation manuelle : « Valider ma séance » → sans course → la séance passe en « Validée »
+  // --- Validation manuelle : « Valider ma séance » → sans course → confirmer la date → « Validée »
   await page.click('[role="dialog"] >> text=Valider ma séance')
   await page.waitForSelector('text=Quelle sortie COROS')
   await page.click('text=Valider sans associer de sortie')
+  await page.waitForSelector('text=Quel jour as-tu fait cette séance')
+  await page.click('[role="dialog"] >> text=Valider ✓')
   await page.waitForSelector('[role="dialog"]', { state: 'detached' })
   await page.waitForSelector('text=Validée')
   await page.screenshot({ path: `${DIR}/43-plan-validee.png` })

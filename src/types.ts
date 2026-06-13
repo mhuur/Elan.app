@@ -117,6 +117,12 @@ export interface Repeat {
   /** Date de départ YYYY-MM-DD */
   startDate: string
   /**
+   * Jours de semaine (0 = lundi … 6 = dimanche) où poser le cycle. Si défini et non
+   * vide, l'alternance se fait sur CES jours (et `everyDays` est ignoré) — utile pour
+   * caser des séances uniquement les jours libres (ex. lun/jeu/sam, hors jours de course).
+   */
+  onDays?: number[]
+  /**
    * Rotation par jours : chaque étape regroupe les séances faites le même jour
    * (ex. [[Pompes, Abdos], [Jambes, Dos]] = jour A puis jour B, et on recommence).
    * Pas de tableaux imbriqués dans Firestore → tableau d'objets `{ ids }`.
