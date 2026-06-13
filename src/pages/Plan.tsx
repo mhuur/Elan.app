@@ -239,24 +239,24 @@ export default function Plan() {
               <Metric label="FC max" value={String(PLAN_METRICS.fcMax)} unit="bpm" />
               <Metric label="FC repos" value={String(PLAN_METRICS.fcRest)} unit="bpm" />
             </div>
-            <div className="mt-3.5 flex items-center gap-2.5">
+            <div className="mt-3.5 flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 shrink-0" />
               <span className="flex-1 text-[10px] font-bold uppercase tracking-wide text-ink-soft/60">Zone</span>
-              <span className="text-[10px] font-bold uppercase tracking-wide text-ink-soft/60">Allure /km</span>
-              <span className="w-12 text-right text-[10px] font-bold uppercase tracking-wide text-ink-soft/60">FC</span>
+              <span className="w-[4.5rem] text-right text-[10px] font-bold uppercase tracking-wide text-ink-soft/60">Allure</span>
+              <span className="w-14 text-right text-[10px] font-bold uppercase tracking-wide text-ink-soft/60">FC bpm</span>
             </div>
             <div className="mt-1.5 space-y-2">
               {PLAN_ZONES.map((z) => (
-                <div key={z.label} className="flex items-center gap-2.5">
+                <div key={z.label} className="flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: z.hex }} />
                   <span className="flex-1 truncate text-sm font-semibold text-ink-soft">{z.label}</span>
-                  <span className="shrink-0 text-sm font-bold tabular-nums text-ink">{z.pace}</span>
-                  <span className="w-12 shrink-0 text-right text-xs font-bold tabular-nums text-ink-soft">{z.hr}</span>
+                  <span className="w-[4.5rem] shrink-0 whitespace-nowrap text-right text-sm font-bold tabular-nums text-ink">{z.pace}</span>
+                  <span className="w-14 shrink-0 whitespace-nowrap text-right text-xs font-bold tabular-nums text-ink-soft">{z.hr}</span>
                 </div>
               ))}
             </div>
             <p className="mt-3 text-[11px] leading-snug text-ink-soft/80">
-              Calculé sur tes données COROS (méthode Réserve FC). FC max estimée — à confirmer par un test à bloc.
+              Zones contiguës (Réserve FC) : toute allure a sa zone. VMA = plus rapide que l'allure semi, fractions visées 4:35–4:50. FC max confirmée (pic réel 183 bpm).
             </p>
           </div>
         )}

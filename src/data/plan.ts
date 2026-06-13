@@ -86,12 +86,13 @@ export interface PlanZone {
   hr: string
   hex: string
 }
+// Zones contiguës (méthode Réserve FC) : les bornes se touchent, toute allure a sa zone.
 export const PLAN_ZONES: PlanZone[] = [
-  { label: 'Endurance fondamentale', pace: '5:45–6:05', hr: '140–150', hex: '#5f8862' },
-  { label: 'Endurance active', pace: '5:30–5:40', hr: '152–162', hex: '#5b89ad' },
-  { label: 'Seuil', pace: '5:20→5:08', hr: '165–170', hex: '#c2773e' },
-  { label: 'Allure semi (cible)', pace: '5:08–5:13', hr: '163–170', hex: '#d4541c' },
-  { label: 'VMA', pace: '4:35–4:50', hr: '175–186', hex: '#cf6151' },
+  { label: 'Endurance fondamentale', pace: '5:45–6:05', hr: '140–152', hex: '#5f8862' },
+  { label: 'Endurance active', pace: '5:25–5:45', hr: '152–162', hex: '#5b89ad' },
+  { label: 'Seuil', pace: '5:13–5:25', hr: '162–170', hex: '#c2773e' },
+  { label: 'Allure semi (cible)', pace: '5:08–5:13', hr: '170–173', hex: '#d4541c' },
+  { label: 'VMA', pace: '4:35–5:08', hr: '173–186', hex: '#cf6151' },
 ]
 
 // ----- Allures & FC de référence -----
