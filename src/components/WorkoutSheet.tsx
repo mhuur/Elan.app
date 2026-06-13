@@ -154,14 +154,6 @@ export default function WorkoutSheet({
               <Part key={i} part={part} />
             ))}
           </div>
-          <button
-            type="button"
-            disabled
-            title="Disponible bientôt : synchro via TrainingPeaks → COROS"
-            className="mt-2 w-full rounded-2xl bg-sage-100 px-5 py-3.5 text-base font-bold text-sage-700 opacity-60"
-          >
-            Exporter vers COROS · TrainingPeaks <span className="font-semibold text-ink-soft">(bientôt)</span>
-          </button>
         </div>
       )}
     </Sheet>
