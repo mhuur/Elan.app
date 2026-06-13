@@ -41,24 +41,36 @@ const drag = async (handleSel, destY) => {
   await page.waitForTimeout(250)
 }
 
-// Depuis la semaine en cours (avant le départ du plan), saute à la 1re semaine du plan
+// Le plan a démarré cette semaine (S1 = reprise, une seule sortie longue) ; la semaine des
+// footings (ex-S1, « 15 juin ») est donc la suivante.
 const gotoPlanWeek = async () => {
-  await page.click('button:has-text("Le plan semi démarre")')
+  await page.click('[aria-label="Semaine suivante"]')
   await page.waitForSelector('h2:has-text("Running")')
+  await page.waitForSelector('text=Footing 6 km')
 }
 
 try {
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
-  // === 1) Semaine en cours : navigateur + dates, AUCUNE séance du plan (le plan démarre lundi) ===
+  // === 1) Le plan a démarré cette semaine (S1 = reprise) : la sortie longue s'affiche sur la
+  //        semaine en cours ; la semaine d'AVANT montre encore l'indice « démarre » ===
   await page.getByRole('link', { name: 'Planning', exact: true }).click()
   await page.waitForSelector('text=Cette semaine')
-  await page.waitForSelector('button:has-text("Le plan semi démarre")')
+  await page.waitForSelector('h2:has-text("Running")')
+  await page.waitForSelector('text=Sortie longue') // séance de reprise du dimanche 14
   if ((await page.locator('text=Footing 6 km').count()) > 0) {
-    throw new Error('Le plan ne devrait pas apparaître sur la semaine en cours (illusion de retard)')
+    throw new Error('Les footings de la semaine suivante ne devraient pas apparaître sur la semaine en cours')
   }
   await page.screenshot({ path: `${DIR}/44-planning-cette-semaine.png`, fullPage: true })
+  // Semaine précédente : avant le départ du plan, l'indice « démarre » et aucune séance du plan
+  await page.click('[aria-label="Semaine précédente"]')
+  await page.waitForSelector('button:has-text("Le plan semi démarre")')
+  if ((await page.locator('text=Footing 6 km').count()) > 0) {
+    throw new Error('Le plan ne devrait pas apparaître avant son départ')
+  }
+  await page.click('[aria-label="Semaine suivante"]') // revenir sur la semaine en cours
+  await page.waitForSelector('text=Cette semaine')
 
   // === 2) Navigation vers la semaine du plan : dates + section « Running » alignée ===
   await gotoPlanWeek()

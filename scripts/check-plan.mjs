@@ -1,4 +1,4 @@
-// Vérifie la page Plan (semi 16 semaines) en vue semaine par semaine : navigation par
+// Vérifie la page Plan (semi 17 semaines, S1 = reprise) en vue semaine par semaine : navigation par
 // flèches, aperçu hebdo, cartes de séance, et viewer type Campus à l'ouverture d'une séance.
 // Prérequis : `npm run dev:demo` lancé.
 import { chromium } from 'playwright'
@@ -24,17 +24,18 @@ try {
   await page.getByRole('link', { name: 'Plan', exact: true }).click()
   await page.waitForSelector('text=Tout Rennes Court')
   await page.waitForSelector('text=Ton aperçu hebdomadaire')
-  await page.waitForSelector('text=Semaine 1')
-  await page.waitForSelector('text=1 sur 16')
-  await page.waitForSelector('text=Séance 1/4')
+  await page.waitForSelector('text=Cette semaine') // S1 = reprise = la semaine en cours (départ 14 juin)
+  await page.waitForSelector('text=1 sur 17')
+  await page.waitForSelector('text=Séance 1/1') // S1 = reprise : une seule sortie longue
+  await page.waitForSelector('text=Sortie longue 7 km')
   await page.waitForSelector('text=Allure semi')
   await page.screenshot({ path: `${DIR}/40-plan.png` })
 
-  // --- Navigation par flèches jusqu'à la semaine 13 (pic de volume)
-  for (let i = 0; i < 12; i++) {
+  // --- Navigation par flèches jusqu'à la semaine 14 (pic de volume)
+  for (let i = 0; i < 13; i++) {
     await page.click('[aria-label="Semaine suivante"]')
   }
-  await page.waitForSelector('text=Semaine 13')
+  await page.waitForSelector('text=Semaine 14')
   await page.waitForSelector('text=pic de volume')
   await page.waitForSelector('text=VMA 4×1200 m')
 
@@ -60,7 +61,7 @@ try {
   for (let i = 0; i < 3; i++) {
     await page.click('[aria-label="Semaine suivante"]')
   }
-  await page.waitForSelector('text=Semaine 16')
+  await page.waitForSelector('text=Semaine 17')
   await page.waitForSelector('text=Semi-marathon — 21,1 km')
   await page.screenshot({ path: `${DIR}/41-plan-course.png` })
 

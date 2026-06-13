@@ -21,11 +21,13 @@ try {
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
-  // Aller sur la semaine du plan
+  // Aller sur la semaine du 15 juin (le plan a démarré cette semaine-ci avec la S1 de reprise,
+  // la semaine des footings est donc la suivante)
   await page.getByRole('link', { name: 'Planning', exact: true }).click()
   await page.waitForSelector('text=Cette semaine')
-  await page.click('button:has-text("Le plan semi démarre")')
+  await page.click('[aria-label="Semaine suivante"]')
   await page.waitForSelector('h2:has-text("Running")')
+  await page.waitForSelector('text=Footing 5 km')
 
   // Ouvrir « Footing 5 km » (mercredi 17) et valider SANS sortie, sur le lundi 15
   await page.click('text=Footing 5 km')
