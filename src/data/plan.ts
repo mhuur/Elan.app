@@ -87,17 +87,17 @@ export interface PlanZone {
   hex: string
 }
 export const PLAN_ZONES: PlanZone[] = [
-  { label: 'Endurance fondamentale', pace: '6:20–6:40', hr: '138–153', hex: '#5f8862' },
-  { label: 'Endurance active', pace: '5:55–6:10', hr: '153–160', hex: '#5b89ad' },
+  { label: 'Endurance fondamentale', pace: '5:45–6:05', hr: '140–150', hex: '#5f8862' },
+  { label: 'Endurance active', pace: '5:30–5:40', hr: '152–162', hex: '#5b89ad' },
   { label: 'Seuil', pace: '5:18→5:05', hr: '165–170', hex: '#c2773e' },
   { label: 'Allure semi (cible)', pace: '5:08–5:13', hr: '163–170', hex: '#d4541c' },
   { label: 'VMA', pace: '4:35–4:50', hr: '175–186', hex: '#cf6151' },
 ]
 
 // ----- Allures & FC de référence -----
-const EF: Pace = { from: '6:20', to: '6:40' }
-const EA: Pace = { from: '5:55', to: '6:10' }
-const HR = { ef: '138–153', ea: '153–160', seuil: '165–170', as: '163–170', vma: '175–186' }
+const EF: Pace = { from: '5:45', to: '6:05' }
+const EA: Pace = { from: '5:30', to: '5:40' }
+const HR = { ef: '140–150', ea: '152–162', seuil: '165–170', as: '163–170', vma: '175–186' }
 const p = (s: string): Pace => ({ from: s })
 
 // ----- Briques de construction des séances -----
