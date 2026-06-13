@@ -14,6 +14,7 @@
 import { createServer } from 'vite'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline/promises'
+import { loadCreds } from './intervals-creds.mjs'
 
 // Charge le plan (TypeScript) via Vite pour garder une source unique avec l'app
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -36,10 +37,12 @@ const CLEAR = has('--clear')
 const onlyWeek = valOf('--week') ? Number(valOf('--week')) : undefined
 
 const API = 'https://intervals.icu/api/v1'
-// Identifiants : variables d'environnement OU demandés à l'écran au moment de l'envoi
-let KEY = process.env.INTERVALS_API_KEY
-let ATHLETE = process.env.INTERVALS_ATHLETE_ID
+// Identifiants : env, sinon fichier (« user + API.txt »…), sinon demandés à l'écran
+const creds = loadCreds()
+let KEY = creds.key
+let ATHLETE = creds.athleteId
 let auth = null
+if (creds.file) console.log(`Identifiants lus depuis « ${creds.file} »`)
 
 async function ask(question) {
   const rl = createInterface({ input: process.stdin, output: process.stdout })
@@ -145,5 +148,5 @@ if (PUSH) {
   }
   console.log(`\n${ok}/${events.length} séance(s) envoyée(s) sur intervals.icu.`)
 } else {
-  console.log('— DRY-RUN terminé. Ajoute --push pour envoyer (avec INTERVALS_API_KEY + INTERVALS_ATHLETE_ID).')
+  console.log('— DRY-RUN terminé. Ajoute --push pour envoyer (identifiants lus depuis le fichier, l’env, ou demandés à l’écran).')
 }

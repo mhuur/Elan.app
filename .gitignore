@@ -7,3 +7,11 @@ screenshots
 .env
 .firebase
 firebase-debug.log
+
+# Identifiants intervals.icu (clé API + Athlete ID) — NE JAMAIS committer
+user + API.txt
+user+API.txt
+intervals.txt
+intervals*.local.txt
+*credentials*.txt
+identifiants*.txt

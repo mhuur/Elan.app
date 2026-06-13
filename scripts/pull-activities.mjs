@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
+import { loadCreds } from './intervals-creds.mjs'
 
 const PROJECT = 'routine-sport-ca440'
 const CLIENT_ID = '563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com'
@@ -28,8 +29,11 @@ const ask = async (q) => {
 }
 
 // ---- intervals.icu ----
-let KEY = process.env.INTERVALS_API_KEY
-let ATHLETE = process.env.INTERVALS_ATHLETE_ID
+// Identifiants : env, sinon fichier (« user + API.txt »…), sinon demandés à l'écran
+const creds = loadCreds()
+let KEY = creds.key
+let ATHLETE = creds.athleteId
+if (creds.file) console.log(`Identifiants lus depuis « ${creds.file} »`)
 if (!KEY) KEY = await ask('🔑 Colle ta clé API intervals.icu puis Entrée : ')
 if (!ATHLETE) ATHLETE = await ask('🏃 Ton Athlete ID (ex. i123456) puis Entrée : ')
 const ivAuth = 'Basic ' + Buffer.from('API_KEY:' + KEY).toString('base64')
