@@ -45,8 +45,14 @@ try {
   await page.waitForSelector('[role="dialog"] >> text=4:48')
   await page.waitForSelector('[role="dialog"] >> text=Récupération')
   await page.screenshot({ path: `${DIR}/42-plan-seance.png` })
-  await page.mouse.click(195, 30) // clic sur le fond pour fermer la feuille
+
+  // --- Validation manuelle : « Valider ma séance » → sans course → la séance passe en « Validée »
+  await page.click('[role="dialog"] >> text=Valider ma séance')
+  await page.waitForSelector('text=Quelle sortie COROS')
+  await page.click('text=Valider sans associer de sortie')
   await page.waitForSelector('[role="dialog"]', { state: 'detached' })
+  await page.waitForSelector('text=Validée')
+  await page.screenshot({ path: `${DIR}/43-plan-validee.png` })
 
   // --- Dernière semaine : le semi est bien là
   for (let i = 0; i < 3; i++) {

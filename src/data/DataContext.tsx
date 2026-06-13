@@ -17,7 +17,7 @@ import {
   type User,
 } from 'firebase/auth'
 import { auth, db, firebaseEnabled } from '../firebase'
-import type { Exercise, Idea, Log, Session } from '../types'
+import type { Activity, Exercise, Idea, Log, Session } from '../types'
 import { FirestoreStore, LocalStore, type Store, type StoreData } from './store'
 import { runSeed, SUBTYPE_BY_NAME } from './seed'
 
@@ -30,6 +30,8 @@ interface DataCtx {
   sessions: Session[]
   logs: Log[]
   ideas: Idea[]
+  /** Courses réelles importées de COROS via intervals.icu (collection en lecture seule côté app) */
+  activities: Activity[]
   addExercise(e: Omit<Exercise, 'id'>): Promise<string>
   updateExercise(id: string, patch: Partial<Exercise>): Promise<void>
   removeExercise(id: string): Promise<void>
@@ -66,6 +68,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<Session[]>([])
   const [logs, setLogs] = useState<Log[]>([])
   const [ideas, setIdeas] = useState<Idea[]>([])
+  const [activities, setActivities] = useState<Activity[]>([])
   const [dataReady, setDataReady] = useState(false)
   const seedCheckedRef = useRef(false)
   const migCheckedRef = useRef(false)
@@ -89,6 +92,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setExercises([])
       setSessions([])
       setLogs([])
+      setActivities([])
       return
     }
     const flags = { exercises: false, sessions: false, logs: false }
@@ -124,11 +128,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const u4 = store.subscribe('ideas', (d) => {
       setIdeas((d as unknown as Idea[]).slice().sort((a, b) => b.createdAt - a.createdAt))
     })
+    // Les courses importées (intervals.icu) ne conditionnent pas dataReady non plus
+    const u5 = store.subscribe('activities', (d) => {
+      setActivities((d as unknown as Activity[]).slice().sort((a, b) => b.date.localeCompare(a.date)))
+    })
     return () => {
       u1()
       u2()
       u3()
       u4()
+      u5()
       setDataReady(false)
     }
   }, [store])
@@ -173,6 +182,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       sessions,
       logs,
       ideas,
+      activities,
       addExercise: (e) => need().add('exercises', e as unknown as Record<string, unknown>),
       updateExercise: (id, patch) => need().update('exercises', id, patch as Record<string, unknown>),
       removeExercise: async (id) => {
@@ -218,7 +228,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       exportAll: () => need().exportAll(),
       importAll: (data) => need().importAll(data),
     }),
-    [mode, user, authReady, dataReady, exercises, sessions, logs, ideas, need],
+    [mode, user, authReady, dataReady, exercises, sessions, logs, ideas, activities, need],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

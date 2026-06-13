@@ -1,7 +1,10 @@
-import { Repeat, Route, Footprints } from 'lucide-react'
+import { useState } from 'react'
+import { Check, Repeat, Route, Footprints } from 'lucide-react'
 import { Sheet } from './ui'
-import { DAY_NAMES } from '../lib/dates'
+import { useData } from '../data/DataContext'
+import { DAY_NAMES, formatShortFr } from '../lib/dates'
 import { isRepeat, stepSeconds, workoutStats, type PlanSeance, type Pace, type WorkoutStep, type WorkoutPart } from '../data/plan'
+import type { Activity } from '../types'
 
 // Couleurs façon COROS Campus : échauffement/EF vert, travail orange, récup rose
 const KIND: Record<WorkoutStep['kind'], { bar: string; border: string; label: string }> = {
@@ -113,13 +116,113 @@ function summary(parts: WorkoutPart[]): string {
   return `≈ ${Math.round(distM / 100) / 10} km · ${Math.round(sec / 60)} min`
 }
 
+const fmtPaceSec = (sec?: number) => (sec ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}/km` : '')
+const activityLine = (a: Activity) =>
+  `${a.distanceKm.toFixed(1)} km · ${Math.round(a.durationSec / 60)} min${a.paceSec ? ` · ${fmtPaceSec(a.paceSec)}` : ''}`
+
+/** Valider une séance du plan : la relier à une vraie sortie COROS, ou la cocher sans course */
+function Validation({ title, planRef, plannedDate, onClose }: { title: string; planRef: string; plannedDate: string; onClose: () => void }) {
+  const { activities, logs, addLog, removeLog } = useData()
+  const [picking, setPicking] = useState(false)
+  const existing = logs.find((l) => l.planRef === planRef)
+  const assoc = existing?.activityId ? activities.find((a) => a.id === existing.activityId) : undefined
+  const recent = activities.slice(0, 12)
+
+  const validate = (a?: Activity) => {
+    void addLog({
+      date: a?.date ?? plannedDate,
+      sessionId: '',
+      sessionName: title,
+      category: 'running',
+      planRef,
+      ...(a ? { activityId: a.id } : {}),
+      ...(a
+        ? {
+            metrics: [
+              { key: 'distance', label: 'Distance', unit: 'km', value: a.distanceKm },
+              { key: 'duration', label: 'Durée', unit: 'min', value: Math.round(a.durationSec / 60) },
+            ],
+          }
+        : {}),
+      note: '',
+      createdAt: Date.now(),
+    })
+    setPicking(false)
+    onClose()
+  }
+
+  if (existing) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-2xl bg-sage-50 px-4 py-3">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-sm font-extrabold text-sage-700">
+            <Check className="h-4 w-4" strokeWidth={3} /> Séance validée
+          </p>
+          {assoc && <p className="mt-0.5 truncate text-xs font-semibold text-ink-soft">{activityLine(assoc)}</p>}
+        </div>
+        <button type="button" onClick={() => void removeLog(existing.id)} className="shrink-0 text-xs font-bold text-hiit active:opacity-70">
+          Annuler
+        </button>
+      </div>
+    )
+  }
+
+  if (picking) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs font-bold text-ink-soft">Quelle sortie COROS correspond à cette séance ?</p>
+        {recent.length === 0 && (
+          <p className="rounded-xl bg-sand/60 px-3 py-2 text-xs font-semibold text-ink-soft">
+            Aucune course importée. Double-clique « recuperer-mes-courses » sur ton PC, puis reviens ici.
+          </p>
+        )}
+        {recent.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => validate(a)}
+            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-sand bg-surface px-4 py-2.5 text-left active:bg-sage-50"
+          >
+            <span className="text-sm font-bold first-letter:uppercase">{formatShortFr(a.date)}</span>
+            <span className="shrink-0 text-xs font-semibold text-ink-soft">{activityLine(a)}</span>
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => validate(undefined)}
+          className="w-full rounded-2xl bg-sage-100 px-4 py-2.5 text-sm font-bold text-sage-700 active:bg-sage-200"
+        >
+          Valider sans associer de sortie
+        </button>
+        <button type="button" onClick={() => setPicking(false)} className="w-full py-1 text-center text-xs font-bold text-ink-soft">
+          Annuler
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setPicking(true)}
+      className="w-full rounded-2xl bg-sage-500 px-5 py-3.5 text-base font-extrabold text-white shadow-md shadow-sage-500/25 active:bg-sage-600"
+    >
+      Valider ma séance ✓
+    </button>
+  )
+}
+
 export default function WorkoutSheet({
   seance,
   weekIdx,
+  planRef,
+  plannedDate,
   onClose,
 }: {
   seance: PlanSeance | null
   weekIdx: number
+  planRef: string
+  plannedDate: string
   onClose: () => void
 }) {
   return (
@@ -153,6 +256,9 @@ export default function WorkoutSheet({
             {seance.workout.parts.map((part, i) => (
               <Part key={i} part={part} />
             ))}
+          </div>
+          <div className="border-t border-sand pt-3">
+            <Validation title={seance.title} planRef={planRef} plannedDate={plannedDate} onClose={onClose} />
           </div>
         </div>
       )}

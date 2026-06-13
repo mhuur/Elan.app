@@ -28,7 +28,7 @@ export interface Store {
   importAll(data: Partial<StoreData>): Promise<void>
 }
 
-const COLS: ColName[] = ['exercises', 'sessions', 'logs', 'ideas']
+const COLS: ColName[] = ['exercises', 'sessions', 'logs', 'ideas', 'activities']
 
 /** Firestore refuse `undefined` : on nettoie récursivement */
 function clean<T>(value: T): T {
@@ -48,7 +48,7 @@ function clean<T>(value: T): T {
 const LOCAL_KEY = 'elan-data-v1'
 
 function emptyData(): StoreData {
-  return { exercises: [], sessions: [], logs: [], ideas: [] }
+  return { exercises: [], sessions: [], logs: [], ideas: [], activities: [] }
 }
 
 export class LocalStore implements Store {
@@ -59,6 +59,7 @@ export class LocalStore implements Store {
     sessions: new Set(),
     logs: new Set(),
     ideas: new Set(),
+    activities: new Set(),
   }
 
   constructor() {

@@ -1,6 +1,23 @@
 export type Category = 'running' | 'velo' | 'muscu' | 'hiit' | 'etirements'
 export type Measure = 'reps' | 'sec'
-export type ColName = 'exercises' | 'sessions' | 'logs' | 'ideas'
+export type ColName = 'exercises' | 'sessions' | 'logs' | 'ideas' | 'activities'
+
+/** Course réelle importée depuis COROS (via intervals.icu), pour valider une séance du plan */
+export interface Activity {
+  id: string
+  /** Date locale YYYY-MM-DD */
+  date: string
+  name: string
+  distanceKm: number
+  durationSec: number
+  /** Allure moyenne, secondes par km */
+  paceSec?: number
+  avgHr?: number
+  /** Plateforme source (intervals) */
+  source?: string
+  /** Id intervals.icu (= id du document) */
+  externalId?: string
+}
 
 /** Note libre « bug ou idée d'amélioration » saisie depuis les Réglages */
 export interface Idea {
@@ -227,6 +244,10 @@ export interface Log {
   velo?: VeloData
   results?: ExerciseResult[]
   note?: string
+  /** Séance du plan validée (ex. « elan-2026-06-30 ») — découple la validation de la date du log */
+  planRef?: string
+  /** Course COROS associée (id intervals.icu), si validée depuis une vraie sortie */
+  activityId?: string
   createdAt: number
 }
 

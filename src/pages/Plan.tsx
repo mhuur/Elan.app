@@ -68,6 +68,7 @@ function SeanceCard({
   idx,
   total,
   runDates,
+  validatedRefs,
   today,
   onOpen,
 }: {
@@ -76,11 +77,14 @@ function SeanceCard({
   idx: number
   total: number
   runDates: Set<string>
+  validatedRefs: Set<string>
   today: string
   onOpen: () => void
 }) {
   const date = seanceDateStr(week, s)
-  const st = STATUS_META[statusOf(date, runDates, today)]
+  // Validation explicite (par référence de séance) prime sur la coche automatique par date
+  const status = validatedRefs.has('elan-' + date) ? 'done' : statusOf(date, runDates, today)
+  const st = STATUS_META[status]
   const { sec, distM } = workoutStats(s.workout)
   const diff = TYPE_DIFFICULTY[s.type]
   const tile = diff >= 4 ? 'bg-running/15 text-running' : diff === 3 ? 'bg-running/10 text-running' : 'bg-sage-100 text-sage-600'
@@ -120,6 +124,7 @@ export default function Plan() {
   const [sheet, setSheet] = useState<PlanSeance | null>(null)
 
   const runDates = useMemo(() => new Set(logs.filter((l) => l.category === 'running').map((l) => l.date)), [logs])
+  const validatedRefs = useMemo(() => new Set(logs.filter((l) => l.planRef).map((l) => l.planRef as string)), [logs])
 
   const week = weeks[weekIdx]
   const end = toDateStr(addDays(new Date(week.start + 'T12:00:00'), 6))
@@ -206,6 +211,7 @@ export default function Plan() {
             idx={i}
             total={week.seances.length}
             runDates={runDates}
+            validatedRefs={validatedRefs}
             today={today}
             onOpen={() => setSheet(s)}
           />
@@ -225,7 +231,13 @@ export default function Plan() {
         </div>
       </section>
 
-      <WorkoutSheet seance={sheet} weekIdx={weekIdx} onClose={() => setSheet(null)} />
+      <WorkoutSheet
+        seance={sheet}
+        weekIdx={weekIdx}
+        planRef={sheet ? 'elan-' + seanceDateStr(week, sheet) : ''}
+        plannedDate={sheet ? seanceDateStr(week, sheet) : ''}
+        onClose={() => setSheet(null)}
+      />
     </div>
   )
 }
