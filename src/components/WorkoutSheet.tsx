@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Check, Repeat, Route, Footprints } from 'lucide-react'
 import { Sheet } from './ui'
 import { useData } from '../data/DataContext'
-import { DAY_NAMES, formatShortFr } from '../lib/dates'
+import { DAY_NAMES, addDays, formatShortFr, toDateStr } from '../lib/dates'
 import { isRepeat, stepSeconds, workoutStats, type PlanSeance, type Pace, type WorkoutStep, type WorkoutPart } from '../data/plan'
 import type { Activity } from '../types'
 
@@ -128,7 +128,9 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
   const [date, setDate] = useState(plannedDate)
   const existing = logs.find((l) => l.planRef === planRef)
   const assoc = existing?.activityId ? activities.find((a) => a.id === existing.activityId) : undefined
-  const recent = activities.slice(0, 12)
+  // Ne proposer que les sorties récentes (≤ 1 semaine) : au-delà, ce n'est pas la course à valider
+  const weekAgo = toDateStr(addDays(new Date(), -7))
+  const recent = activities.filter((a) => a.date >= weekAgo).slice(0, 12)
 
   // Sélection d'une sortie (ou « sans sortie ») → on passe à la confirmation de date,
   // pré-remplie avec la date de la sortie COROS (ou le jour prévu).
@@ -213,7 +215,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
         <p className="text-xs font-bold text-ink-soft">Quelle sortie COROS correspond à cette séance ?</p>
         {recent.length === 0 && (
           <p className="rounded-xl bg-sand/60 px-3 py-2 text-xs font-semibold text-ink-soft">
-            Aucune course importée. Double-clique « recuperer-mes-courses » sur ton PC, puis reviens ici.
+            Aucune sortie récente (moins d'une semaine). Double-clique « recuperer-mes-courses » sur ton PC, puis reviens ici.
           </p>
         )}
         {recent.map((a) => (
