@@ -1,0 +1,9 @@
+name = "strava-elan"
+main = "strava-elan.js"
+compatibility_date = "2026-06-01"
+
+# Secrets à poser (jamais committés) :
+#   npx wrangler secret put STRAVA_CLIENT_ID
+#   npx wrangler secret put STRAVA_CLIENT_SECRET
+#   npx wrangler secret put STRAVA_REFRESH_TOKEN
+#   npx wrangler secret put ELAN_SYNC_KEY      # optionnel

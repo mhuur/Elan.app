@@ -55,7 +55,7 @@ try {
 
   await page.click(`button:has-text("${target}")`)
   await page.click('[role="dialog"] >> text=Valider ma séance')
-  await page.waitForSelector('text=Quelle sortie COROS correspond')
+  await page.waitForSelector('text=Quelle sortie correspond')
 
   const dialog = page.locator('[role="dialog"]')
   await dialog.locator('button:has-text("8.3 km")').first().waitFor({ timeout: 4000 })

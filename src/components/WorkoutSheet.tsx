@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Check, Repeat, Route, Footprints } from 'lucide-react'
+import { Check, Repeat, Route, Footprints, RefreshCw } from 'lucide-react'
 import { Sheet } from './ui'
 import { useData } from '../data/DataContext'
+import { useStravaSync } from '../lib/useStravaSync'
 import { DAY_NAMES, addDays, formatShortFr, toDateStr } from '../lib/dates'
 import { isRepeat, stepSeconds, workoutStats, type PlanSeance, type Pace, type WorkoutStep, type WorkoutPart } from '../data/plan'
 import type { Activity } from '../types'
@@ -123,6 +124,7 @@ const activityLine = (a: Activity) =>
 /** Valider une séance du plan : la relier à une vraie sortie COROS (ou non), en confirmant la date faite */
 function Validation({ title, planRef, plannedDate, onClose }: { title: string; planRef: string; plannedDate: string; onClose: () => void }) {
   const { activities, logs, addLog, removeLog } = useData()
+  const strava = useStravaSync()
   const [step, setStep] = useState<'idle' | 'picking' | 'confirm'>('idle')
   const [chosen, setChosen] = useState<Activity | null>(null)
   const [date, setDate] = useState(plannedDate)
@@ -212,10 +214,24 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
   if (step === 'picking') {
     return (
       <div className="space-y-2">
-        <p className="text-xs font-bold text-ink-soft">Quelle sortie COROS correspond à cette séance ?</p>
-        {recent.length === 0 && (
+        <p className="text-xs font-bold text-ink-soft">Quelle sortie correspond à cette séance ?</p>
+        {strava.configured && (
+          <button
+            type="button"
+            onClick={() => void strava.sync()}
+            disabled={strava.syncing}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-sand bg-surface px-4 py-2.5 text-sm font-bold text-ink-soft active:bg-sage-50 disabled:opacity-50"
+          >
+            <RefreshCw className={'h-4 w-4 ' + (strava.syncing ? 'animate-spin' : '')} />
+            {strava.syncing ? 'Synchronisation…' : 'Synchroniser depuis Strava'}
+          </button>
+        )}
+        {strava.message && <p className="text-center text-xs font-semibold text-ink-soft">{strava.message}</p>}
+        {recent.length === 0 && !strava.syncing && (
           <p className="rounded-xl bg-sand/60 px-3 py-2 text-xs font-semibold text-ink-soft">
-            Aucune sortie récente (moins d'une semaine). Double-clique « recuperer-mes-courses » sur ton PC, puis reviens ici.
+            {strava.configured
+              ? 'Aucune sortie récente (moins d\'une semaine). Tape « Synchroniser depuis Strava » ci-dessus.'
+              : 'Aucune sortie récente (moins d\'une semaine). Double-clique « recuperer-mes-courses » sur ton PC, puis reviens ici.'}
           </p>
         )}
         {recent.map((a) => (

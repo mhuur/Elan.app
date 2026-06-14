@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react'
-import { Bug, Check, Cloud, Download, Smartphone, Upload, X } from 'lucide-react'
+import { Bug, Check, Cloud, Download, RefreshCw, Smartphone, Upload, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { todayStr } from '../lib/dates'
+import { formatLastSync, useStravaSync } from '../lib/useStravaSync'
 import type { StoreData } from '../data/store'
 import { GhostButton, Sheet } from './ui'
 
 export default function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { mode, user, signOut, exportAll, importAll, ideas, addIdea, updateIdea, removeIdea } = useData()
+  const strava = useStravaSync()
   const fileRef = useRef<HTMLInputElement>(null)
   const [ideaText, setIdeaText] = useState('')
 
@@ -61,6 +63,26 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
               Pour les synchroniser entre téléphone et ordinateur, configurez Firebase (guide dans le fichier README du
               projet), ou utilisez l'export/import ci-dessous.
             </span>
+          </div>
+        )}
+
+        {strava.configured && (
+          <div className="rounded-2xl bg-sage-50 p-4">
+            <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+              <RefreshCw className="h-3.5 w-3.5" /> Courses Strava
+            </h3>
+            <button
+              type="button"
+              onClick={() => void strava.sync()}
+              disabled={strava.syncing}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-surface px-4 py-2.5 text-sm font-extrabold text-sage-700 shadow-sm active:bg-sage-100 disabled:opacity-50"
+            >
+              <RefreshCw className={'h-4 w-4 ' + (strava.syncing ? 'animate-spin' : '')} />
+              {strava.syncing ? 'Synchronisation…' : 'Synchroniser mes courses'}
+            </button>
+            <p className="mt-2 text-center text-xs font-semibold text-ink-soft">
+              {strava.message ?? (formatLastSync(strava.lastSync) ? `Dernière synchro : ${formatLastSync(strava.lastSync)}` : 'Importe tes sorties COROS via Strava')}
+            </p>
           </div>
         )}
 

@@ -48,7 +48,14 @@ interface DataCtx {
   signOut(): Promise<void>
   exportAll(): Promise<StoreData>
   importAll(data: Partial<StoreData>): Promise<void>
+  /** Synchro Strava configurée (VITE_STRAVA_SYNC_URL présent) → bouton « Synchroniser » visible */
+  stravaSyncConfigured: boolean
+  /** Importe les courses Strava récentes via le Worker, dédoublonne par externalId. */
+  syncStrava(days?: number): Promise<{ added: number; total: number }>
 }
+
+const STRAVA_SYNC_URL = import.meta.env.VITE_STRAVA_SYNC_URL as string | undefined
+const STRAVA_SYNC_KEY = import.meta.env.VITE_STRAVA_SYNC_KEY as string | undefined
 
 const Ctx = createContext<DataCtx | null>(null)
 
@@ -227,6 +234,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
       },
       exportAll: () => need().exportAll(),
       importAll: (data) => need().importAll(data),
+      stravaSyncConfigured: !!STRAVA_SYNC_URL,
+      syncStrava: async (days = 30) => {
+        if (!STRAVA_SYNC_URL) throw new Error('Synchro Strava non configurée')
+        const s = need()
+        const res = await fetch(`${STRAVA_SYNC_URL}?days=${days}`, {
+          headers: STRAVA_SYNC_KEY ? { Authorization: 'Bearer ' + STRAVA_SYNC_KEY } : undefined,
+        })
+        if (!res.ok) throw new Error('Strava ' + res.status)
+        const { activities: incoming } = (await res.json()) as { activities: Activity[] }
+        const known = new Set(activities.map((a) => a.externalId).filter(Boolean))
+        let added = 0
+        for (const a of incoming) {
+          if (a.externalId && known.has(a.externalId)) continue
+          await s.add('activities', a as unknown as Record<string, unknown>)
+          added++
+        }
+        return { added, total: incoming.length }
+      },
     }),
     [mode, user, authReady, dataReady, exercises, sessions, logs, ideas, activities, need],
   )

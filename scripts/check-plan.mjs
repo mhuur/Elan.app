@@ -53,7 +53,7 @@ try {
 
   // --- Validation manuelle : « Valider ma séance » → sans course → confirmer la date → « Validée »
   await page.click('[role="dialog"] >> text=Valider ma séance')
-  await page.waitForSelector('text=Quelle sortie COROS')
+  await page.waitForSelector('text=Quelle sortie correspond')
   await page.click('text=Valider sans associer de sortie')
   await page.waitForSelector('text=Quel jour as-tu fait cette séance')
   await page.click('[role="dialog"] >> text=Valider ✓')
