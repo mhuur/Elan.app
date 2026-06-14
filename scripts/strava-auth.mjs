@@ -2,8 +2,16 @@
 // Zéro dépendance : petit serveur localhost + fetch natif (Node 18+).
 // Usage : node scripts/strava-auth.mjs   (ou double-clic sur autoriser-strava.bat)
 import http from 'node:http'
+import { exec } from 'node:child_process'
+import { platform } from 'node:process'
 import { createInterface } from 'node:readline/promises'
 import { stdin, stdout } from 'node:process'
+
+/** Ouvre une URL dans le navigateur par défaut (Windows/mac/Linux), sans dépendance. */
+function openBrowser(url) {
+  const cmd = platform === 'win32' ? `start "" "${url}"` : platform === 'darwin' ? `open "${url}"` : `xdg-open "${url}"`
+  exec(cmd, () => {})
+}
 
 const PORT = 4571
 const REDIRECT = `http://localhost:${PORT}/callback`
@@ -21,9 +29,10 @@ const authUrl =
   `&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT)}` +
   `&approval_prompt=auto&scope=activity:read_all`
 
-console.log('\n1) Sur https://www.strava.com/settings/api, mets « Authorization Callback Domain » = localhost')
-console.log('2) Ouvre cette URL dans ton navigateur et clique « Authorize » :\n')
+console.log("\nJ'ouvre Strava dans ton navigateur — clique le bouton orange « Authorize ».")
+console.log('Si rien ne s\'ouvre, copie-colle cette URL à la main :\n')
 console.log('   ' + authUrl + '\n')
+openBrowser(authUrl)
 
 const code = await new Promise((resolve, reject) => {
   const server = http.createServer((req, res) => {
