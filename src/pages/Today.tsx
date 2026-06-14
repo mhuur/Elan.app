@@ -26,6 +26,7 @@ export default function Today() {
 
   const dStr = toDateStr(viewDate)
   const isToday = dStr === todayStr()
+  const isFuture = dStr > todayStr()
   const shiftDay = (n: number) => setViewDate((d) => addDays(d, n))
 
   const plannedIds = plannedSessionIdsOn(viewDate, sessions)
@@ -52,7 +53,7 @@ export default function Today() {
       <header className="px-5 pt-8 pb-4">
         <div className="flex items-center justify-between">
           <p className="text-[11px] font-extrabold uppercase tracking-widest text-sage-500">
-            {isToday ? "Aujourd'hui" : 'Saisie passée'}
+            {isToday ? "Aujourd'hui" : isFuture ? 'À venir' : 'Saisie passée'}
           </p>
           <button
             type="button"
@@ -78,9 +79,8 @@ export default function Today() {
           <button
             type="button"
             aria-label="Jour suivant"
-            disabled={isToday}
             onClick={() => shiftDay(1)}
-            className="rounded-full bg-surface p-2 text-ink-soft shadow-sm active:bg-sand disabled:opacity-30"
+            className="rounded-full bg-surface p-2 text-ink-soft shadow-sm active:bg-sand"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -152,7 +152,9 @@ export default function Today() {
             text={
               isToday
                 ? "Rien de prévu aujourd'hui. Journée repos — ou lancez une séance libre ci-dessous."
-                : "Rien n'était prévu ce jour-là. Utilisez « Séance libre » pour saisir une séance oubliée."
+                : isFuture
+                  ? 'Rien de prévu ce jour-là — journée repos.'
+                  : "Rien n'était prévu ce jour-là. Utilisez « Séance libre » pour saisir une séance oubliée."
             }
           />
         )}
