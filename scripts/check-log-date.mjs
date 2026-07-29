@@ -17,6 +17,9 @@ page.on('console', (m) => {
 })
 
 try {
+  // Date figée (samedi 13/06/2026, dans la S1 de reprise) → test déterministe : on valide la
+  // séance du samedi « aujourd'hui » quelle que soit la date d'exécution réelle.
+  await page.clock.setFixedTime(new Date('2026-06-13T12:00:00'))
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 

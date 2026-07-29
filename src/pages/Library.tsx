@@ -101,7 +101,7 @@ export default function Library() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Rechercher un exercice ou un sous-type…"
-            className="w-full rounded-2xl border border-sand bg-surface px-4 py-3 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink-soft/60 focus:border-sage-400"
+            className="w-full rounded-2xl border border-sand bg-shoal px-4 py-3 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink-soft/60 focus:border-sage-400"
           />
           {CATEGORIES.map((cat) => {
             const list = visibleExercises.filter((e) => e.category === cat)

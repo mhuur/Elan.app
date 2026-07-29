@@ -1,32 +1,66 @@
 @import "tailwindcss";
 
+/*
+ * Charte « bord de mer » (juillet 2026) — ardoise & écume.
+ *
+ * La marque est l'ogive écume sur ardoise (public/icon.svg, public/icons/). L'interface
+ * reprend ses deux seules matières : des fonds ardoise de plus en plus clairs à mesure
+ * qu'un élément monte vers l'utilisateur, et de l'écume pour tout ce qui se lit.
+ *
+ * Les NOMS des tokens n'ont pas changé (`cream`, `sand`, `surface`, `ink`, `sage-*`) :
+ * ils sont sémantiques et déjà employés partout dans les écrans, seules leurs valeurs
+ * basculent en sombre. Conséquence importante : **la rampe `sage-*` est inversée** —
+ * en clair elle allait du fond pâle (50) vers le texte foncé (700), en sombre elle va
+ * du fond profond (50) vers le texte lumineux (700). Les composants qui écrivaient
+ * `bg-sage-100 text-sage-700` restent donc justes sans être touchés.
+ */
 @theme {
   --font-sans: 'Nunito', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
-  --color-cream: #f7f5ef;
-  --color-sand: #eee9dd;
-  --color-surface: #ffffff;
-  --color-ink: #36423a;
-  --color-ink-soft: #717d72;
+  /* Neutres marins — du plus profond au plus clair */
+  --color-abysse: #04121b;   /* fond de démarrage, immersif, voiles de modale */
+  --color-cream: #061722;    /* fond de page (ardoise) */
+  --color-sand: #17323f;     /* séparateurs, bordures, fonds neutres */
+  --color-surface: #0e2634;  /* carte posée sur le fond */
+  --color-shoal: #123449;    /* carte surélevée / survol (haut du dégradé ardoise) */
+  --color-ink: #e9f2f6;      /* écume : texte principal */
+  --color-ink-soft: #8fa8b6; /* écume délavée : texte secondaire */
 
-  --color-sage-50: #f1f5f0;
-  --color-sage-100: #e2ebe1;
-  --color-sage-200: #c8d8c6;
-  --color-sage-300: #a6c0a4;
-  --color-sage-400: #8aab88;
-  --color-sage-500: #71946f;
-  --color-sage-600: #5a7a59;
-  --color-sage-700: #475f46;
+  /* Accent lagon — rampe inversée : 50 = le plus sombre, 700 = le plus clair */
+  --color-sage-50: #0f2a38;
+  --color-sage-100: #16394b;
+  --color-sage-200: #1f4e64;
+  --color-sage-300: #2c6b85;
+  --color-sage-400: #4e9ebb;
+  --color-sage-500: #6fc6d6;
+  --color-sage-600: #8fd9e4;
+  --color-sage-700: #b9e9ef;
 
-  --color-running: #c2773e;
-  --color-velo: #5b89ad;
-  --color-muscu: #8d6ba0;
-  --color-hiit: #cf6151;
-  --color-etirements: #5f8862;
+  /* Texte posé SUR un aplat d'accent (bouton plein, pastille) : l'accent est clair,
+     le texte doit donc être sombre — d'où ce token plutôt que `text-white`. */
+  --color-onaccent: #04121b;
+
+  /* Catégories — remontées en clarté pour tenir sur l'ardoise */
+  --color-running: #e8a15c;
+  --color-velo: #7fb6dc;
+  --color-muscu: #b99ad4;
+  --color-hiit: #f08a76;
+  --color-etirements: #86c48e;
+
+  /* Ombres : sur fond sombre le noir à 5 % ne se voit pas. On reprend l'ombre douce
+     de la marque (0 18px 34px rgba(2,10,16,.55)), déclinée par palier. */
+  --shadow-sm: 0 1px 2px rgb(2 10 16 / 0.45);
+  --shadow-md: 0 4px 12px rgb(2 10 16 / 0.5);
+  --shadow-lg: 0 10px 22px rgb(2 10 16 / 0.55);
+  --shadow-xl: 0 16px 30px rgb(2 10 16 / 0.6);
+  --shadow-2xl: 0 18px 34px rgb(2 10 16 / 0.65);
 }
 
 html {
   -webkit-tap-highlight-color: transparent;
+  /* Contrôles natifs (select, input date, barres de défilement) en sombre */
+  color-scheme: dark;
+  background-color: var(--color-cream);
 }
 
 body {
@@ -34,10 +68,15 @@ body {
   overscroll-behavior-y: none;
 }
 
+::selection {
+  background: var(--color-sage-300);
+  color: var(--color-ink);
+}
+
 /* Masque les flèches des champs numériques */
 input[type='number'] {
-  appearance: textfield;
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {

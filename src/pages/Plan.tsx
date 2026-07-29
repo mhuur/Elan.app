@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Footprints, Zap } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, Footprints, Zap } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { PageHeader } from '../components/ui'
 import WorkoutSheet from '../components/WorkoutSheet'
@@ -34,7 +34,7 @@ function statusOf(date: string, runDates: Set<string>, today: string): Status {
 }
 const STATUS_META: Record<Status, { label: string; cls: string }> = {
   done: { label: 'Validée', cls: 'bg-sage-100 text-sage-700' },
-  today: { label: "Aujourd'hui", cls: 'bg-sage-500 text-white' },
+  today: { label: "Aujourd'hui", cls: 'bg-sage-500 text-onaccent' },
   missed: { label: 'Non faite', cls: 'bg-sand text-ink-soft' },
   todo: { label: 'À venir', cls: 'bg-sand/60 text-ink-soft' },
 }
@@ -117,11 +117,46 @@ function SeanceCard({
   )
 }
 
+/** Ligne compacte d'une séance déjà validée (section « Terminées », façon Aujourd'hui) */
+function DoneSeanceRow({
+  s,
+  idx,
+  total,
+  onOpen,
+}: {
+  s: PlanSeance
+  idx: number
+  total: number
+  onOpen: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 rounded-2xl bg-surface/70 px-4 py-3 text-left shadow-sm active:bg-sage-50/50"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage-500 text-onaccent">
+        <Check className="h-4 w-4" strokeWidth={3} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-bold text-ink-soft">
+          Séance {idx + 1}/{total} · {DAY_NAMES[s.day]}
+        </p>
+        <p className="truncate text-sm font-extrabold">{s.title}</p>
+      </div>
+      <ChevronRight className="h-5 w-5 shrink-0 text-ink-soft/40" />
+    </button>
+  )
+}
+
 export default function Plan() {
   const { logs } = useData()
   const today = todayStr()
   const weeks = PLAN_SEMI.weeks
   const cur = currentWeekIndex(today)
+  // Plan recalé le 8 juil. 2026 : les semaines de juin (Fondation) sont conservées comme historique.
+  // On numérote « Semaine 1 » à partir de la reprise = 1re semaine de Reconstruction.
+  const planStart = Math.max(0, weeks.findIndex((w) => w.phase === 'Reconstruction'))
   const clampedCur = Math.min(weeks.length - 1, Math.max(0, cur))
   const [weekIdx, setWeekIdx] = useState(clampedCur)
   const [sheet, setSheet] = useState<PlanSeance | null>(null)
@@ -131,6 +166,15 @@ export default function Plan() {
   const validatedRefs = useMemo(() => new Set(logs.filter((l) => l.planRef).map((l) => l.planRef as string)), [logs])
 
   const week = weeks[weekIdx]
+  // Comme « Aujourd'hui » : les séances validées quittent le flux principal et passent en
+  // « Terminées ». Validée = référence de séance (planRef) OU course enregistrée ce jour-là.
+  const isValidated = (s: PlanSeance) => {
+    const date = seanceDateStr(week, s)
+    return validatedRefs.has('elan-' + date) || runDates.has(date)
+  }
+  const indexed = week.seances.map((s, i) => ({ s, i }))
+  const todo = indexed.filter(({ s }) => !isValidated(s))
+  const done = indexed.filter(({ s }) => isValidated(s))
   const end = toDateStr(addDays(new Date(week.start + 'T12:00:00'), 6))
   const totals = useMemo(() => {
     let sec = 0
@@ -172,8 +216,12 @@ export default function Plan() {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="text-center">
-          <p className="text-base font-extrabold">{weekIdx === cur ? 'Cette semaine' : `Semaine ${weekIdx + 1}`}</p>
-          <p className="text-xs font-bold text-ink-soft">{weekIdx + 1} sur {weeks.length}</p>
+          <p className="text-base font-extrabold">
+            {weekIdx === cur ? 'Cette semaine' : weekIdx >= planStart ? `Semaine ${weekIdx - planStart + 1}` : 'Préparation juin'}
+          </p>
+          <p className="text-xs font-bold text-ink-soft">
+            {weekIdx >= planStart ? `${weekIdx - planStart + 1} sur ${weeks.length - planStart}` : 'historique'}
+          </p>
         </div>
         <button
           type="button"
@@ -205,9 +253,9 @@ export default function Plan() {
         </div>
       </section>
 
-      {/* Séances de la semaine */}
+      {/* Séances restant à faire (les validées passent en « Terminées », comme Aujourd'hui) */}
       <div className="mt-3 space-y-3">
-        {week.seances.map((s, i) => (
+        {todo.map(({ s, i }) => (
           <SeanceCard
             key={s.day}
             week={week}
@@ -220,7 +268,23 @@ export default function Plan() {
             onOpen={() => setSheet(s)}
           />
         ))}
+        {todo.length === 0 && (
+          <div className="rounded-2xl bg-sage-100 px-6 py-5 text-center">
+            <p className="text-sm font-extrabold text-sage-700">Semaine bouclée, bravo ! 🎉</p>
+          </div>
+        )}
       </div>
+
+      {done.length > 0 && (
+        <section className="mt-5">
+          <h2 className="mb-2 px-1 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">Terminées</h2>
+          <div className="space-y-2">
+            {done.map(({ s, i }) => (
+              <DoneSeanceRow key={s.day} s={s} idx={i} total={week.seances.length} onOpen={() => setSheet(s)} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Mes allures & zones — dépliable, calculé sur les données COROS */}
       <section className="mt-4 overflow-hidden rounded-2xl bg-sage-50">

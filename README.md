@@ -1,6 +1,6 @@
-# 🌿 Élan — Suivi sport
+# 💨 Avel — Suivi sport
 
-Application web mobile-first pour planifier vos séances de sport, enregistrer vos performances et suivre vos progrès. Design doux (vert sauge & crème), installable sur l'écran d'accueil du téléphone.
+Application web mobile-first pour planifier vos séances de sport, enregistrer vos performances et suivre vos progrès. Charte « bord de mer » (ardoise & écume, thème sombre), installable sur l'écran d'accueil du téléphone.
 
 ## Fonctionnalités
 
@@ -94,6 +94,7 @@ L'URL `https://votre-projet.web.app` est affichée à la fin.
 
 - React 19 + TypeScript + Vite, Tailwind CSS 4, Recharts, Firebase (Auth Google + Firestore avec cache hors-ligne), PWA via vite-plugin-pwa.
 - Données : `users/{uid}/exercises|sessions|logs` dans Firestore, ou `localStorage` en mode local (même interface `Store`, voir [src/data/store.ts](src/data/store.ts)).
-- `npm run build` : compile dans `dist/`. `node scripts/make-icons.mjs` : régénère les icônes PNG depuis [public/icon.svg](public/icon.svg).
+- Charte « bord de mer » : tous les tokens (couleurs, ombres, police) vivent dans [src/index.css](src/index.css) (`@theme` Tailwind v4). La marque est l'**ogive** : version transparente dans [public/icon.svg](public/icon.svg) pour l'écran, version sur pastille ardoise dans [public/icons/](public/icons/) pour l'écran d'accueil et les favicons.
+- `npm run build` : compile dans `dist/`. `node scripts/make-icons.mjs` : régénère les icônes PNG de `public/icons/` (le script compose son propre SVG).
 - `npm run dev:demo` : serveur en mode local forcé (port 5174), même si `.env` est configuré — pratique pour tester sans toucher aux vraies données.
-- `node scripts/smoke.mjs` : test de fumée Playwright (nécessite `npm run dev:demo` lancé). `node scripts/check-cloud.mjs` : vérifie l'écran de connexion en mode cloud.
+- `node scripts/smoke.mjs` : test de fumée Playwright (nécessite `npm run dev:demo` lancé). `node scripts/check-charte.mjs` : captures des écrans que le smoke ne traverse pas (Réglages, Plan, fiche COROS, Objectifs), pour contrôler la charte. `node scripts/check-cloud.mjs` : vérifie l'écran de connexion en mode cloud.

@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, Lightbulb, Link2, Play, Repeat } from 'lucide-react'
+import { ClipboardList, Lightbulb, Link2, Play, Repeat, TrendingUp } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, setTargetsOf, type Exercise, type Log, type MetricValue, type Session, type SessionItem } from '../types'
-import { todayStr } from '../lib/dates'
+import { CATEGORY_META, feelingOf, setTargetsOf, type Exercise, type Log, type MetricValue, type Session, type SessionItem } from '../types'
+import { relativeDayFr, todayStr } from '../lib/dates'
+import { lastDetailLine, lastPerfLine } from '../lib/format'
 import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { muscuBlocks } from '../lib/blocks'
-import { buildTimeline, collectSets, type SetStatus } from '../lib/timeline'
+import { buildTimeline, collectSets, stopPoint, type SetStatus } from '../lib/timeline'
+import { progressedSession } from '../lib/progression'
 import { CategoryIcon, Field, GhostButton, NumInput, PrimaryButton, Sheet, TextArea } from './ui'
+import FeelingPicker from './FeelingPicker'
 import ResultTimeline from './ResultTimeline'
 
 /** Feuille d'une séance depuis Aujourd'hui : consulter le programme, lancer le minuteur, entrer le résultat */
@@ -51,13 +54,22 @@ function itemSummary(it: SessionItem, ex?: Exercise): string {
 }
 
 
-function Inner({ session, onClose, date }: { session: Session; onClose: () => void; date?: string }) {
+function Inner({ session: planned, onClose, date }: { session: Session; onClose: () => void; date?: string }) {
   const { addLog, logs, exercises } = useData()
   const navigate = useNavigate()
   const [note, setNote] = useState('')
+  const [feeling, setFeeling] = useState<number | undefined>(undefined)
   const [entering, setEntering] = useState(false)
   const [celebrate, setCelebrate] = useState<{ text: string; reward?: string }[] | null>(null)
   const logDate = date ?? todayStr()
+  // Saisie interdite sur une date future (aperçu seulement) — on ne journalise pas l'avenir
+  const isFuture = logDate > todayStr()
+
+  // Objectifs relevés à hauteur de la dernière perf (dérivé : la fiche de séance n'est pas touchée)
+  const { session, raised } = useMemo(
+    () => progressedSession(planned, exercises, logs, logDate),
+    [planned, exercises, logs, logDate],
+  )
 
   const metrics = useMemo(() => effectiveMetrics(session), [session])
   const links = session.links ?? []
@@ -71,8 +83,23 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
     logDate === todayStr()
   const hasForm = metrics.length > 0
 
-  // Dernière séance identique, pour préremplir (logs triés du plus récent au plus ancien)
-  const lastLog = useMemo(() => logs.find((l) => l.sessionId === session.id), [logs, session.id])
+  // Dernière séance VALIDÉE de ce type (la plus récente jusqu'au jour affiché), pour le récap
+  // « Dernière fois » et le préremplissage. Indépendante des séances sautées entre-temps — une
+  // séance sautée ne crée aucun log — et robuste quel que soit l'ordre de la liste (tri explicite).
+  const lastLog = useMemo(
+    () =>
+      logs
+        .filter((l) => l.sessionId === session.id && l.date <= logDate)
+        .sort((a, b) => (a.date === b.date ? b.createdAt - a.createdAt : b.date.localeCompare(a.date)))[0],
+    [logs, session.id, logDate],
+  )
+
+  // Point d'arrêt de la dernière séance (bloc/tour/exercice) : quand il est connu, la ligne
+  // principale l'annonce et le détail par exercice passe en dessous, complet (plus de « … »)
+  const lastStop = useMemo(
+    () => (lastLog ? stopPoint(lastLog, session, exercises) : null),
+    [lastLog, session, exercises],
+  )
 
   // Valeurs des mesures personnalisées
   const [mvals, setMvals] = useState<Record<string, number | undefined>>(() => {
@@ -180,6 +207,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
       category: session.category,
       createdAt: Date.now(),
       note: note.trim(),
+      ...(feeling ? { feeling } : {}),
       ...extra,
     })
     if (achieved.length) setCelebrate(achieved)
@@ -215,7 +243,34 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
 
   return (
     <div className="space-y-4">
+      {lastLog && (
+        <div className="rounded-2xl bg-sage-50 px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-extrabold uppercase tracking-wider text-sage-600">
+              Dernière fois · {relativeDayFr(lastLog.date)}
+            </p>
+            {feelingOf(lastLog.feeling) && (
+              <span className="text-lg" title={feelingOf(lastLog.feeling)!.label}>
+                {feelingOf(lastLog.feeling)!.emoji}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-sm font-bold text-ink">{lastPerfLine(lastLog, session, exercises)}</p>
+          {lastStop && <p className="mt-0.5 text-xs font-semibold text-ink-soft">{lastDetailLine(lastLog)}</p>}
+          {lastLog.note && (
+            <p className="mt-0.5 text-xs font-semibold italic text-ink-soft">« {lastLog.note} »</p>
+          )}
+        </div>
+      )}
+
       {session.notes && <p className="text-sm font-semibold text-ink-soft">{session.notes}</p>}
+
+      {raised && (
+        <p className="flex items-center gap-2 rounded-2xl bg-sage-50 px-4 py-2.5 text-xs font-bold text-sage-600">
+          <TrendingUp className="h-4 w-4 shrink-0" />
+          Objectifs relevés à hauteur de ta dernière perf.
+        </p>
+      )}
 
       {program.length > 0 && (
         <p className="flex items-center gap-2 rounded-2xl bg-sage-50 px-4 py-2.5 text-sm font-bold">
@@ -322,7 +377,13 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         </div>
       )}
 
-      {!entering && hasTimer && (
+      {isFuture && (
+        <p className="rounded-2xl bg-sand/60 px-4 py-3 text-sm font-semibold text-ink-soft">
+          📅 Séance à venir — reviens le jour J pour la lancer et enregistrer ton résultat.
+        </p>
+      )}
+
+      {!isFuture && !entering && hasTimer && (
         <PrimaryButton onClick={() => navigate(`/player/${session.id}`)}>
           <span className="flex items-center justify-center gap-2">
             <Play className="h-4 w-4" /> Lancer le minuteur guidé
@@ -331,7 +392,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
       )}
 
       {/* Muscu/HIIT — saisie du résultat : timeline à curseur (un tap marque où on s'est arrêté) */}
-      {!entering && (isMuscu || isHiit) && session.items.length > 0 && (
+      {!isFuture && !entering && (isMuscu || isHiit) && session.items.length > 0 && (
         <GhostButton onClick={() => setEntering(true)}>Entrer le résultat ✓</GhostButton>
       )}
 
@@ -351,7 +412,7 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         </>
       )}
 
-      {(!isMuscu || entering) && metrics.length > 0 && (
+      {!isFuture && (!isMuscu || entering) && metrics.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
           {metrics.map((d) => (
             <Field key={d.key} label={d.label}>
@@ -366,15 +427,19 @@ function Inner({ session, onClose, date }: { session: Session; onClose: () => vo
         </div>
       )}
 
-      {(entering || (!isMuscu && hasForm)) && (
-        <Field label="Note (optionnel)">
-          <TextArea value={note} onChange={setNote} rows={2} placeholder="Ressenti, remarques…" />
-        </Field>
+      {!isFuture && (entering || (!isMuscu && hasForm)) && (
+        <>
+          <FeelingPicker value={feeling} onChange={setFeeling} />
+          <Field label="Note (optionnel)">
+            <TextArea value={note} onChange={setNote} rows={2} placeholder="Remarques (ex. « monter le niveau »)…" />
+          </Field>
+        </>
       )}
 
       {entering && <PrimaryButton onClick={() => void save()}>Valider la séance ✓</PrimaryButton>}
 
-      {!isMuscu &&
+      {!isFuture &&
+        !isMuscu &&
         !entering &&
         (hasTimer ? (
           <GhostButton onClick={() => void save()}>Marquer comme faite ✓ (sans minuteur)</GhostButton>

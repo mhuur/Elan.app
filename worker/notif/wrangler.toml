@@ -1,0 +1,26 @@
+name = "elan-notif"
+main = "notif-elan.js"
+compatibility_date = "2026-06-01"
+
+# Réveil toutes les 5 min : le Worker compare l'heure LOCALE de chaque abonné (son fuseau est
+# stocké avec son abonnement) à son heure de rappel. Le cron, lui, tourne en UTC — c'est ce qui
+# fait que le passage heure d'été/hiver se gère tout seul.
+# 288 réveils/jour, très loin du plafond gratuit de 100 000 requêtes/jour.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# Créé avec : npx wrangler kv namespace create REMINDERS
+[[kv_namespaces]]
+binding = "REMINDERS"
+id = "9bfc1363c0d44c678c5f54b08110cfed"
+
+[vars]
+# Clé publique VAPID — non secrète (elle est déjà dans le bundle de l'app).
+# Doit être EXACTEMENT la valeur de VITE_VAPID_PUBLIC_KEY du .env.
+VAPID_PUBLIC_KEY = "BOKo9KuMJ_l8of4HWxusScyM3ytLQVikTs-cJnAnCtdiMeLvQNUift1HQLeP2csNqvkGjOsJgezrYi1Bmj31ssw"
+# Contact exigé par la spec VAPID : le service de push s'en sert s'il doit vous joindre.
+ADMIN_CONTACT = "mailto:saintilan.romain@gmail.com"
+
+# Secrets à poser (jamais committés) :
+#   npx wrangler secret put VAPID_PRIVATE_KEY   # valeur = VAPID_PRIVATE_KEY du .env
+#   npx wrangler secret put ELAN_NOTIF_KEY      # optionnel — = VITE_NOTIF_KEY du .env

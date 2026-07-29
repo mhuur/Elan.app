@@ -114,11 +114,9 @@ try {
   await shot('12-fiche-exercice')
   await page.click('[aria-label="Retour"]')
 
-  // --- Progrès : activité + liste des suivis + historique
+  // --- Progrès : suivis par exercice
   await page.click('text=Progrès')
-  await page.waitForSelector('text=Séances complétées par semaine')
   await page.waitForSelector('text=Mes suivis')
-  await page.waitForSelector('text=Historique')
   await page.waitForTimeout(800)
   await shot('13-progres')
 

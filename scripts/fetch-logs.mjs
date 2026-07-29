@@ -1,4 +1,4 @@
-// Lit les logs Élan depuis Firestore via les identifiants firebase-tools déjà connectés.
+// Lit les logs Avel depuis Firestore via les identifiants firebase-tools déjà connectés.
 // Usage : node scripts/fetch-logs.mjs
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'

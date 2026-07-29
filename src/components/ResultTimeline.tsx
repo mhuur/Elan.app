@@ -53,9 +53,9 @@ export default function ResultTimeline({
                     className={
                       'flex h-6 w-6 shrink-0 items-center justify-center rounded-full ' +
                       (st === 'ok'
-                        ? 'bg-sage-500 text-white'
+                        ? 'bg-sage-500 text-onaccent'
                         : st === 'flag'
-                          ? 'bg-amber-400 text-white'
+                          ? 'bg-amber-400 text-onaccent'
                           : 'border-2 border-sand text-transparent')
                     }
                   >
@@ -80,7 +80,7 @@ export default function ResultTimeline({
                   </span>
                   <span
                     className={`shrink-0 text-xs font-extrabold ${
-                      st === 'no' ? 'text-ink-soft/40' : st === 'flag' ? 'text-amber-600' : 'text-ink-soft'
+                      st === 'no' ? 'text-ink-soft/40' : st === 'flag' ? 'text-amber-400' : 'text-ink-soft'
                     }`}
                   >
                     {st === 'no' ? 'non faite' : st === 'flag' ? 'mal réalisée' : `${row.value} ${row.unit}`}

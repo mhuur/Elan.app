@@ -1,6 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="115" fill="#71946f"/>
-  <path d="M256 92c-92 60-134 134-134 208 0 70 60 126 134 126s134-56 134-126c0-74-42-148-134-208z" fill="#f7f5ef"/>
-  <path d="M256 168v220" stroke="#71946f" stroke-width="22" stroke-linecap="round" fill="none"/>
-  <path d="M256 282l-56-56M256 344l56-56" stroke="#71946f" stroke-width="22" stroke-linecap="round" fill="none"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Avel">
+  <!-- Avel : l'ogive — amande verticale tendue aux deux pointes, écume dégradée.
+       Fond transparent : cette version sert sur fond sombre (splash, connexion, en-têtes).
+       Jamais de contour, jamais de rotation. Pastille ardoise = icons/elan-ogive-plate.svg. -->
+  <defs>
+    <linearGradient id="o" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"></stop>
+      <stop offset="1" stop-color="#DCE7EC"></stop>
+    </linearGradient>
+  </defs>
+  <path d="M256 88 C 344 194, 344 318, 256 424 C 168 318, 168 194, 256 88 Z" fill="url(#o)"></path>
 </svg>

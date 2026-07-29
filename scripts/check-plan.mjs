@@ -1,5 +1,6 @@
-// Vérifie la page Plan (semi 17 semaines, S1 = reprise) en vue semaine par semaine : navigation par
-// flèches, aperçu hebdo, cartes de séance, et viewer type Campus à l'ouverture d'une séance.
+// Vérifie la page Plan en vue semaine par semaine : navigation par flèches, aperçu hebdo, cartes
+// de séance, et viewer type Campus à l'ouverture d'une séance. Plan recalé : la numérotation
+// « Semaine 1..13 » part de la reprise (6 juil.) ; les semaines de juin sont marquées « historique ».
 // Prérequis : `npm run dev:demo` lancé.
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
@@ -17,15 +18,18 @@ page.on('console', (m) => {
 })
 
 try {
+  // Date figée (dim. 14/06/2026, fin de la S1 de reprise) → test déterministe quelle que soit
+  // la date d'exécution réelle (le plan semi est calé sur des dates fixes).
+  await page.clock.setFixedTime(new Date('2026-06-14T12:00:00'))
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // --- Onglet Plan : en-tête, navigateur de semaines, aperçu hebdo, cartes de séance
-  await page.getByRole('link', { name: 'Plan', exact: true }).click()
+  await page.getByRole('link', { name: '21K', exact: true }).click()
   await page.waitForSelector('text=Tout Rennes Court')
   await page.waitForSelector('text=Ton aperçu hebdomadaire')
-  await page.waitForSelector('text=Cette semaine') // S1 = reprise = la semaine en cours (départ 14 juin)
-  await page.waitForSelector('text=1 sur 17')
+  await page.waitForSelector('text=Cette semaine') // 14 juin = semaine en cours (départ 14 juin)
+  await page.waitForSelector('text=historique') // juin = conservé comme historique (avant la reprise du 6 juil.)
   await page.waitForSelector('text=Séance 1/1') // S1 = reprise : une seule sortie longue
   await page.waitForSelector('text=Sortie longue 8 km')
   // Panneau « Mes allures & zones » : replié par défaut, déplié au tap (constantes + 5 zones)
@@ -35,11 +39,11 @@ try {
   await page.waitForSelector('text=Endurance fondamentale')
   await page.screenshot({ path: `${DIR}/40-plan.png` })
 
-  // --- Navigation par flèches jusqu'à la semaine 14 (pic de volume)
+  // --- Navigation par flèches jusqu'au pic de volume (7 sept.) = Semaine 10 depuis la reprise
   for (let i = 0; i < 13; i++) {
     await page.click('[aria-label="Semaine suivante"]')
   }
-  await page.waitForSelector('text=Semaine 14')
+  await page.waitForSelector('text=Semaine 10')
   await page.waitForSelector('text=pic de volume')
   await page.waitForSelector('text=VMA 4×1200 m')
 
@@ -58,14 +62,16 @@ try {
   await page.waitForSelector('text=Quel jour as-tu fait cette séance')
   await page.click('[role="dialog"] >> text=Valider ✓')
   await page.waitForSelector('[role="dialog"]', { state: 'detached' })
-  await page.waitForSelector('text=Validée')
+  // La séance validée quitte le flux principal et passe en « Terminées » (comme Aujourd'hui)
+  await page.waitForSelector('h2:has-text("Terminées")')
+  await page.waitForSelector('section:has(h2:has-text("Terminées")) >> text=VMA 4×1200 m')
   await page.screenshot({ path: `${DIR}/43-plan-validee.png` })
 
   // --- Dernière semaine : le semi est bien là
   for (let i = 0; i < 3; i++) {
     await page.click('[aria-label="Semaine suivante"]')
   }
-  await page.waitForSelector('text=Semaine 17')
+  await page.waitForSelector('text=Semaine 13')
   await page.waitForSelector('text=Semi-marathon — 21,1 km')
   await page.screenshot({ path: `${DIR}/41-plan-course.png` })
 

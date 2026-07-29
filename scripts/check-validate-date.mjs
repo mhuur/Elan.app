@@ -18,6 +18,9 @@ page.on('console', (m) => {
 })
 
 try {
+  // Date figée (dim. 14/06/2026, fin de la S1 de reprise) → test déterministe quelle que soit
+  // la date d'exécution réelle (le plan semi est calé sur des dates fixes).
+  await page.clock.setFixedTime(new Date('2026-06-14T12:00:00'))
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 

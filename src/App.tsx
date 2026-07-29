@@ -14,9 +14,10 @@ import Login from './pages/Login'
 
 function Splash() {
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-cream">
-      <div className="animate-pulse text-5xl">🌿</div>
-      <p className="text-lg font-extrabold tracking-wide text-sage-600">Élan</p>
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-abysse">
+      {/* L'ogive écume, ombre douce de la charte, sur l'abysse du manifest */}
+      <img src="/icon.svg" alt="" className="h-16 w-16 animate-pulse drop-shadow-[0_18px_34px_rgba(2,10,16,0.55)]" />
+      <p className="text-lg font-extrabold tracking-[0.2em] text-ink-soft uppercase">Avel</p>
     </div>
   )
 }

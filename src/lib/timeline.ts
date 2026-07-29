@@ -79,6 +79,57 @@ export function timelineFromLog(log: Log): SetGroup[] {
   return rows.length ? [{ header: '', rows }] : []
 }
 
+/** Point d'arrêt d'une séance journalisée : la dernière série réellement faite, située dans le circuit */
+export interface StopPoint {
+  /** En-tête du groupe : « Bloc 2 · Tour 1/2 » (vide si un seul bloc et un seul tour) */
+  where: string
+  /** Nom de l'exercice de la dernière série faite */
+  name: string
+  /** « Série 2 » en muscu, vide en HIIT */
+  setLabel: string
+  /** Séries faites / prévues */
+  done: number
+  total: number
+  /** Toutes les séries prévues ont été faites */
+  complete: boolean
+}
+
+/**
+ * Où s'est arrêtée une séance journalisée. Le log ne garde que le compte de séries PAR EXERCICE :
+ * on rejoue donc la timeline prévue en consommant ces séries dans l'ordre réel d'exécution, et on
+ * retient la DERNIÈRE consommée. Prendre la dernière (plutôt que le premier manque) reste juste
+ * quand une série a été sautée en cours de route — le Player n'enregistre pas les séries passées.
+ * Renvoie null si la séance n'a pas de timeline (autre catégorie) ou si aucune série ne correspond
+ * (séance modifiée depuis le log) : l'appelant retombe alors sur le détail par exercice.
+ */
+export function stopPoint(log: Log, session: Session, exercises: Exercise[]): StopPoint | null {
+  const groups = buildTimeline(session, exercises)
+  const total = groups.reduce((a, g) => a + g.rows.length, 0)
+  if (!total) return null
+  const left = new Map<string, number>()
+  for (const r of log.results ?? []) left.set(r.exerciseId, (left.get(r.exerciseId) ?? 0) + r.sets.length)
+  let done = 0
+  let last: { group: SetGroup; row: SetRow } | null = null
+  for (const group of groups) {
+    for (const row of group.rows) {
+      const n = left.get(row.exId) ?? 0
+      if (n <= 0) continue
+      left.set(row.exId, n - 1)
+      done++
+      last = { group, row }
+    }
+  }
+  if (!last) return null
+  return {
+    where: last.group.header,
+    name: last.row.name,
+    setLabel: last.row.setLabel,
+    done,
+    total,
+    complete: done >= total,
+  }
+}
+
 /** Séries retenues (et indices ⚠ dans `sets`) pour un exercice, depuis la timeline à plat */
 export function collectSets(
   flatRows: SetRow[],

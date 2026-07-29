@@ -55,7 +55,7 @@ export interface PlanSeance {
   workout: Workout
 }
 
-export type PlanPhase = 'Fondation' | 'Développement' | 'Spécifique' | 'Affûtage'
+export type PlanPhase = 'Fondation' | 'Reconstruction' | 'Développement' | 'Spécifique' | 'Affûtage'
 
 export interface PlanWeek {
   /** Lundi de la semaine, YYYY-MM-DD */
@@ -89,11 +89,13 @@ export interface PlanZone {
 // Zones définies par la FC (méthode Réserve FC) : bornes FC contiguës, aucun trou.
 // L'allure est l'allure VISÉE dans ce type de séance (indicative), pas une frontière stricte.
 export const PLAN_ZONES: PlanZone[] = [
-  { label: 'Endurance fondamentale', pace: '5:45–6:05', hr: '140–152', hex: '#5f8862' },
-  { label: 'Endurance active', pace: '5:25–5:45', hr: '152–162', hex: '#5b89ad' },
-  { label: 'Seuil', pace: '5:13–5:25', hr: '162–170', hex: '#c2773e' },
-  { label: 'Allure semi (cible)', pace: '5:08–5:13', hr: '170–173', hex: '#d4541c' },
-  { label: 'VMA', pace: '4:35–4:50', hr: '173–186', hex: '#cf6151' },
+  // Teintes de la charte bord de mer : remontées en clarté pour tenir sur l'ardoise,
+  // et étagées du calme (vert/bleu) vers l'intense (ambre → orange → corail).
+  { label: 'Endurance fondamentale', pace: '5:45–6:05', hr: '140–152', hex: '#86c48e' },
+  { label: 'Endurance active', pace: '5:25–5:45', hr: '152–162', hex: '#7fb6dc' },
+  { label: 'Seuil', pace: '5:13–5:25', hr: '162–170', hex: '#f0c060' },
+  { label: 'Allure semi (cible)', pace: '5:08–5:13', hr: '170–173', hex: '#f4956a' },
+  { label: 'VMA', pace: '4:35–4:50', hr: '173–186', hex: '#ef7d86' },
 ]
 
 // ----- Allures & FC de référence -----
@@ -174,12 +176,12 @@ export interface PlanTypeMeta {
   hex: string
 }
 export const TYPE_META: Record<PlanType, PlanTypeMeta> = {
-  ef: { short: 'Footing', hex: '#5f8862' }, // endurance — vert sauge
-  sl: { short: 'Sortie longue', hex: '#5b89ad' }, // long & régulier — bleu
-  seuil: { short: 'Seuil', hex: '#c2773e' }, // tempo — ambre
-  as: { short: 'Allure semi', hex: '#d4541c' }, // spécifique — orange
-  vma: { short: 'Fractionné', hex: '#cf6151' }, // intervalles — corail
-  course: { short: 'Course', hex: '#8d6ba0' }, // jour J — violet
+  ef: { short: 'Footing', hex: '#86c48e' }, // endurance — vert écume
+  sl: { short: 'Sortie longue', hex: '#7fb6dc' }, // long & régulier — bleu
+  seuil: { short: 'Seuil', hex: '#f0c060' }, // tempo — ambre
+  as: { short: 'Allure semi', hex: '#f4956a' }, // spécifique — orange
+  vma: { short: 'Fractionné', hex: '#ef7d86' }, // intervalles — corail
+  course: { short: 'Course', hex: '#b99ad4' }, // jour J — violet
 }
 
 /** Allure « m:ss » → secondes par km */
@@ -250,51 +252,67 @@ export const PLAN_SEMI = {
       mk(4, 'ef', 'Footing 6 km', '6 km en EF · 5 lignes droites', footing(6, 5)),
       mk(6, 'sl', 'Sortie longue 12 km', '12 km en EF', longRun(12)),
     ] },
-    { start: '2026-07-06', phase: 'Fondation', label: 'allégée', km: 27, seances: [
-      mk(1, 'ef', 'Footing 6 km', '6 km en EF · 6 lignes droites', footing(6, 6)),
+    { start: '2026-07-06', phase: 'Reconstruction', label: 'reprise', km: 26, seances: [
+      mk(1, 'ef', 'Footing 6 km', '6 km en EF · 5 lignes droites', footing(6, 5)),
       mk(2, 'ef', 'Footing 5 km', '5 km en EF', footing(5)),
-      mk(4, 'seuil', 'Tempo 2×8 min', '2×8 min à 5:20, récup 2 min', seuilInt(2, 8, '5:20', 120, 'Tempo')),
-      mk(6, 'sl', 'Sortie longue 9 km', '9 km en EF', longRun(9)),
+      mk(4, 'ef', 'Footing 6 km', '6 km en EF · 5 lignes droites', footing(6, 5)),
+      mk(6, 'sl', 'Sortie longue 9 km', '9 km en EF · chaleur : pilote à la FC', longRun(9, 'chaleur : pilote à la FC (≤150), l’allure n’a aucune importance')),
     ] },
-    { start: '2026-07-13', phase: 'Développement', km: 37, seances: [
-      mk(1, 'vma', 'VMA 8×400 m', '8×400 m à 4:40, récup 1:00', vma(8, 400, '4:40', 60)),
+    { start: '2026-07-13', phase: 'Reconstruction', km: 28, seances: [
+      mk(1, 'ef', 'Footing 6 km', '6 km en EF · 5 lignes droites', footing(6, 5)),
       mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
+      mk(4, 'ef', 'Footing 6 km', '6 km en EF · 5 lignes droites', footing(6, 5)),
+      mk(6, 'sl', 'Sortie longue 10 km', '10 km en EF', longRun(10, 'chaleur : cours tôt, pilote à la FC')),
+    ] },
+    { start: '2026-07-20', phase: 'Reconstruction', km: 31, seances: [
+      mk(1, 'vma', 'Fartlek 8×1 min', '20 min EF + 8×(1 min vif / 1 min EF) + 5 min calme', {
+        surface: 'route',
+        parts: [
+          { kind: 'steady', label: 'EF', durationSec: 20 * 60, pace: EF, hr: HR.ef },
+          rep(8, [{ kind: 'work', label: 'Vif', durationSec: 60, pace: p('4:55'), hr: HR.vma }, { kind: 'recovery', label: 'EF', durationSec: 60, pace: EF }]),
+          { kind: 'cooldown', label: 'Retour au calme', durationSec: 5 * 60, pace: EF },
+        ],
+      }),
+      mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
+      mk(4, 'ef', 'Footing 7 km', '7 km en EF · 5 lignes droites', footing(7, 5)),
+      mk(6, 'sl', 'Sortie longue 11 km', '11 km en EF', longRun(11)),
+    ] },
+    { start: '2026-07-27', phase: 'Développement', km: 33, seances: [
+      mk(1, 'vma', 'VMA 10×30/30', 'éch. + 10×(30 s vif / 30 s lent) + calme', {
+        surface: 'piste',
+        parts: [wu(15), rep(10, [{ kind: 'work', label: 'VMA', durationSec: 30, pace: p('4:30'), hr: HR.vma }, { kind: 'recovery', label: 'Lent', durationSec: 30 }]), cd(10)],
+      }),
+      mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
+      mk(4, 'seuil', 'Tempo 2×8 min', '2×8 min à 5:22, récup 2 min', seuilInt(2, 8, '5:22', 120, 'Tempo')),
+      mk(6, 'sl', 'Sortie longue 12 km', '12 km en EF', longRun(12)),
+    ] },
+    { start: '2026-08-03', phase: 'Développement', km: 38, seances: [
+      mk(1, 'vma', 'VMA 8×400 m', '8×400 m à 4:40, récup 1:00', vma(8, 400, '4:40', 60)),
+      mk(2, 'ef', 'Footing 7 km', '7 km en EF', footing(7)),
       mk(4, 'seuil', 'Seuil 20 min', '20 min continu à 5:18', seuilContinu(20, '5:18')),
       mk(6, 'sl', 'Sortie longue 13 km', '13 km en EF', longRun(13)),
     ] },
-    { start: '2026-07-20', phase: 'Développement', km: 39, seances: [
-      mk(1, 'vma', 'VMA 10×400 m', '10×400 m à 4:38, récup 1:00', vma(10, 400, '4:38', 60)),
-      mk(2, 'ef', 'Footing 7 km', '7 km en EF', footing(7)),
-      mk(4, 'seuil', 'Seuil 2×10 min', '2×10 min à 5:15, récup 2 min', seuilInt(2, 10, '5:15', 120)),
-      mk(6, 'sl', 'Sortie longue 14 km', '12 km EF + 2 km EA', longRunEA(12, 2)),
-    ] },
-    { start: '2026-07-27', phase: 'Développement', km: 42, seances: [
-      mk(1, 'vma', 'VMA 6×600 m', '6×600 m à 4:40, récup 1:15', vma(6, 600, '4:40', 75)),
-      mk(2, 'ef', 'Footing 8 km', '8 km en EF', footing(8)),
-      mk(4, 'seuil', 'Seuil 3×8 min', '3×8 min à 5:12, récup 2 min', seuilInt(3, 8, '5:12', 120)),
-      mk(6, 'sl', 'Sortie longue 15 km', '15 km en EF', longRun(15)),
-    ] },
-    { start: '2026-08-03', phase: 'Développement', label: 'allégée', km: 35, seances: [
+    { start: '2026-08-10', phase: 'Développement', label: 'allégée', km: 32, seances: [
       mk(1, 'vma', 'VMA 8×300 m', '8×300 m à 4:35, récup 1:00', vma(8, 300, '4:35', 60)),
       mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
-      mk(4, 'seuil', 'Seuil 20 min', '20 min continu à 5:12', seuilContinu(20, '5:12')),
-      mk(6, 'sl', 'Sortie longue 13 km', '13 km en EF', longRun(13)),
+      mk(4, 'seuil', 'Seuil 2×8 min', '2×8 min à 5:15, récup 2 min', seuilInt(2, 8, '5:15', 120)),
+      mk(6, 'sl', 'Sortie longue 11 km', '11 km en EF', longRun(11)),
     ] },
-    { start: '2026-08-10', phase: 'Développement', km: 44, seances: [
+    { start: '2026-08-17', phase: 'Développement', km: 40, seances: [
+      mk(1, 'vma', 'VMA 6×600 m', '6×600 m à 4:40, récup 1:15', vma(6, 600, '4:40', 75)),
+      mk(2, 'ef', 'Footing 8 km', '8 km en EF', footing(8)),
+      mk(4, 'seuil', 'Seuil 2×10 min', '2×10 min à 5:12, récup 2 min', seuilInt(2, 10, '5:12', 120)),
+      mk(6, 'sl', 'Sortie longue 14 km', '12 km EF + 2 km EA', longRunEA(12, 2)),
+    ] },
+    { start: '2026-08-24', phase: 'Développement', km: 43, seances: [
       mk(1, 'vma', 'VMA 5×800 m', '5×800 m à 4:45, récup 1:30', vma(5, 800, '4:45', 90)),
       mk(2, 'ef', 'Footing 8 km', '8 km en EF', footing(8)),
-      mk(4, 'seuil', 'Seuil 2×12 min', '2×12 min à 5:10, récup 2:30', seuilInt(2, 12, '5:10', 150)),
-      mk(6, 'sl', 'Sortie longue 16 km', '13 km EF + 3 km EA', longRunEA(13, 3)),
-    ] },
-    { start: '2026-08-17', phase: 'Développement', km: 45, seances: [
-      mk(1, 'vma', 'VMA 6×800 m', '6×800 m à 4:42, récup 1:30', vma(6, 800, '4:42', 90)),
-      mk(2, 'ef', 'Footing 8 km', '8 km en EF', footing(8)),
       mk(4, 'seuil', 'Seuil 25 min', '25 min continu à 5:10', seuilContinu(25, '5:10')),
-      mk(6, 'sl', 'Sortie longue 17 km', '17 km en EF', longRun(17)),
+      mk(6, 'sl', 'Sortie longue 15 km', '13 km EF + 2 km EA', longRunEA(13, 2)),
     ] },
-    { start: '2026-08-24', phase: 'Spécifique', km: 47, seances: [
+    { start: '2026-08-31', phase: 'Spécifique', km: 44, seances: [
       mk(1, 'vma', 'VMA 5×1000 m', '5×1000 m à 4:48, récup 1:30', vma(5, 1000, '4:48', 90)),
-      mk(2, 'ef', 'Footing 8 km', '8 km en EF', footing(8)),
+      mk(2, 'ef', 'Footing 7 km', '7 km en EF', footing(7)),
       mk(4, 'as', 'Allure semi 3×2 km', '3×2 km à 5:10, récup 2 min', asInt(3, 2000, '5:10', 120)),
       mk(6, 'sl', 'Sortie longue 16 km', '16 km dont 2×4 km à allure semi', {
         surface: 'route',
@@ -307,45 +325,39 @@ export const PLAN_SEMI = {
         ],
       }),
     ] },
-    { start: '2026-08-31', phase: 'Spécifique', label: 'allégée', km: 42, seances: [
-      mk(1, 'vma', 'VMA 4×1000 m', '4×1000 m à 4:46, récup 1:30', vma(4, 1000, '4:46', 90)),
-      mk(2, 'ef', 'Footing 7 km', '7 km en EF', footing(7)),
-      mk(4, 'as', 'Allure semi 4×1500 m', '4×1500 m à 5:08, récup 2 min', asInt(4, 1500, '5:08', 120)),
-      mk(6, 'sl', 'Sortie longue 14 km', '14 km en EF', longRun(14)),
-    ] },
-    { start: '2026-09-07', phase: 'Spécifique', label: 'pic de volume', km: 49, seances: [
+    { start: '2026-09-07', phase: 'Spécifique', label: 'pic de volume', km: 45, seances: [
       mk(1, 'vma', 'VMA 4×1200 m', '4×1200 m à 4:48, récup 2 min', vma(4, 1200, '4:48', 120)),
       mk(2, 'ef', 'Footing 8 km', '8 km en EF', footing(8)),
-      mk(4, 'seuil', 'Seuil 2×15 min', '2×15 min à 5:08, récup 3 min', seuilInt(2, 15, '5:08', 180)),
-      mk(6, 'sl', 'Répétition générale 18 km', '18 km dont 6 km à allure semi', {
+      mk(4, 'seuil', 'Seuil 2×10 min', '2×10 min à 5:10, récup 2:30', seuilInt(2, 10, '5:10', 150)),
+      mk(6, 'sl', 'Répétition générale 17 km', '17 km dont 6 km à allure semi', {
         surface: 'route',
         parts: [
-          { kind: 'steady', label: 'EF', distanceM: 8000, pace: EF, hr: HR.ef },
+          { kind: 'steady', label: 'EF', distanceM: 7000, pace: EF, hr: HR.ef },
           { kind: 'work', label: 'Allure semi', distanceM: 6000, pace: p('5:10'), hr: HR.as, note: 'teste ravito, allure et tenue du jour J' },
           { kind: 'steady', label: 'EF', distanceM: 4000, pace: EF, hr: HR.ef },
         ],
       }),
     ] },
-    { start: '2026-09-14', phase: 'Spécifique', km: 46, seances: [
+    { start: '2026-09-14', phase: 'Spécifique', km: 40, seances: [
       mk(1, 'vma', 'VMA 5×800 m', '5×800 m à 4:42, récup 1:30', vma(5, 800, '4:42', 90)),
-      mk(2, 'ef', 'Footing 7 km', '7 km en EF', footing(7)),
-      mk(4, 'as', 'Allure semi 3×3 km', '3×3 km à 5:08, récup 2:30', asInt(3, 3000, '5:08', 150)),
-      mk(6, 'sl', 'Sortie longue 16 km', '16 km dont 2×5 km à allure semi', {
+      mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
+      mk(4, 'as', 'Allure semi 3×2 km', '3×2 km à 5:08, récup 2 min', asInt(3, 2000, '5:08', 120)),
+      mk(6, 'sl', 'Sortie longue 14 km', '14 km dont 2×4 km à allure semi', {
         surface: 'route',
         parts: [
           { kind: 'steady', label: 'EF', distanceM: 3000, pace: EF, hr: HR.ef },
-          { kind: 'work', label: 'Allure semi', distanceM: 5000, pace: p('5:10'), hr: HR.as },
+          { kind: 'work', label: 'Allure semi', distanceM: 4000, pace: p('5:10'), hr: HR.as },
           { kind: 'recovery', label: 'EF', distanceM: 1000, pace: EF, hr: HR.ef },
-          { kind: 'work', label: 'Allure semi', distanceM: 5000, pace: p('5:10'), hr: HR.as },
+          { kind: 'work', label: 'Allure semi', distanceM: 4000, pace: p('5:10'), hr: HR.as },
           { kind: 'steady', label: 'EF', distanceM: 2000, pace: EF, hr: HR.ef },
         ],
       }),
     ] },
-    { start: '2026-09-21', phase: 'Affûtage', km: 36, seances: [
+    { start: '2026-09-21', phase: 'Affûtage', km: 33, seances: [
       mk(1, 'vma', 'VMA 6×400 m', '6×400 m à 4:40, récup 1:00', vma(6, 400, '4:40', 60)),
       mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
       mk(4, 'as', 'Allure semi 2×2 km', '2×2 km à 5:08, récup 2 min', asInt(2, 2000, '5:08', 120)),
-      mk(6, 'sl', 'Sortie longue 13 km', '13 km en EF', longRun(13)),
+      mk(6, 'sl', 'Sortie longue 11 km', '11 km en EF', longRun(11)),
     ] },
     { start: '2026-09-28', phase: 'Affûtage', label: 'semaine de course', km: 37, seances: [
       mk(1, 'ef', 'Footing 6 km', '6 km en EF · 4 lignes droites', footing(6, 4)),

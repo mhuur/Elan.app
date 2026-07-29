@@ -7,13 +7,15 @@ import { DAY_NAMES, addDays, formatShortFr, toDateStr } from '../lib/dates'
 import { isRepeat, stepSeconds, workoutStats, type PlanSeance, type Pace, type WorkoutStep, type WorkoutPart } from '../data/plan'
 import type { Activity } from '../types'
 
-// Couleurs façon COROS Campus : échauffement/EF vert, travail orange, récup rose
-const KIND: Record<WorkoutStep['kind'], { bar: string; border: string; label: string }> = {
-  warmup: { bar: '#bcd35f', border: 'border-[#bcd35f]', label: 'text-[#74902a]' },
-  steady: { bar: '#bcd35f', border: 'border-[#bcd35f]', label: 'text-[#74902a]' },
-  work: { bar: '#f4733a', border: 'border-[#f4733a]', label: 'text-[#d4541c]' },
-  recovery: { bar: '#f6b6cb', border: 'border-[#f6b6cb]', label: 'text-[#c76b89]' },
-  cooldown: { bar: '#f6b6cb', border: 'border-[#f6b6cb]', label: 'text-[#c76b89]' },
+// Couleurs façon COROS Campus, calées sur la charte bord de mer : échauffement/EF vert
+// écume, travail orange, récup rose. Barre et libellé partagent la teinte — sur l'ardoise,
+// un libellé assombri (l'ancien vert olive) devenait illisible.
+const KIND: Record<WorkoutStep['kind'], { bar: string; label: string }> = {
+  warmup: { bar: '#86c48e', label: 'text-[#86c48e]' },
+  steady: { bar: '#86c48e', label: 'text-[#86c48e]' },
+  work: { bar: '#f4956a', label: 'text-[#f4956a]' },
+  recovery: { bar: '#e9a2bd', label: 'text-[#e9a2bd]' },
+  cooldown: { bar: '#e9a2bd', label: 'text-[#e9a2bd]' },
 }
 const HEIGHT: Record<WorkoutStep['kind'], number> = { warmup: 0.62, steady: 0.55, work: 0.96, recovery: 0.4, cooldown: 0.55 }
 
@@ -100,9 +102,9 @@ function Part({ part }: { part: WorkoutPart }) {
   }
   const pill = part.kind === 'warmup' ? 'Échauffement' : part.kind === 'cooldown' ? 'Récupération' : undefined
   return (
-    <div className="relative rounded-2xl border border-sand bg-surface px-3 py-2.5">
+    <div className="relative rounded-2xl border border-sand bg-shoal px-3 py-2.5">
       {pill && (
-        <span className="absolute -top-2 left-3 rounded-full border border-sand bg-surface px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">
+        <span className="absolute -top-2 left-3 rounded-full border border-sand bg-shoal px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">
           {pill}
         </span>
       )}
@@ -132,7 +134,9 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
   const assoc = existing?.activityId ? activities.find((a) => a.id === existing.activityId) : undefined
   // Ne proposer que les sorties récentes (≤ 1 semaine) : au-delà, ce n'est pas la course à valider
   const weekAgo = toDateStr(addDays(new Date(), -7))
-  const recent = activities.filter((a) => a.date >= weekAgo).slice(0, 12)
+  // Une sortie déjà utilisée pour valider une séance ne réapparaît pas (une course = une séance)
+  const usedIds = new Set(logs.filter((l) => l.activityId).map((l) => l.activityId))
+  const recent = activities.filter((a) => a.date >= weekAgo && !usedIds.has(a.id)).slice(0, 12)
 
   // Sélection d'une sortie (ou « sans sortie ») → on passe à la confirmation de date,
   // pré-remplie avec la date de la sortie COROS (ou le jour prévu).
@@ -185,7 +189,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
       <div className="space-y-3">
         <p className="text-xs font-bold text-ink-soft">Quel jour as-tu fait cette séance ?</p>
         {chosen && (
-          <div className="rounded-2xl border border-sand bg-surface px-4 py-2.5">
+          <div className="rounded-2xl border border-sand bg-shoal px-4 py-2.5">
             <p className="text-sm font-bold first-letter:uppercase">{formatShortFr(chosen.date)}</p>
             <p className="text-xs font-semibold text-ink-soft">{activityLine(chosen)}</p>
           </div>
@@ -195,12 +199,12 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
           aria-label="Date de la séance"
           value={date}
           onChange={(e) => setDate(e.target.value || plannedDate)}
-          className="w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold text-ink outline-none focus:border-sage-400"
+          className="w-full rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-bold text-ink outline-none focus:border-sage-400"
         />
         <button
           type="button"
           onClick={validate}
-          className="w-full rounded-2xl bg-sage-500 px-5 py-3.5 text-base font-extrabold text-white shadow-md shadow-sage-500/25 active:bg-sage-600"
+          className="w-full rounded-2xl bg-sage-500 px-5 py-3.5 text-base font-extrabold text-onaccent shadow-md shadow-sage-500/25 active:bg-sage-600"
         >
           Valider ✓
         </button>
@@ -220,7 +224,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
             type="button"
             onClick={() => void strava.sync()}
             disabled={strava.syncing}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-sand bg-surface px-4 py-2.5 text-sm font-bold text-ink-soft active:bg-sage-50 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-sand bg-shoal px-4 py-2.5 text-sm font-bold text-ink-soft active:bg-sage-50 disabled:opacity-50"
           >
             <RefreshCw className={'h-4 w-4 ' + (strava.syncing ? 'animate-spin' : '')} />
             {strava.syncing ? 'Synchronisation…' : 'Synchroniser depuis Strava'}
@@ -239,7 +243,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
             key={a.id}
             type="button"
             onClick={() => pick(a)}
-            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-sand bg-surface px-4 py-2.5 text-left active:bg-sage-50"
+            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-sand bg-shoal px-4 py-2.5 text-left active:bg-sage-50"
           >
             <span className="text-sm font-bold first-letter:uppercase">{formatShortFr(a.date)}</span>
             <span className="shrink-0 text-xs font-semibold text-ink-soft">{activityLine(a)}</span>
@@ -263,7 +267,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
     <button
       type="button"
       onClick={() => setStep('picking')}
-      className="w-full rounded-2xl bg-sage-500 px-5 py-3.5 text-base font-extrabold text-white shadow-md shadow-sage-500/25 active:bg-sage-600"
+      className="w-full rounded-2xl bg-sage-500 px-5 py-3.5 text-base font-extrabold text-onaccent shadow-md shadow-sage-500/25 active:bg-sage-600"
     >
       Valider ma séance ✓
     </button>

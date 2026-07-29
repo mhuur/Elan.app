@@ -108,7 +108,7 @@ export default function ExerciseForm() {
                   type="button"
                   title="Retirer"
                   onClick={() => removeSubtype(st)}
-                  className="flex items-center gap-1.5 rounded-full bg-sage-500 px-3 py-1.5 text-xs font-extrabold text-white"
+                  className="flex items-center gap-1.5 rounded-full bg-sage-500 px-3 py-1.5 text-xs font-extrabold text-onaccent"
                 >
                   {st} <X className="h-3 w-3 opacity-60" />
                 </button>

@@ -15,15 +15,14 @@ const errors = []
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text()))
 
-// Dates relatives à AUJOURD'HUI (horloge système) : une course du jour, une de 12 jours avant
-const fmt = (d) => d.toISOString().slice(0, 10)
-const today = new Date()
-const old = new Date(today)
-old.setDate(old.getDate() - 12)
-const recentDate = fmt(today)
-const oldDate = fmt(old)
+// Dates déterministes : horloge figée au dim. 14/06/2026 (jour de la « Sortie longue 8 km » de
+// reprise). Une course du jour + une de 12 jours avant → test stable quelle que soit la date
+// réelle d'exécution (sinon la séance de reprise sort de la fenêtre de navigation arrière).
+const recentDate = '2026-06-14'
+const oldDate = '2026-06-02'
 
 try {
+  await page.clock.setFixedTime(new Date('2026-06-14T12:00:00'))
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 

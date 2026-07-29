@@ -11,6 +11,9 @@
 //   node scripts/push-to-intervals.mjs --week 5 --push → ENVOIE la semaine 5
 //   node scripts/push-to-intervals.mjs --push          → ENVOIE tout le plan
 //   ... --push --clear                                 → efface d'abord nos séances déjà envoyées (re-run propre)
+//   ... --future                                       → n'envoie QUE les séances d'aujourd'hui et à venir
+//                                                        (on ne planifie pas une séance dans le passé ; évite le bruit
+//                                                         « conformité 0% » sur intervals.icu). Recommandé, utilisé par le .bat.
 import { createServer } from 'vite'
 import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline/promises'
@@ -34,7 +37,11 @@ const has = (f) => args.includes(f)
 const valOf = (f) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : undefined }
 const PUSH = has('--push')
 const CLEAR = has('--clear')
+const FUTURE = has('--future')
 const onlyWeek = valOf('--week') ? Number(valOf('--week')) : undefined
+// Date du jour en local (YYYY-MM-DD) — sert au filtre --future
+const now = new Date()
+const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
 const API = 'https://intervals.icu/api/v1'
 // Identifiants : env, sinon fichier (« user + API.txt »…), sinon demandés à l'écran
@@ -51,7 +58,7 @@ async function ask(question) {
   return answer.trim()
 }
 
-// ---- Conversion d'une séance Élan → texte d'entraînement intervals.icu ----
+// ---- Conversion d'une séance Avel → texte d'entraînement intervals.icu ----
 const fmtDur = (sec) => {
   if (sec < 60) return `${sec}s`
   const m = Math.floor(sec / 60), s = sec % 60
@@ -89,6 +96,7 @@ PLAN_SEMI.weeks.forEach((week, wi) => {
   if (onlyWeek && wi + 1 !== onlyWeek) return
   for (const s of week.seances) {
     const date = seanceDateStr(week, s)
+    if (FUTURE && date < todayStr) continue // on ne planifie pas dans le passé
     events.push({
       category: 'WORKOUT',
       start_date_local: `${date}T00:00:00`,
@@ -115,7 +123,7 @@ async function clearOurs() {
   const existing = await api(`/athlete/${ATHLETE}/events?oldest=${oldest}&newest=${newest}&category=WORKOUT`)
   const ours = existing.filter((e) => (e.external_id ?? '').startsWith('elan-'))
   for (const e of ours) await api(`/athlete/${ATHLETE}/events/${e.id}`, { method: 'DELETE' })
-  console.log(`Nettoyage : ${ours.length} séance(s) Élan existante(s) supprimée(s).`)
+  console.log(`Nettoyage : ${ours.length} séance(s) Avel existante(s) supprimée(s).`)
 }
 
 // ---- Exécution ----

@@ -1,10 +1,8 @@
 // Vérifie : sous-types multiples + « + » de section, onglet Objectifs + célébration,
-// superset, heatmap, saisie rétroactive via la navigation de dates d'Aujourd'hui.
+// superset, suivis de Progrès, saisie rétroactive via la navigation de dates d'Aujourd'hui.
 import { chromium } from 'playwright'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
-const yesterday = new Date(Date.now() - 86400000)
-const yLabel = yesterday.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
@@ -49,7 +47,7 @@ try {
   await page.click('text=Enregistrer')
 
   // --- Onglet Objectifs : objectif Pompes à 2 paliers avec récompenses
-  await page.click('text=Objectifs')
+  await page.goto(BASE + '/goals') // onglet masqué : on atteint la page par URL
   await page.waitForSelector('text=Cap sur la progression')
   await page.click('text=+ Objectif')
   await page.waitForSelector('text=Nouvel objectif')
@@ -80,7 +78,7 @@ try {
   await page.waitForSelector('text=Terminées')
 
   // --- L'onglet montre le palier 1 débloqué et la progression vers le palier 2
-  await page.click('text=Objectifs')
+  await page.goto(BASE + '/goals') // onglet masqué : on atteint la page par URL
   await page.waitForSelector('text=Glace — débloquée !')
   await page.waitForSelector('text=12 / 20')
   await page.waitForSelector('text=Lunettes de soleil')
@@ -107,14 +105,12 @@ try {
   await page.click('text=Valider la séance ✓')
   await page.waitForSelector('text=Objectif atteint')
   await page.click('text=Continuer')
-  await page.click('text=Objectifs')
+  await page.goto(BASE + '/goals') // onglet masqué : on atteint la page par URL
   await page.waitForSelector('text=Tous les paliers atteints !')
   await page.screenshot({ path: 'screenshots/23-objectif-multi-atteint.png' })
 
-  // --- Progrès : régularité + fiche d'exercice (palier suivant avec récompense)
+  // --- Progrès : « Mes suivis » + fiche d'exercice (palier suivant avec récompense)
   await page.click('text=Progrès')
-  await page.waitForSelector('text=Régularité')
-  await page.waitForSelector("text=d'affilée")
   await page.waitForSelector('text=Mes suivis')
   await page.locator('button:has-text("Pompes")').first().click() // ligne du suivi → fiche
   await page.waitForSelector('text=Palier 20')
@@ -134,11 +130,11 @@ try {
   await page.click('text=Marquer comme faite')
   await page.waitForSelector('text=Terminées')
   await page.screenshot({ path: 'screenshots/19-retro.png' })
-  // L'historique de Progrès montre bien la date d'hier
+  // Retour sur Progrès : la page se recharge bien après la saisie rétroactive
   await page.click('text=Progrès')
-  await page.waitForSelector(`text=${yLabel}`)
+  await page.waitForSelector('text=Mes suivis')
 
-  console.log('V5 OK — sous-types multiples, + de section, Objectifs, superset, heatmap, rétroactif par dates')
+  console.log('V5 OK — sous-types multiples, + de section, Objectifs, superset, rétroactif par dates')
   if (errors.length) {
     console.error('ERREURS :')
     for (const e of errors) console.error(' -', e)

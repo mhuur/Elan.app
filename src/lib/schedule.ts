@@ -66,9 +66,17 @@ export function canonicalCycles(sessions: Session[]): Map<string, string[][]> {
   return cycles
 }
 
-/** Séance propriétaire du cycle canonique dont fait partie sessionId (elle-même si propriétaire) */
-export function ownerOf(sessionId: string, sessions: Session[]): Session | undefined {
-  for (const [ownerId, steps] of canonicalCycles(sessions)) {
+/**
+ * Séance propriétaire du cycle canonique dont fait partie sessionId (elle-même si
+ * propriétaire). `cycles` peut être pré-calculé et passé pour éviter de reconstruire
+ * les cycles à chaque appel (cf. mémoïsation dans Planning/Aujourd'hui).
+ */
+export function ownerOf(
+  sessionId: string,
+  sessions: Session[],
+  cycles: Map<string, string[][]> = canonicalCycles(sessions),
+): Session | undefined {
+  for (const [ownerId, steps] of cycles) {
     if (steps.some((st) => st.includes(sessionId))) return sessions.find((s) => s.id === ownerId)
   }
   return undefined
@@ -80,11 +88,14 @@ export function ownerOf(sessionId: string, sessions: Session[]): Session | undef
  * séances de l'étape du jour). Les membres d'un cycle sont pilotés par la
  * rotation : leurs éventuels jours fixes résiduels sont ignorés.
  */
-export function plannedSessionIdsOn(date: Date, sessions: Session[]): Set<string> {
+export function plannedSessionIdsOn(
+  date: Date,
+  sessions: Session[],
+  cycles: Map<string, string[][]> = canonicalCycles(sessions),
+): Set<string> {
   const ids = new Set<string>()
   const dStr = toDateStr(date)
   const dayIdx = mondayIndex(date)
-  const cycles = canonicalCycles(sessions)
   const inCycle = new Set([...cycles.values()].flat(2))
   for (const [ownerId, steps] of cycles) {
     const owner = sessions.find((x) => x.id === ownerId)
@@ -109,12 +120,16 @@ export function plannedSessionIdsOn(date: Date, sessions: Session[]): Set<string
 }
 
 /** Description courte de la planification d'une séance (y compris membre d'un cycle) */
-export function describeSchedule(s: Session, all: Session[]): string {
+export function describeSchedule(
+  s: Session,
+  all: Session[],
+  cycles: Map<string, string[][]> = canonicalCycles(all),
+): string {
   const nameOf = (id: string) => all.find((x) => x.id === id)?.name ?? '?'
-  const owner = ownerOf(s.id, all)
+  const owner = ownerOf(s.id, all, cycles)
   if (owner?.repeat) {
     const r = owner.repeat
-    const steps = canonicalCycles(all).get(owner.id) ?? []
+    const steps = cycles.get(owner.id) ?? []
     const base =
       r.onDays && r.onDays.length
         ? r.onDays.slice().sort((a, b) => a - b).map((d) => DAY_SHORT[d]).join(' · ')

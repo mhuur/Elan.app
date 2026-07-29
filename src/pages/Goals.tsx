@@ -6,7 +6,7 @@ import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { CategoryIcon, EmptyState, Fab, Field, NumInput, PageHeader, PrimaryButton, Seg, Select, Sheet } from '../components/ui'
 
 const inputSm =
-  'w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
+  'w-full rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
 
 function ProgressBar({ ratio, reached }: { ratio: number; reached: boolean }) {
   return (

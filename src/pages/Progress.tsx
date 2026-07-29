@@ -13,51 +13,32 @@ import {
 } from 'recharts'
 import { ChevronRight, MoveRight, TrendingDown, TrendingUp, TriangleAlert } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, type Exercise, type Log, type MetricValue, type Session } from '../types'
-import { addDays, formatDayMonth, formatShortFr, startOfWeek, toDateStr, todayStr } from '../lib/dates'
-import { logSummary } from '../lib/format'
+import { CATEGORY_META, type Exercise, type MetricValue, type Session } from '../types'
+import { formatShortFr } from '../lib/dates'
 import { goalLevels } from '../lib/metrics'
 import { buildTimeline } from '../lib/timeline'
 import { CategoryIcon, Chip, EmptyState, PageHeader, Select, Sheet } from '../components/ui'
-import LogSheet from '../components/LogSheet'
 
-const HEAT_WEEKS = 16
-
-/** Heatmap d'activité façon Strava/GitHub : 16 semaines, lundi en haut */
-function Heatmap({ logs }: { logs: Log[] }) {
-  const byDate = new Map<string, number>()
-  for (const l of logs) byDate.set(l.date, (byDate.get(l.date) ?? 0) + 1)
-  const monday = startOfWeek(new Date())
-  const today = todayStr()
-  return (
-    <div className="flex justify-between gap-1">
-      {Array.from({ length: HEAT_WEEKS }, (_, w) => {
-        const ws = addDays(monday, -7 * (HEAT_WEEKS - 1 - w))
-        return (
-          <div key={w} className="flex flex-col gap-1">
-            {Array.from({ length: 7 }, (_, d) => {
-              const ds = toDateStr(addDays(ws, d))
-              const count = byDate.get(ds) ?? 0
-              const cls =
-                ds > today
-                  ? 'bg-transparent'
-                  : count === 0
-                    ? 'bg-sand/70'
-                    : count === 1
-                      ? 'bg-sage-300'
-                      : count === 2
-                        ? 'bg-sage-500'
-                        : 'bg-sage-700'
-              return <div key={d} title={`${formatShortFr(ds)} : ${count}`} className={'h-3.5 w-3.5 rounded-[4px] ' + cls} />
-            })}
-          </div>
-        )
-      })}
-    </div>
-  )
+// Recharts dessine en SVG : ses couleurs ne peuvent pas venir des classes Tailwind.
+// Ces valeurs sont donc le miroir des tokens de index.css (charte bord de mer).
+const axisStyle = { fontSize: 11, fontFamily: 'Nunito', fill: '#8fa8b6' } // ink-soft
+const GRID = '#17323f' // sand
+/** Infobulle Recharts par défaut : fond clair d'origine → carte ardoise */
+const TOOLTIP = {
+  contentStyle: {
+    background: '#0e2634',
+    border: '1px solid #17323f',
+    borderRadius: 12,
+    fontFamily: 'Nunito',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#e9f2f6',
+    boxShadow: '0 10px 22px rgb(2 10 16 / 0.55)',
+  },
+  itemStyle: { color: '#e9f2f6' },
+  labelStyle: { color: '#8fa8b6' },
+  cursor: { stroke: '#2c6b85' },
 }
-
-const axisStyle = { fontSize: 11, fontFamily: 'Nunito', fill: '#717d72' }
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -165,12 +146,12 @@ function ExoSheetInner({ t }: { t: ExoTracker }) {
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 4, right: 8, left: -22, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eee9dd" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={axisStyle} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
-              <Tooltip formatter={(v) => [`${v} ${t.unit}`, '']} />
+              <Tooltip {...TOOLTIP} formatter={(v) => [`${v} ${t.unit}`, '']} />
               {levelsOnChart.map((lv) => (
-                <ReferenceLine key={lv.value} y={lv.value} stroke="#c2773e" strokeWidth={2} strokeDasharray="6 4" />
+                <ReferenceLine key={lv.value} y={lv.value} stroke="#e8a15c" strokeWidth={2} strokeDasharray="6 4" />
               ))}
               <Line type="monotone" dataKey="value" stroke={color} strokeWidth={3} dot={{ r: 4, fill: color }} />
             </LineChart>
@@ -259,10 +240,10 @@ function MetricsSheetInner({ t }: { t: MetricTracker }) {
         <div className="h-44">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 4, right: 8, left: -22, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eee9dd" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
               <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={axisStyle} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
-              <Tooltip formatter={(v) => [`${v}${sel?.unit ? ' ' + sel.unit : ''}`, '']} />
+              <Tooltip {...TOOLTIP} formatter={(v) => [`${v}${sel?.unit ? ' ' + sel.unit : ''}`, '']} />
               <Line type="monotone" dataKey="value" stroke={color} strokeWidth={3} dot={{ r: 4, fill: color }} />
             </LineChart>
           </ResponsiveContainer>
@@ -321,7 +302,7 @@ function SuccTooltip({ active, payload, label }: { active?: boolean; payload?: {
   if (!active || !payload?.length) return null
   const p = payload[0].payload
   return (
-    <div className="rounded-xl border border-sand bg-surface px-3 py-2 text-xs font-bold shadow-md">
+    <div className="rounded-xl border border-sand bg-shoal px-3 py-2 text-xs font-bold shadow-md">
       {label} · {p.done}/{p.total} séries · {p.total ? Math.round((p.done / p.total) * 100) : 0} %
       {p.flag > 0 ? ` · ${p.flag} mal réalisée${p.flag > 1 ? 's' : ''}` : ''}
     </div>
@@ -332,40 +313,6 @@ export default function Progress() {
   const { logs, exercises, sessions } = useData()
   const [openExo, setOpenExo] = useState<ExoTracker | null>(null)
   const [openMetrics, setOpenMetrics] = useState<MetricTracker | null>(null)
-  const [viewingLog, setViewingLog] = useState<Log | null>(null)
-
-  // Streak : semaines consécutives avec au moins une séance (semaine en cours tolérée)
-  const streak = useMemo(() => {
-    const monday = startOfWeek(new Date())
-    const hasWeek = (offset: number) => {
-      const a = toDateStr(addDays(monday, -7 * offset))
-      const b = toDateStr(addDays(monday, -7 * offset + 6))
-      return logs.some((l) => l.date >= a && l.date <= b)
-    }
-    let count = 0
-    let w = hasWeek(0) ? 0 : 1
-    while (hasWeek(w)) {
-      count++
-      w++
-    }
-    return count
-  }, [logs])
-
-  // Séances par semaine (8 dernières semaines)
-  const weekly = useMemo(() => {
-    const thisMonday = startOfWeek(new Date())
-    return Array.from({ length: 8 }, (_, i) => {
-      const ws = addDays(thisMonday, -7 * (7 - i))
-      const we = addDays(ws, 7)
-      const count = logs.filter((l) => {
-        const d = new Date(l.date + 'T12:00:00')
-        return d >= ws && d < we
-      }).length
-      return { label: i === 7 ? 'Cette sem.' : formatDayMonth(ws), count }
-    })
-  }, [logs])
-
-  const thisWeekCount = weekly[7]?.count ?? 0
 
   // Mes suivis — exercices : un point par séance où l'exercice a été journalisé
   const exoTrackers = useMemo(() => {
@@ -449,49 +396,6 @@ export default function Progress() {
 
       <div className="space-y-4 px-5">
         {!hasAnyLog && <EmptyState emoji="🌱" text="Complétez vos premières séances pour voir vos progrès fleurir ici." />}
-
-        {hasAnyLog && (
-          <>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-3xl bg-surface p-4 text-center shadow-sm">
-                <p className="text-2xl font-extrabold text-sage-600">{thisWeekCount}</p>
-                <p className="text-[11px] font-bold text-ink-soft">cette semaine</p>
-              </div>
-              <div className="rounded-3xl bg-surface p-4 text-center shadow-sm">
-                <p className="text-2xl font-extrabold text-sage-600">{weekly.reduce((a, w) => a + w.count, 0)}</p>
-                <p className="text-[11px] font-bold text-ink-soft">sur 8 semaines</p>
-              </div>
-              <div className="rounded-3xl bg-surface p-4 text-center shadow-sm">
-                <p className="text-2xl font-extrabold text-sage-600">{logs.length}</p>
-                <p className="text-[11px] font-bold text-ink-soft">au total</p>
-              </div>
-            </div>
-
-            <ChartCard title="Régularité">
-              <p className="mb-3 text-sm font-extrabold text-sage-700">
-                {streak > 0
-                  ? `🔥 ${streak} semaine${streak > 1 ? 's' : ''} d'affilée avec au moins une séance`
-                  : '🌱 Complétez une séance pour démarrer votre série'}
-              </p>
-              <Heatmap logs={logs} />
-              <p className="mt-2 text-right text-[11px] font-semibold text-ink-soft">16 dernières semaines</p>
-            </ChartCard>
-
-            <ChartCard title="Séances complétées par semaine">
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weekly} margin={{ top: 4, right: 8, left: -22, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eee9dd" vertical={false} />
-                    <XAxis dataKey="label" tick={axisStyle} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                    <YAxis tick={axisStyle} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip cursor={{ fill: '#f1f5f0' }} formatter={(v) => [`${v} séance${Number(v) > 1 ? 's' : ''}`, '']} />
-                    <Bar dataKey="count" fill="#71946f" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </ChartCard>
-          </>
-        )}
 
         {hasAnyLog && !hasTrackers && (
           <ChartCard title="Mes suivis">
@@ -582,13 +486,13 @@ export default function Progress() {
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={succData} margin={{ top: 4, right: 8, left: -22, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eee9dd" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
                     <XAxis dataKey="date" tick={axisStyle} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                     <YAxis tick={axisStyle} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip cursor={{ fill: '#f1f5f0' }} content={<SuccTooltip />} />
-                    <Bar dataKey="ok" stackId="a" fill="#71946f" />
+                    <Tooltip cursor={{ fill: '#16394b' }} content={<SuccTooltip />} />
+                    <Bar dataKey="ok" stackId="a" fill="#6fc6d6" />
                     <Bar dataKey="flag" stackId="a" fill="#fbbf24" />
-                    <Bar dataKey="missed" stackId="a" fill="#eee9dd" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="missed" stackId="a" fill="#17323f" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -611,47 +515,10 @@ export default function Progress() {
           </ChartCard>
         )}
 
-        {logs.length > 0 && (
-          <ChartCard title="Historique">
-            <p className="mb-2 text-xs font-semibold text-ink-soft">
-              Tapez une séance pour la consulter ou la corriger. Une séance oubliée ? Naviguez vers une date passée
-              depuis l'écran Aujourd'hui (flèche ‹).
-            </p>
-            <div>
-              {logs.slice(0, 15).map((l) => (
-                <button
-                  key={l.id}
-                  type="button"
-                  onClick={() => setViewingLog(l)}
-                  className="flex w-full items-center gap-2 border-b border-cream py-2 text-left last:border-0"
-                >
-                  <span className="w-14 shrink-0 text-xs font-bold text-ink-soft">{formatShortFr(l.date)}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1.5 text-sm font-extrabold">
-                      <CategoryIcon
-                        category={l.category}
-                        className={`h-3.5 w-3.5 shrink-0 ${CATEGORY_META[l.category].text}`}
-                      />
-                      <span className="min-w-0 truncate">{l.sessionName}</span>
-                    </p>
-                    <p className="truncate text-xs font-semibold text-ink-soft">{logSummary(l)}</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-ink-soft/40" />
-                </button>
-              ))}
-              {logs.length > 15 && (
-                <p className="pt-2 text-center text-xs font-semibold text-ink-soft">
-                  … et {logs.length - 15} autres séances
-                </p>
-              )}
-            </div>
-          </ChartCard>
-        )}
       </div>
 
       <ExoSheet t={openExo} onClose={() => setOpenExo(null)} />
       <MetricsSheet t={openMetrics} onClose={() => setOpenMetrics(null)} />
-      <LogSheet log={viewingLog} onClose={() => setViewingLog(null)} />
     </div>
   )
 }

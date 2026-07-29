@@ -1,15 +1,16 @@
-// Cloudflare Worker — pont Strava → Élan
+// Cloudflare Worker — pont Strava → Avel
 //
 // Détient les identifiants Strava (en secrets, jamais dans l'app). À chaque appel il
 // rafraîchit le token Strava côté serveur (l'étape que le navigateur ne peut PAS faire :
 // Strava bloque le CORS sur /oauth/token), récupère les courses récentes et les renvoie
-// au format Élan. Le navigateur (app Élan) ne voit jamais le secret ni le token Strava.
+// au format Avel. Le navigateur (app Avel) ne voit jamais le secret ni le token Strava.
 //
 // Secrets attendus (wrangler secret put …) :
 //   STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, STRAVA_REFRESH_TOKEN
 // Optionnel : ELAN_SYNC_KEY (clé partagée anti-abus léger ; non secrète car embarquée dans l'app)
 
 const ALLOWED_ORIGINS = [
+  'https://avel.web.app',
   'https://routine-sport-ca440.web.app',
   'https://routine-sport-ca440.firebaseapp.com',
   'http://localhost:5173',
@@ -47,7 +48,7 @@ async function stravaAccessToken(env) {
 // Disciplines « course à pied » Strava qu'on importe
 const RUN_TYPES = new Set(['Run', 'TrailRun', 'VirtualRun'])
 
-/** Mappe une activité Strava vers le format Activity d'Élan */
+/** Mappe une activité Strava vers le format Activity d'Avel */
 function toActivity(a) {
   const distanceKm = (a.distance ?? 0) / 1000
   const durationSec = a.moving_time ?? a.elapsed_time ?? 0

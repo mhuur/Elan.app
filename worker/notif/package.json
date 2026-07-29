@@ -1,0 +1,10 @@
+{
+  "name": "elan-notif",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Worker Cloudflare : rappels de séance d'Avel (Web Push + Cron Trigger)",
+  "dependencies": {
+    "web-push-browser": "^1.4.2"
+  }
+}

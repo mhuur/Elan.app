@@ -4,7 +4,7 @@ cd /d "%~dp0"
 set "PATH=%PATH%;%LOCALAPPDATA%\Programs\node-v24.16.0-win-x64"
 echo.
 echo ========================================================
-echo   Autoriser Strava pour Elan (une seule fois)
+echo   Autoriser Strava pour Avel (une seule fois)
 echo ========================================================
 echo.
 echo  Prepare ton Client ID et Client Secret depuis :

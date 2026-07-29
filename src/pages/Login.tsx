@@ -19,10 +19,10 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-cream px-8 text-center">
-      <div className="text-6xl">🌿</div>
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-abysse px-8 text-center">
+      <img src="/icon.svg" alt="" className="h-20 w-20 drop-shadow-[0_18px_34px_rgba(2,10,16,0.55)]" />
       <div>
-        <h1 className="text-3xl font-extrabold text-sage-700">Élan</h1>
+        <h1 className="text-3xl font-extrabold tracking-wide text-ink">Avel</h1>
         <p className="mt-2 text-sm font-semibold text-ink-soft">
           Planifiez vos séances, enregistrez vos performances,
           <br />

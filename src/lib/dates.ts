@@ -47,3 +47,16 @@ export function formatShortFr(dateStr: string): string {
 export function formatDayMonth(d: Date): string {
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
 }
+
+/** « aujourd'hui » / « hier » / « il y a 3 j » / « il y a 2 sem. » / sinon « 10 juin » */
+export function relativeDayFr(dateStr: string, from: Date = new Date()): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  const ref = new Date(toDateStr(from) + 'T12:00:00')
+  const days = Math.round((ref.getTime() - d.getTime()) / 86_400_000)
+  if (days <= 0) return "aujourd'hui"
+  if (days === 1) return 'hier'
+  if (days < 7) return `il y a ${days} j`
+  if (days < 14) return 'il y a 1 sem.'
+  if (days < 56) return `il y a ${Math.round(days / 7)} sem.`
+  return formatShortFr(dateStr)
+}

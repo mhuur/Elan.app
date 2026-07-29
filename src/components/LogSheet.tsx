@@ -4,6 +4,7 @@ import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Log } from '../types'
 import { buildTimeline, timelineFromLog, collectSets, type SetStatus } from '../lib/timeline'
 import { CategoryIcon, Field, NumInput, PrimaryButton, Sheet, TextArea } from './ui'
+import FeelingPicker from './FeelingPicker'
 import ResultTimeline from './ResultTimeline'
 
 const shortFr = (d: string) =>
@@ -97,11 +98,13 @@ function Inner({ log, onClose }: { log: Log; onClose: () => void }) {
     Object.fromEntries((log.metrics ?? []).map((m) => [m.key, m.value])),
   )
   const [note, setNote] = useState(log.note ?? '')
+  const [feeling, setFeeling] = useState<number | undefined>(log.feeling)
   // Date à laquelle la séance a été faite — éditable (ex. validée un autre jour que prévu)
   const [logDate, setLogDate] = useState(log.date)
 
   const save = async () => {
     const patch: Partial<Log> = { note: note.trim(), date: logDate }
+    if (feeling != null) patch.feeling = feeling
     if (log.metrics?.length) {
       patch.metrics = log.metrics.map((m) => ({ ...m, value: mvals[m.key] ?? m.value }))
     }
@@ -142,7 +145,7 @@ function Inner({ log, onClose }: { log: Log; onClose: () => void }) {
             aria-label="Date de la séance"
             value={logDate}
             onChange={(e) => setLogDate(e.target.value || log.date)}
-            className="rounded-lg border border-sand bg-surface px-2 py-1 text-sm font-bold text-ink outline-none focus:border-sage-400"
+            className="rounded-lg border border-sand bg-shoal px-2 py-1 text-sm font-bold text-ink outline-none focus:border-sage-400"
           />
         </label>
         <span className="shrink-0 text-xs font-semibold text-ink-soft/70">
@@ -173,8 +176,10 @@ function Inner({ log, onClose }: { log: Log; onClose: () => void }) {
         </div>
       )}
 
+      <FeelingPicker value={feeling} onChange={setFeeling} />
+
       <Field label="Note">
-        <TextArea value={note} onChange={setNote} rows={2} placeholder="Ressenti, remarques…" />
+        <TextArea value={note} onChange={setNote} rows={2} placeholder="Remarques (ex. « monter le niveau »)…" />
       </Field>
 
       <PrimaryButton onClick={() => void save()}>Enregistrer</PrimaryButton>

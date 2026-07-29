@@ -9,7 +9,9 @@ const BASE = process.env.BASE_URL ?? 'http://localhost:5190'
 const DIR = 'screenshots'
 mkdirSync(DIR, { recursive: true })
 
-const today = new Date().toISOString().slice(0, 10)
+// Horloge figée au dim. 14/06/2026 (jour de la « Sortie longue 8 km » de reprise) → la carte du
+// plan est visible sans dépendre de la date réelle, et la course mockée tombe dans la fenêtre < 1 sem.
+const today = '2026-06-14'
 const MOCK = {
   activities: [
     { externalId: 'strava-111', date: today, name: 'Sortie test Strava', distanceKm: 7.7, durationSec: 2700, paceSec: 350, avgHr: 150, source: 'strava' },
@@ -34,6 +36,7 @@ await page.route('**strava-elan.test.workers.dev**', async (route) => {
 })
 
 try {
+  await page.clock.setFixedTime(new Date('2026-06-14T12:00:00'))
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 

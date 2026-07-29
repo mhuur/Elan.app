@@ -16,5 +16,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Le service worker est typé à part (lib WebWorker, incompatible avec DOM) : cf. tsconfig.worker.json
+  "exclude": ["src/sw.ts"]
 }

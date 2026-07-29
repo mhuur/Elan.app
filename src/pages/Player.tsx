@@ -6,6 +6,7 @@ import { CATEGORY_META, setTargetsOf, type Category, type Exercise, type Session
 import { todayStr } from '../lib/dates'
 import { mmss } from '../lib/format'
 import { muscuBlocks } from '../lib/blocks'
+import { progressedSession } from '../lib/progression'
 import { tone as playTone } from '../lib/audio'
 import { CategoryIcon } from '../components/ui'
 
@@ -157,16 +158,20 @@ function itemLabel(session: Session, it: SessionItem, ex?: Exercise): string {
   return tgs.every((t) => t === tgs[0]) ? `${tgs.length} × ${tgs[0]}${unit}` : tgs.join(' / ') + unit
 }
 
-/** Accents lumineux par catégorie pour l'écran sombre (palette de l'app éclaircie) */
+/**
+ * Accents par catégorie de l'écran immersif. Depuis la charte bord de mer, les couleurs
+ * de catégorie de l'app sont elles-mêmes claires : plus besoin d'une seconde palette
+ * éclaircie, on lit directement les tokens partagés.
+ */
 const ACCENT: Record<Category, string> = {
-  running: '#e3a06b',
-  velo: '#85b2d6',
-  muscu: '#bb97cf',
-  hiit: '#f28b78',
-  etirements: '#93c096',
+  running: CATEGORY_META.running.hex,
+  velo: CATEGORY_META.velo.hex,
+  muscu: CATEGORY_META.muscu.hex,
+  hiit: CATEGORY_META.hiit.hex,
+  etirements: CATEGORY_META.etirements.hex,
 }
-/** Repos et préparation : accent apaisé, bleuté */
-const CALM = '#8fb3c9'
+/** Repos et préparation : le lagon de l'app, apaisé (= --color-sage-600) */
+const CALM = '#8fd9e4'
 
 /** Anneau de progression : piste discrète + arc accent qui se vide avec le temps restant */
 function Ring({
@@ -213,8 +218,18 @@ function Ring({
 export default function Player() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { sessions, exercises, addLog } = useData()
-  const session = sessions.find((s) => s.id === id)
+  const { sessions, exercises, addLog, logs } = useData()
+  const planned = sessions.find((s) => s.id === id)
+  // Cibles relevées à hauteur de la dernière perf (dérivé : la fiche de séance n'est pas touchée).
+  // Figées à l'ouverture du minuteur : le log écrit en fin de séance — ou une synchro venue d'un
+  // autre appareil — ne doit pas réécrire le programme pendant qu'on l'exécute.
+  const frozenRef = useRef<Session | null>(null)
+  const session = useMemo(() => {
+    if (!planned) return undefined
+    frozenRef.current ??= progressedSession(planned, exercises, logs, todayStr()).session
+    return frozenRef.current
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planned])
 
   const steps = useMemo(() => (session ? buildSteps(session, exercises) : []), [session, exercises])
   const totalSec = useMemo(() => steps.reduce((a, s) => a + s.sec, 0), [steps])
@@ -502,7 +517,7 @@ export default function Player() {
 
   if (phase === 'ready') {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-[#161b17] px-8 text-center text-white">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-abysse px-8 text-center text-white">
         <div
           className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white/10"
           style={{ color: ACCENT[session.category] }}
@@ -519,7 +534,7 @@ export default function Player() {
         <button
           type="button"
           onClick={start}
-          className="rounded-full bg-white px-10 py-5 text-lg font-extrabold text-ink shadow-lg shadow-black/40 active:bg-white/90"
+          className="rounded-full bg-ink px-10 py-5 text-lg font-extrabold text-abysse shadow-lg shadow-black/40 active:bg-ink/90"
         >
           C'est parti !
         </button>
@@ -532,7 +547,7 @@ export default function Player() {
 
   if (phase === 'done') {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-[#161b17] px-8 text-center text-white">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-abysse px-8 text-center text-white">
         <div className="text-6xl">🎉</div>
         <div>
           <h1 className="text-2xl font-extrabold">Bravo !</h1>
@@ -543,7 +558,7 @@ export default function Player() {
         <button
           type="button"
           onClick={() => navigate('/', { replace: true })}
-          className="rounded-full bg-white px-10 py-4 text-base font-extrabold text-ink shadow-lg shadow-black/40"
+          className="rounded-full bg-ink px-10 py-4 text-base font-extrabold text-abysse shadow-lg shadow-black/40"
         >
           Retour à ma journée
         </button>
@@ -553,7 +568,7 @@ export default function Player() {
 
   // Mode immersif sombre : accent lumineux par catégorie, repos sur une teinte apaisée
   const accent = step.type === 'work' ? ACCENT[session.category] : CALM
-  const bgByType = step.type === 'work' ? 'bg-[#161b17]' : 'bg-[#151a20]'
+  const bgByType = step.type === 'work' ? 'bg-abysse' : 'bg-[#08202e]'
 
   return (
     <div className={`relative flex min-h-dvh flex-col ${bgByType} text-white transition-colors duration-700`}>
@@ -632,7 +647,7 @@ export default function Player() {
                 tone(520, 0.2)
                 goTo(stepIdx + 1)
               }}
-              className="rounded-full bg-white px-10 py-4 text-lg font-extrabold text-ink shadow-lg shadow-black/30 active:bg-white/90"
+              className="rounded-full bg-ink px-10 py-4 text-lg font-extrabold text-abysse shadow-lg shadow-black/30 active:bg-ink/90"
             >
               {session.category === 'muscu' ? 'Série faite ✓' : 'Fait ✓'}
             </button>
@@ -686,7 +701,7 @@ export default function Player() {
             aria-label="Arrêter et enregistrer"
             title="Arrêter la séance ici (le réalisé est enregistré)"
             onClick={stopAndSave}
-            className="flex h-13 w-13 items-center justify-center rounded-full bg-white/10 text-[#f28b78] active:bg-white/20"
+            className="flex h-13 w-13 items-center justify-center rounded-full bg-white/10 text-hiit active:bg-white/20"
           >
             <Square className="h-5 w-5" fill="currentColor" />
           </button>
@@ -695,7 +710,7 @@ export default function Player() {
             aria-label={paused ? 'Reprendre' : 'Pause'}
             title={paused ? 'Reprendre (espace)' : 'Mettre en pause (espace)'}
             onClick={() => setPaused((p) => !p)}
-            className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-ink shadow-lg shadow-black/40 active:bg-white/90"
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-ink text-abysse shadow-lg shadow-black/40 active:bg-ink/90"
           >
             {paused ? <Play className="h-7 w-7" /> : <Pause className="h-7 w-7" />}
           </button>

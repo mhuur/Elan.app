@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
-import { Bug, Check, Cloud, Download, RefreshCw, Smartphone, Upload, X } from 'lucide-react'
+import { Bell, BellOff, Bug, Check, Cloud, Download, Plus, RefreshCw, Smartphone, Upload, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { todayStr } from '../lib/dates'
+import { usePushReminders } from '../lib/usePushReminders'
 import { formatLastSync, useStravaSync } from '../lib/useStravaSync'
 import type { StoreData } from '../data/store'
 import { GhostButton, Sheet } from './ui'
@@ -9,6 +10,7 @@ import { GhostButton, Sheet } from './ui'
 export default function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { mode, user, signOut, exportAll, importAll, ideas, addIdea, updateIdea, removeIdea } = useData()
   const strava = useStravaSync()
+  const rappels = usePushReminders()
   const fileRef = useRef<HTMLInputElement>(null)
   const [ideaText, setIdeaText] = useState('')
 
@@ -25,7 +27,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `elan-sauvegarde-${todayStr()}.json`
+    a.download = `avel-sauvegarde-${todayStr()}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -75,7 +77,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
               type="button"
               onClick={() => void strava.sync()}
               disabled={strava.syncing}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-surface px-4 py-2.5 text-sm font-extrabold text-sage-700 shadow-sm active:bg-sage-100 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-shoal px-4 py-2.5 text-sm font-extrabold text-sage-700 shadow-sm active:bg-sage-100 disabled:opacity-50"
             >
               <RefreshCw className={'h-4 w-4 ' + (strava.syncing ? 'animate-spin' : '')} />
               {strava.syncing ? 'Synchronisation…' : 'Synchroniser mes courses'}
@@ -83,6 +85,93 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
             <p className="mt-2 text-center text-xs font-semibold text-ink-soft">
               {strava.message ?? (formatLastSync(strava.lastSync) ? `Dernière synchro : ${formatLastSync(strava.lastSync)}` : 'Importe tes sorties COROS via Strava')}
             </p>
+          </div>
+        )}
+
+        {rappels.configured && (
+          <div className="rounded-2xl bg-sage-50 p-4">
+            <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+              <Bell className="h-3.5 w-3.5" /> Rappels de séance
+            </h3>
+            {rappels.supported ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void (rappels.enabled ? rappels.disable() : rappels.enable())}
+                  disabled={rappels.busy}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-shoal px-4 py-2.5 text-sm font-extrabold text-sage-700 shadow-sm active:bg-sage-100 disabled:opacity-50"
+                >
+                  {rappels.enabled ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+                  {rappels.enabled ? 'Désactiver les rappels' : 'Activer les rappels'}
+                </button>
+
+                {rappels.enabled && (
+                  <div className="mt-2 space-y-1.5">
+                    {rappels.hours.map((h, i) => (
+                      // Clé positionnelle : `key={h}` remonterait l'input à chaque frappe (la
+                      // valeur change), lui faisant perdre le focus en pleine saisie.
+                      <div key={i} className="flex items-center gap-2 rounded-xl bg-shoal px-4 py-2.5 shadow-sm">
+                        <span className="flex-1 text-sm font-extrabold text-ink">
+                          {i === 0 ? 'Rappel du jour à' : 'Puis relance à'}
+                        </span>
+                        <input
+                          type="time"
+                          aria-label={`Heure du rappel ${i + 1}`}
+                          value={h}
+                          onChange={(e) => void rappels.setHour(i, e.target.value)}
+                          disabled={rappels.busy}
+                          className="rounded-lg border border-sand bg-shoal px-2 py-1 text-sm font-extrabold text-ink outline-none focus:border-sage-400 disabled:opacity-50"
+                        />
+                        {rappels.hours.length > 1 && (
+                          <button
+                            type="button"
+                            aria-label={`Supprimer le rappel de ${h}`}
+                            onClick={() => void rappels.removeHour(i)}
+                            disabled={rappels.busy}
+                            className="shrink-0 rounded-lg p-1 text-ink-soft active:bg-sage-100 disabled:opacity-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+
+                    {rappels.canAdd && (
+                      <button
+                        type="button"
+                        onClick={() => void rappels.addHour()}
+                        disabled={rappels.busy}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-shoal px-4 py-2.5 text-sm font-extrabold text-sage-700 shadow-sm active:bg-sage-100 disabled:opacity-50"
+                      >
+                        <Plus className="h-4 w-4" /> Ajouter un rappel
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <p className="mt-2 text-center text-xs font-semibold text-ink-soft">
+                  {rappels.message ??
+                    (rappels.enabled
+                      ? 'Rien les jours de repos, ni si la séance est déjà validée'
+                      : 'Reçois ta séance du jour en notification')}
+                </p>
+
+                {rappels.enabled && (
+                  <button
+                    type="button"
+                    onClick={() => void rappels.sendTest()}
+                    disabled={rappels.busy}
+                    className="mt-1 w-full text-center text-xs font-extrabold text-sage-700 underline underline-offset-2 disabled:opacity-50"
+                  >
+                    Envoyer une notification de test
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="text-xs font-semibold text-ink-soft">
+                Ce navigateur ne gère pas les notifications. Installe Avel sur ton écran d'accueil depuis Chrome.
+              </p>
+            )}
           </div>
         )}
 
@@ -99,13 +188,13 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
                 if (e.key === 'Enter') void submitIdea()
               }}
               placeholder="Noter un bug ou une idée…"
-              className="min-w-0 flex-1 rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink-soft/60 focus:border-sage-400"
+              className="min-w-0 flex-1 rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink-soft/60 focus:border-sage-400"
             />
             {ideaText.trim() && (
               <button
                 type="button"
                 onClick={() => void submitIdea()}
-                className="shrink-0 rounded-full bg-sage-500 px-3.5 py-2 text-xs font-extrabold text-white active:bg-sage-600"
+                className="shrink-0 rounded-full bg-sage-500 px-3.5 py-2 text-xs font-extrabold text-onaccent active:bg-sage-600"
               >
                 + Noter
               </button>
@@ -114,14 +203,14 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
           {ideas.length > 0 && (
             <div className="mt-2 space-y-1.5">
               {ideas.map((i) => (
-                <div key={i.id} className="flex items-start gap-2 rounded-xl bg-surface px-3 py-2">
+                <div key={i.id} className="flex items-start gap-2 rounded-xl bg-shoal px-3 py-2">
                   <button
                     type="button"
                     aria-label={i.done ? 'Marquer à faire' : 'Marquer réglée'}
                     onClick={() => void updateIdea(i.id, { done: !i.done })}
                     className={
                       'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ' +
-                      (i.done ? 'bg-sage-500 text-white' : 'border-2 border-sand text-transparent')
+                      (i.done ? 'bg-sage-500 text-onaccent' : 'border-2 border-sand text-transparent')
                     }
                   >
                     <Check className="h-3 w-3" strokeWidth={3} />
@@ -175,7 +264,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
           </GhostButton>
         )}
 
-        <p className="pt-2 text-center text-xs text-ink-soft/60">Élan v1.0 — fait avec 🌿</p>
+        <p className="pt-2 text-center text-xs text-ink-soft/60">Avel v1.0 — fait avec 💨</p>
       </div>
     </Sheet>
   )

@@ -43,7 +43,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-ink/35" onClick={onClose} />
+      <div className="absolute inset-0 bg-abysse/70" onClick={onClose} />
       <div className="relative w-full max-w-lg max-h-[88dvh] overflow-y-auto rounded-t-3xl bg-surface px-5 pt-3 pb-10 shadow-2xl">
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-sand" />
         {title && <h2 className="mb-4 text-lg font-extrabold">{title}</h2>}
@@ -83,7 +83,7 @@ export function Select({
       className={
         (bare
           ? 'bg-transparent py-1 text-[15px] font-extrabold text-ink outline-none '
-          : 'rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400 ') +
+          : 'rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-bold outline-none focus:border-sage-400 ') +
         (className ?? 'w-full')
       }
     >
@@ -161,7 +161,7 @@ export function Combobox({
         }}
         className={
           small
-            ? 'w-full rounded-xl border border-sand bg-surface px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/60 focus:border-sage-400'
+            ? 'w-full rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/60 focus:border-sage-400'
             : inputCls
         }
       />
@@ -174,7 +174,7 @@ export function Combobox({
               setOpen(false)
             }}
           />
-          <div className="absolute inset-x-0 top-full z-50 mt-1.5 max-h-56 overflow-y-auto rounded-2xl border border-sand bg-surface py-1 shadow-xl">
+          <div className="absolute inset-x-0 top-full z-50 mt-1.5 max-h-56 overflow-y-auto rounded-2xl border border-sand bg-shoal py-1 shadow-xl">
             {filtered.slice(0, 40).map((o, i, arr) => (
               <Fragment key={o.id}>
                 {o.group && o.group !== arr[i - 1]?.group && (
@@ -209,7 +209,7 @@ export function Combobox({
 }
 
 const inputCls =
-  'w-full rounded-2xl border border-sand bg-surface px-4 py-3 text-base font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/60 focus:border-sage-400'
+  'w-full rounded-2xl border border-sand bg-shoal px-4 py-3 text-base font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/60 focus:border-sage-400'
 
 export function TextInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   return <input type="text" className={inputCls} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
@@ -275,7 +275,7 @@ export function Stepper({ value, onChange, min = 0, max = 990, step = 1, suffix,
           }}
           className={
             (small ? 'w-9 text-sm' : 'w-12 text-lg') +
-            ' rounded-lg border border-transparent bg-transparent text-center font-extrabold tabular-nums outline-none focus:border-sage-300 focus:bg-surface'
+            ' rounded-lg border border-transparent bg-transparent text-center font-extrabold tabular-nums outline-none focus:border-sage-300 focus:bg-sage-50'
           }
         />
         {suffix && <span className="text-xs font-bold text-ink-soft">{suffix}</span>}
@@ -294,7 +294,7 @@ export function Chip({ active, onClick, children }: { active: boolean; onClick: 
       onClick={onClick}
       className={
         'rounded-full px-4 py-2 text-sm font-bold transition-colors ' +
-        (active ? 'bg-sage-500 text-white shadow-sm' : 'bg-sage-100 text-sage-700 active:bg-sage-200')
+        (active ? 'bg-sage-500 text-onaccent shadow-sm' : 'bg-sage-100 text-sage-700 active:bg-sage-200')
       }
     >
       {children}
@@ -311,8 +311,10 @@ export function Seg<T extends string>({ options, value, onChange }: { options: {
           type="button"
           onClick={() => onChange(o.value)}
           className={
+            // Actif = aplat lagon : sur fond sombre, une pastille « plus claire que son
+            // rail » est la seule façon de lire la sélection (l'ombre, elle, ne se voit plus).
             'flex-1 rounded-xl px-3 py-2 text-sm font-bold transition-colors ' +
-            (o.value === value ? 'bg-surface text-ink shadow-sm' : 'text-sage-700')
+            (o.value === value ? 'bg-sage-500 text-onaccent shadow-sm' : 'text-sage-700')
           }
         >
           {o.label}
@@ -328,7 +330,7 @@ export function PrimaryButton({ onClick, children, disabled }: { onClick: () => 
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="w-full rounded-2xl bg-sage-500 px-5 py-4 text-base font-extrabold text-white shadow-md shadow-sage-500/25 active:bg-sage-600 disabled:opacity-40"
+      className="w-full rounded-2xl bg-sage-500 px-5 py-4 text-base font-extrabold text-onaccent shadow-md shadow-sage-500/25 active:bg-sage-600 disabled:opacity-40"
     >
       {children}
     </button>
@@ -355,7 +357,7 @@ export function Fab({ onClick, label }: { onClick: () => void; label: string }) 
     <button
       type="button"
       onClick={onClick}
-      className="fixed bottom-24 right-5 z-40 rounded-full bg-sage-500 px-5 py-4 text-sm font-extrabold text-white shadow-lg shadow-sage-500/30 active:bg-sage-600"
+      className="fixed bottom-24 right-5 z-40 rounded-full bg-sage-500 px-5 py-4 text-sm font-extrabold text-onaccent shadow-lg shadow-sage-500/30 active:bg-sage-600"
     >
       {label}
     </button>
@@ -393,7 +395,7 @@ export function FormActions({
           type="button"
           onClick={onSave}
           disabled={saveDisabled}
-          className="h-12 flex-1 rounded-2xl bg-sage-500 text-base font-extrabold text-white shadow-md shadow-sage-500/25 active:bg-sage-600 disabled:opacity-40"
+          className="h-12 flex-1 rounded-2xl bg-sage-500 text-base font-extrabold text-onaccent shadow-md shadow-sage-500/25 active:bg-sage-600 disabled:opacity-40"
         >
           Enregistrer
         </button>

@@ -1,11 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Footprints, Settings, Undo2 } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORIES, CATEGORY_META, type Log, type Session } from '../types'
-import { addDays, formatLongFr, mondayIndex, startOfWeek, toDateStr, todayStr } from '../lib/dates'
+import { CATEGORIES, CATEGORY_META, feelingOf, type Log, type Session } from '../types'
+import { addDays, formatLongFr, toDateStr } from '../lib/dates'
 import { logSummary, summarizeSession } from '../lib/format'
-import { plannedSessionIdsOn } from '../lib/schedule'
-import { PLAN_SEMI, TYPE_META, seanceDateStr, type PlanSeance } from '../data/plan'
+import { canonicalCycles, plannedSessionIdsOn } from '../lib/schedule'
+import { isPlanLog, planToDoOn, planWeekFor, type PlanSeanceState } from '../lib/planDay'
+import { planningSections } from '../lib/planningLayout'
+import { usePlanAnchor } from '../lib/usePlanAnchor'
+import { TYPE_META } from '../data/plan'
 import { CategoryIcon, EmptyState, Sheet } from '../components/ui'
 import CompleteSheet from '../components/CompleteSheet'
 import LogSheet from '../components/LogSheet'
@@ -13,40 +16,106 @@ import SettingsSheet from '../components/SettingsSheet'
 import WorkoutSheet from '../components/WorkoutSheet'
 
 export default function Today() {
-  const { sessions, logs } = useData()
+  const { sessions, logs, user } = useData()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [completing, setCompleting] = useState<Session | null>(null)
   // Fiche Campus d'une séance du plan (consulter / valider)
-  const [planSheet, setPlanSheet] = useState<PlanSeance | null>(null)
+  const [planSheet, setPlanSheet] = useState<PlanSeanceState | null>(null)
   // Fiche d'une séance terminée (consulter / corriger / supprimer)
   const [viewing, setViewing] = useState<Log | null>(null)
-  // Date affichée : on peut revenir en arrière pour valider des séances oubliées
-  const [viewDate, setViewDate] = useState(() => new Date())
+  // Jour affiché en OFFSET relatif au jour réel (et non figé au montage) : la vue suit ainsi
+  // le passage de minuit. `tick` force le recalcul quand l'onglet redevient visible/focus.
+  const [dayOffset, setDayOffset] = useState(0)
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const refresh = () => document.visibilityState === 'visible' && setTick((t) => t + 1)
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [])
+  const viewDate = useMemo(() => addDays(new Date(), dayOffset), [dayOffset, tick])
+  const [planAnchor] = usePlanAnchor(user?.uid)
 
   const dStr = toDateStr(viewDate)
-  const isToday = dStr === todayStr()
-  const isFuture = dStr > todayStr()
-  const shiftDay = (n: number) => setViewDate((d) => addDays(d, n))
+  const isToday = dayOffset === 0
+  const isFuture = dayOffset > 0
+  const shiftDay = (n: number) => setDayOffset((o) => o + n)
 
-  const plannedIds = plannedSessionIdsOn(viewDate, sessions)
-  const planned = sessions.filter((s) => plannedIds.has(s.id))
+  const cycles = useMemo(() => canonicalCycles(sessions), [sessions])
+  const plannedIds = useMemo(() => plannedSessionIdsOn(viewDate, sessions, cycles), [viewDate, sessions, cycles])
   const todayLogs = logs.filter((l) => l.date === dStr)
-  const doneIds = new Set(todayLogs.map((l) => l.sessionId))
-  const toDo = planned.filter((s) => !doneIds.has(s.id))
+  // Les logs « validation de séance du plan » (planRef) ne marquent pas une séance utilisateur faite
+  const doneIds = new Set(todayLogs.filter((l) => !isPlanLog(l)).map((l) => l.sessionId))
+  const toDo = sessions.filter((s) => plannedIds.has(s.id) && !doneIds.has(s.id))
 
-  // Séances de course du plan semi dues ce jour-là : la vue Aujourd'hui doit les
-  // proposer en « à faire », pas seulement les révéler après validation. On prend la
-  // semaine du plan dont le lundi correspond à celle de la date affichée (→ chaque séance
-  // tombe sur sa vraie date) et on retire celles déjà validées (log avec leur `planRef`)
-  // ou déjà couvertes par une course enregistrée ce jour-là (repli, comme le Planning).
-  const planWeekIdx = PLAN_SEMI.weeks.findIndex((w) => w.start === toDateStr(startOfWeek(viewDate)))
-  const planWeek = planWeekIdx >= 0 ? PLAN_SEMI.weeks[planWeekIdx] : undefined
-  const dayIdx = mondayIndex(viewDate)
-  const runThisDay = logs.some((l) => l.category === 'running' && l.date === dStr)
-  const planToDo = (planWeek?.seances ?? []).filter(
-    (s) => s.day === dayIdx && !logs.some((l) => l.planRef === 'elan-' + seanceDateStr(planWeek!, s)) && !runThisDay,
-  )
+  // Séances de course du plan dues ce jour-là et pas encore faites — source unique
+  // partagée avec le Planning (validation explicite ou course libre, cf. planToDoOn).
+  const planInfo = planWeekFor(viewDate)
+  const planWeekIdx = planInfo?.weekIdx ?? -1
+  const planToDo = planToDoOn(viewDate, logs)
+
+  // Ordre IDENTIQUE au Planning : on parcourt les sections dans leur ordre vertical et,
+  // dans la section « Running », on insère la séance du plan du jour avant les séances.
+  type DayItem = { kind: 'plan'; st: PlanSeanceState } | { kind: 'session'; s: Session }
+  const toDoSet = new Set(toDo.map((s) => s.id))
+  const sections = planningSections(sessions, !!planInfo, planAnchor)
+  const dayItems: DayItem[] = []
+  for (const sec of sections) {
+    if (sec.plan) for (const st of planToDo) dayItems.push({ kind: 'plan', st })
+    for (const s of sec.sessions) if (toDoSet.has(s.id)) dayItems.push({ kind: 'session', s })
+  }
+
+  const renderDayItem = (item: DayItem) => {
+    if (item.kind === 'plan') {
+      const s = item.st.seance
+      const t = TYPE_META[s.type]
+      return (
+        <button
+          key={item.st.planRef}
+          type="button"
+          onClick={() => setPlanSheet(item.st)}
+          className="flex w-full items-center gap-4 rounded-3xl bg-surface p-4 text-left shadow-sm transition-transform active:scale-[0.985]"
+        >
+          <div
+            className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl"
+            style={{ backgroundColor: t.hex + '1a', color: t.hex }}
+          >
+            <Footprints className="h-6 w-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-extrabold uppercase tracking-wider" style={{ color: t.hex }}>{t.short}</p>
+            <p className="truncate text-base font-extrabold">{s.title}</p>
+            {s.detail && <p className="truncate text-xs font-semibold text-ink-soft">{s.detail}</p>}
+          </div>
+          <ChevronRight className="h-5 w-5 shrink-0 text-sage-400" />
+        </button>
+      )
+    }
+    const s = item.s
+    const meta = CATEGORY_META[s.category]
+    return (
+      <button
+        key={s.id}
+        type="button"
+        onClick={() => setCompleting(s)}
+        className="flex w-full items-center gap-4 rounded-3xl bg-surface p-4 text-left shadow-sm transition-transform active:scale-[0.985]"
+      >
+        <div className={`flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl ${meta.soft} ${meta.text}`}>
+          <CategoryIcon category={s.category} className="h-6 w-6" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className={`text-[11px] font-extrabold uppercase tracking-wider ${meta.text}`}>{meta.label}</p>
+          <p className="truncate text-base font-extrabold">{s.name}</p>
+          <p className="truncate text-xs font-semibold text-ink-soft">{summarizeSession(s)}</p>
+        </div>
+        <ChevronRight className="h-5 w-5 shrink-0 text-sage-400" />
+      </button>
+    )
+  }
 
   return (
     <div>
@@ -89,7 +158,7 @@ export default function Today() {
           <div className="mt-2 text-center">
             <button
               type="button"
-              onClick={() => setViewDate(new Date())}
+              onClick={() => setDayOffset(0)}
               className="mx-auto flex items-center gap-1.5 rounded-full bg-sage-100 px-3.5 py-1.5 text-xs font-extrabold text-sage-700 active:bg-sage-200"
             >
               <Undo2 className="h-3.5 w-3.5" /> Revenir à aujourd'hui
@@ -99,54 +168,9 @@ export default function Today() {
       </header>
 
       <div className="space-y-3 px-5">
-        {planToDo.map((s) => {
-          const t = TYPE_META[s.type]
-          return (
-            <button
-              key={'plan-' + s.day}
-              type="button"
-              onClick={() => setPlanSheet(s)}
-              className="flex w-full items-center gap-4 rounded-3xl bg-surface p-4 text-left shadow-sm transition-transform active:scale-[0.985]"
-            >
-              <div
-                className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl"
-                style={{ backgroundColor: t.hex + '1a', color: t.hex }}
-              >
-                <Footprints className="h-6 w-6" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-extrabold uppercase tracking-wider" style={{ color: t.hex }}>{t.short}</p>
-                <p className="truncate text-base font-extrabold">{s.title}</p>
-                {s.detail && <p className="truncate text-xs font-semibold text-ink-soft">{s.detail}</p>}
-              </div>
-              <ChevronRight className="h-5 w-5 shrink-0 text-sage-400" />
-            </button>
-          )
-        })}
+        {dayItems.map(renderDayItem)}
 
-        {toDo.map((s) => {
-          const meta = CATEGORY_META[s.category]
-          return (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setCompleting(s)}
-              className="flex w-full items-center gap-4 rounded-3xl bg-surface p-4 text-left shadow-sm transition-transform active:scale-[0.985]"
-            >
-              <div className={`flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl ${meta.soft} ${meta.text}`}>
-                <CategoryIcon category={s.category} className="h-6 w-6" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className={`text-[11px] font-extrabold uppercase tracking-wider ${meta.text}`}>{meta.label}</p>
-                <p className="truncate text-base font-extrabold">{s.name}</p>
-                <p className="truncate text-xs font-semibold text-ink-soft">{summarizeSession(s)}</p>
-              </div>
-              <ChevronRight className="h-5 w-5 shrink-0 text-sage-400" />
-            </button>
-          )
-        })}
-
-        {toDo.length === 0 && planToDo.length === 0 && todayLogs.length === 0 && (
+        {dayItems.length === 0 && todayLogs.length === 0 && (
           <EmptyState
             emoji="🌿"
             text={
@@ -158,7 +182,7 @@ export default function Today() {
             }
           />
         )}
-        {toDo.length === 0 && planToDo.length === 0 && todayLogs.length > 0 && isToday && (
+        {dayItems.length === 0 && todayLogs.length > 0 && isToday && (
           <div className="rounded-3xl bg-sage-100 px-6 py-5 text-center">
             <p className="text-sm font-extrabold text-sage-700">Tout est fait pour aujourd'hui, bravo ! 🎉</p>
           </div>
@@ -186,7 +210,7 @@ export default function Today() {
                   onClick={() => setViewing(l)}
                   className="flex w-full items-center gap-3 rounded-3xl bg-surface/70 p-4 text-left shadow-sm transition-transform active:scale-[0.985]"
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage-500 text-white">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage-500 text-onaccent">
                     <Check className="h-4 w-4" strokeWidth={3} />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -194,7 +218,10 @@ export default function Today() {
                       <CategoryIcon category={l.category} className={`h-3.5 w-3.5 shrink-0 ${meta.text}`} />
                       <span className="min-w-0 truncate">{l.sessionName}</span>
                     </p>
-                    <p className="truncate text-xs font-semibold text-ink-soft">{logSummary(l)}</p>
+                    <p className="truncate text-xs font-semibold text-ink-soft">
+                      {logSummary(l)}
+                      {feelingOf(l.feeling) && <span className="ml-1">{feelingOf(l.feeling)!.emoji}</span>}
+                    </p>
                   </div>
                   <ChevronRight className="h-5 w-5 shrink-0 text-sage-400" />
                 </button>
@@ -207,10 +234,10 @@ export default function Today() {
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <CompleteSheet session={completing} date={dStr} onClose={() => setCompleting(null)} />
       <WorkoutSheet
-        seance={planSheet}
+        seance={planSheet?.seance ?? null}
         weekIdx={planWeekIdx}
-        planRef={planSheet && planWeek ? 'elan-' + seanceDateStr(planWeek, planSheet) : ''}
-        plannedDate={planSheet && planWeek ? seanceDateStr(planWeek, planSheet) : ''}
+        planRef={planSheet?.planRef ?? ''}
+        plannedDate={planSheet?.date ?? ''}
         onClose={() => setPlanSheet(null)}
       />
       <LogSheet log={viewing} onClose={() => setViewing(null)} />

@@ -1,6 +1,7 @@
-import type { Log, Session } from '../types'
+import type { Exercise, Log, Session } from '../types'
 import { effectiveMetrics } from './metrics'
 import { muscuBlocks } from './blocks'
+import { stopPoint } from './timeline'
 
 /** « 12:05 » à partir de secondes */
 export function mmss(totalSec: number): string {
@@ -55,6 +56,50 @@ export function logSummary(l: Log): string {
     return `${l.results.length} exercices · ${totalSets} séries${flaggedCount ? ` · ${flaggedCount} mal réalisée${flaggedCount > 1 ? 's' : ''}` : ''}`
   }
   return l.note || 'Bien joué !'
+}
+
+/**
+ * Récap riche de la dernière séance faite, pour le bloc « Dernière fois » :
+ * résultat vélo, ou — en muscu/HIIT — le point d'arrêt situé dans le circuit
+ * (« Arrêté au Bloc 2 · Tour 2/3 — Pompes · Série 2 · 8/14 séries »).
+ */
+export function lastPerfLine(l: Log, s?: Session, exercises: Exercise[] = []): string {
+  if (l.metrics?.length) {
+    return l.metrics.map((m) => `${m.value}${m.unit ? ' ' + m.unit : ''}`).join(' · ')
+  }
+  if (l.velo) {
+    const parts: string[] = []
+    if (l.velo.durationMin) parts.push(`${l.velo.durationMin} min`)
+    if (l.velo.distanceKm) parts.push(`${l.velo.distanceKm} km`)
+    if (l.velo.avgSpeedKmh) parts.push(`${l.velo.avgSpeedKmh} km/h`)
+    if (l.velo.avgBpm) parts.push(`${l.velo.avgBpm} bpm`)
+    if (parts.length) return parts.join(' · ')
+  }
+  if (l.results?.length) {
+    // Muscu / HIIT : à quel tour du circuit et sur quel exercice la séance s'est arrêtée
+    const sp = s ? stopPoint(l, s, exercises) : null
+    if (sp) {
+      const word = s?.category === 'hiit' ? 'intervalle' : 'série'
+      const count = `${sp.done}${sp.complete ? '' : `/${sp.total}`} ${word}${sp.total > 1 ? 's' : ''}`
+      if (sp.complete) return `Séance complète · ${count}`
+      const what = [sp.where, [sp.name, sp.setLabel].filter(Boolean).join(' · ')].filter(Boolean).join(' — ')
+      return `Arrêté à ${what} · ${count}`
+    }
+    // Repli (séance modifiée ou supprimée depuis) : le détail complet, sans troncature
+    return lastDetailLine(l)
+  }
+  return l.note || 'fait'
+}
+
+/** Détail par exercice d'un log muscu/HIIT : reps (ou secondes) par série, avec le total en reps */
+export function lastDetailLine(l: Log): string {
+  return (l.results ?? [])
+    .map((r) => {
+      const body = r.sets.join('·')
+      const sum = r.sets.reduce((a, b) => a + b, 0)
+      return r.measure === 'sec' ? `${r.name} ${body}s` : `${r.name} ${body} (${sum})`
+    })
+    .join(' — ')
 }
 
 /** Petit résumé d'une séance pour les cartes */

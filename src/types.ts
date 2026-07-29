@@ -250,11 +250,27 @@ export interface Log {
   velo?: VeloData
   results?: ExerciseResult[]
   note?: string
+  /** Ressenti de difficulté en fin de séance (1 = très facile … 5 = très dur) */
+  feeling?: number
   /** Séance du plan validée (ex. « elan-2026-06-30 ») — découple la validation de la date du log */
   planRef?: string
   /** Course COROS associée (id intervals.icu), si validée depuis une vraie sortie */
   activityId?: string
   createdAt: number
+}
+
+/** Ressenti de fin de séance (RPE simplifié) : 1 = très facile … 5 = très dur */
+export const FEELINGS: { value: number; emoji: string; label: string }[] = [
+  { value: 1, emoji: '😄', label: 'très facile' },
+  { value: 2, emoji: '🙂', label: 'facile' },
+  { value: 3, emoji: '😐', label: 'correct' },
+  { value: 4, emoji: '😓', label: 'difficile' },
+  { value: 5, emoji: '🥵', label: 'très dur' },
+]
+
+/** Métadonnée du ressenti (emoji + libellé) à partir de sa valeur, ou undefined si absent */
+export function feelingOf(v?: number) {
+  return v == null ? undefined : FEELINGS.find((f) => f.value === v)
 }
 
 export const CATEGORIES: Category[] = ['running', 'velo', 'muscu', 'hiit', 'etirements']
@@ -268,10 +284,12 @@ export interface CategoryMeta {
 }
 
 /** L'icône Lucide de chaque catégorie vit dans `components/ui.tsx` (CategoryIcon) */
+/** `hex` doit rester le miroir exact des tokens `--color-{catégorie}` de index.css
+ *  (charte bord de mer) : il sert aux graphes Recharts et aux aplats en style inline. */
 export const CATEGORY_META: Record<Category, CategoryMeta> = {
-  running: { label: 'Running', text: 'text-running', bg: 'bg-running', soft: 'bg-running/10', hex: '#c2773e' },
-  velo: { label: 'Vélo', text: 'text-velo', bg: 'bg-velo', soft: 'bg-velo/10', hex: '#5b89ad' },
-  muscu: { label: 'Muscu', text: 'text-muscu', bg: 'bg-muscu', soft: 'bg-muscu/10', hex: '#8d6ba0' },
-  hiit: { label: 'HIIT', text: 'text-hiit', bg: 'bg-hiit', soft: 'bg-hiit/10', hex: '#cf6151' },
-  etirements: { label: 'Étirements', text: 'text-etirements', bg: 'bg-etirements', soft: 'bg-etirements/10', hex: '#5f8862' },
+  running: { label: 'Running', text: 'text-running', bg: 'bg-running', soft: 'bg-running/10', hex: '#e8a15c' },
+  velo: { label: 'Vélo', text: 'text-velo', bg: 'bg-velo', soft: 'bg-velo/10', hex: '#7fb6dc' },
+  muscu: { label: 'Muscu', text: 'text-muscu', bg: 'bg-muscu', soft: 'bg-muscu/10', hex: '#b99ad4' },
+  hiit: { label: 'HIIT', text: 'text-hiit', bg: 'bg-hiit', soft: 'bg-hiit/10', hex: '#f08a76' },
+  etirements: { label: 'Étirements', text: 'text-etirements', bg: 'bg-etirements', soft: 'bg-etirements/10', hex: '#86c48e' },
 }

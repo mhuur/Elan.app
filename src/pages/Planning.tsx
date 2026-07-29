@@ -1,24 +1,20 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  DndContext,
-  PointerSensor,
-  TouchSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core'
-import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { DndContext, closestCenter } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ArrowLeft, ArrowRight, Footprints, GripVertical } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Session } from '../types'
-import { DAY_LETTER, DAY_NAMES, addDays, formatShortFr, mondayIndex, startOfWeek, toDateStr, todayStr } from '../lib/dates'
-import { describeSchedule, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
+import { DAY_LETTER, DAY_NAMES, addDays, formatShortFr, todayStr } from '../lib/dates'
+import { canonicalCycles, describeSchedule, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
+import { isPlanLog } from '../lib/planDay'
+import { usePlanAnchor } from '../lib/usePlanAnchor'
+import { usePlanningWeek } from '../lib/usePlanningWeek'
+import { usePlanningOrdering } from '../lib/usePlanningOrdering'
 import { CategoryIcon, EmptyState, PageHeader } from '../components/ui'
 import WorkoutSheet from '../components/WorkoutSheet'
-import { PLAN_SEMI, TYPE_META, seanceDateStr, type PlanSeance, type PlanWeek } from '../data/plan'
+import { TYPE_META, seanceDateStr, type PlanSeance } from '../data/plan'
 
 /** Grille commune : poignée · nom · 7 jours */
 const GRID = 'grid grid-cols-[1rem_minmax(0,1fr)_repeat(7,1.85rem)] items-center gap-x-0.5'
@@ -135,11 +131,13 @@ function PlanRow({
         </span>
       </button>
       {Array.from({ length: 7 }, (_, d) => {
-        // Rond plein le jour réellement fait ; anneau « prévu » le jour du plan (pâli si la
-        // séance a été faite un autre jour) ; petit point sable ailleurs.
+        // Rond plein le jour réellement fait ; anneau « prévu » le jour du plan UNIQUEMENT si
+        // la séance n'est pas encore faite (sinon le rond plein du vrai jour suffit, on
+        // n'encombre plus le jour prévu d'un anneau qui ressemble à « en attente ») ; petit
+        // point sable ailleurs.
         const isDone = done && d === doneCol
-        const isPlanned = d === s.day
-        const plannedMoved = done && isPlanned && doneCol !== s.day
+        // Anneau « prévu » seulement tant que la séance n'a pas été faite (ailleurs ou non)
+        const showPlannedRing = d === s.day && !done
         return (
           <button
             key={d}
@@ -150,11 +148,8 @@ function PlanRow({
           >
             {isDone ? (
               <span className="h-4 w-4 rounded-full shadow-sm transition-all" style={{ backgroundColor: t.hex }} />
-            ) : isPlanned ? (
-              <span
-                className={'h-4 w-4 rounded-full border-[3px] bg-surface transition-all ' + (plannedMoved ? 'opacity-40' : '')}
-                style={{ borderColor: t.hex }}
-              />
+            ) : showPlannedRing ? (
+              <span className="h-4 w-4 rounded-full border-[3px] bg-surface transition-all" style={{ borderColor: t.hex }} />
             ) : (
               <span className="h-2 w-2 rounded-full bg-sand" />
             )}
@@ -190,156 +185,35 @@ export default function Planning() {
   const navigate = useNavigate()
   // Navigation semaine par semaine (0 = cette semaine), avec dates, comme l'onglet Plan
   const [weekOffset, setWeekOffset] = useState(0)
-  const monday = addDays(startOfWeek(new Date()), weekOffset * 7)
-  // On ne surligne « aujourd'hui » que sur la semaine en cours
-  const todayIdx = weekOffset === 0 ? mondayIndex() : -1
-
-  // Position de la section « Running » du plan : elle n'a pas de séance pour porter un
-  // `sortOrder`, on l'ancre donc AU-DESSUS d'une section utilisateur ('__start__' = tout
-  // en haut, '__end__' = tout en bas), mémorisé en local (préférence d'affichage).
-  const anchorKey = `elan-plan-anchor-${user?.uid ?? 'local'}`
-  const [planAnchor, setPlanAnchor] = useState<string>(() => {
-    try {
-      return localStorage.getItem(anchorKey) ?? '__start__'
-    } catch {
-      return '__start__'
-    }
-  })
-  useEffect(() => {
-    try {
-      setPlanAnchor(localStorage.getItem(anchorKey) ?? '__start__')
-    } catch {
-      setPlanAnchor('__start__')
-    }
-  }, [anchorKey])
-  const savePlanAnchor = (k: string) => {
-    setPlanAnchor(k)
-    try {
-      localStorage.setItem(anchorKey, k)
-    } catch {
-      /* stockage indisponible */
-    }
-  }
-
-  // Ordre local optimiste pendant le drag & drop
-  const [orderIds, setOrderIds] = useState<string[]>(() => sessions.map((s) => s.id))
-  useEffect(() => {
-    setOrderIds(sessions.map((s) => s.id))
-  }, [sessions])
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
-  )
-
-  const ordered = orderIds.map((id) => sessions.find((s) => s.id === id)).filter((s): s is Session => !!s)
-
-  // Jours de la semaine AFFICHÉE : planifié (jours fixes + rotation) et fait (logs)
-  const weekDates = Array.from({ length: 7 }, (_, d) => toDateStr(addDays(monday, d)))
-  const plannedByDay = Array.from({ length: 7 }, (_, d) => plannedSessionIdsOn(addDays(monday, d), sessions))
-  const doneByDay = weekDates.map((ds) => new Set(logs.filter((l) => l.date === ds).map((l) => l.sessionId)))
-  const perWeek = plannedByDay.reduce((a, ids) => a + ids.size, 0)
-
-  // Plan semi : la semaine du plan dont le lundi correspond à la semaine AFFICHÉE (alignée
-  // par date → les séances tombent sur leurs vraies dates, plus d'illusion de retard).
-  const planWeekIdx = PLAN_SEMI.weeks.findIndex((w) => w.start === weekDates[0])
-  const planWeek: PlanWeek | undefined = planWeekIdx >= 0 ? PLAN_SEMI.weeks[planWeekIdx] : undefined
-  // Avant le départ du plan : indice cliquable pour sauter à la 1re semaine
-  const firstStart = PLAN_SEMI.weeks[0].start
-  const planStartOffset = Math.round(
-    (new Date(firstStart + 'T12:00:00').getTime() - startOfWeek(new Date()).getTime()) / (7 * 86_400_000),
-  )
-  const showStartHint = !planWeek && weekDates[0] < firstStart
-  const runDates = useMemo(() => new Set(logs.filter((l) => l.category === 'running').map((l) => l.date)), [logs])
   const [sheet, setSheet] = useState<PlanSeance | null>(null)
+  // Position de la section « Running » du plan (préférence locale partagée avec Aujourd'hui)
+  const [planAnchor, savePlanAnchor] = usePlanAnchor(user?.uid)
 
-  // Sections personnalisées (Session.group) : ordre d'apparition, « Autres » à la fin
-  const groupOf = (s: Session) => (s.group ?? '').trim()
-  const groupNames: string[] = []
-  for (const s of ordered) {
-    const g = groupOf(s)
-    if (g && !groupNames.includes(g)) groupNames.push(g)
-  }
-  const hasGroups = groupNames.length > 0
-  const grouped: [string, Session[]][] = hasGroups
-    ? [...groupNames.map((g): [string, Session[]] => [g, ordered.filter((s) => groupOf(s) === g)]),
-       ...(ordered.some((s) => !groupOf(s)) ? [['', ordered.filter((s) => !groupOf(s))] as [string, Session[]]] : [])]
-    : [['', ordered]]
+  // Semaine affichée + alignement de la semaine du plan (audit P2 : extrait en hook pur)
+  const { monday, weekDates, todayIdx, planWeek, planWeekIdx, planStates, firstStart, planStartOffset, showStartHint } =
+    usePlanningWeek(weekOffset, logs)
+  // Ordre optimiste + sections + drag & drop (audit P2 : extrait en hook dédié)
+  const { sensors, sections, sectionItems, canDragSections, hasGroups, showGrid, handleDragEnd } = usePlanningOrdering({
+    sessions,
+    planActive: !!planWeek,
+    planAnchor,
+    savePlanAnchor,
+    updateSession,
+  })
 
-  // Les séances du plan s'injectent DANS la section « Running » de l'utilisateur, à sa
-  // place habituelle (l'ordre des autres sections est préservé). Si aucune section
-  // « Running » n'existe encore, on la crée en tête.
-  const RUN = 'Running'
-  const hasRunningGroup = groupNames.includes(RUN)
-  // Quand l'utilisateur n'a pas de section « Running » à lui, le plan en crée une, insérée
-  // à sa position d'ancrage parmi les sections utilisateur (et non plus figée en tête).
-  const showPlanSection = !!planWeek && !hasRunningGroup
-  let sections: [string, Session[]][] = grouped
-  if (showPlanSection) {
-    const at =
-      planAnchor === '__end__'
-        ? grouped.length
-        : (() => {
-            const i = grouped.findIndex(([g]) => g === planAnchor)
-            return i === -1 ? 0 : i // ancre absente (ex. section supprimée) → tout en haut
-          })()
-    sections = [...grouped.slice(0, at), [RUN, []] as [string, Session[]], ...grouped.slice(at)]
-  }
+  // Cycles d'alternance calculés une fois par changement de séances, partagés aux helpers.
+  const cycles = useMemo(() => canonicalCycles(sessions), [sessions])
+  // Jours de la semaine AFFICHÉE : planifié (jours fixes + rotation) et fait (logs)
+  const plannedByDay = useMemo(
+    () => Array.from({ length: 7 }, (_, d) => plannedSessionIdsOn(addDays(monday, d), sessions, cycles)),
+    [monday, sessions, cycles],
+  )
+  const doneByDay = weekDates.map((ds) => new Set(logs.filter((l) => l.date === ds && !isPlanLog(l)).map((l) => l.sessionId)))
+  // Compteur d'en-tête : séances utilisateur planifiées + séances de course du plan de la semaine
+  const perWeek = plannedByDay.reduce((a, ids) => a + ids.size, 0) + planStates.length
+
   const emptyLabel = hasGroups ? 'Autres' : 'Mes séances'
   const showHeaders = hasGroups || !!planWeek
-  const showGrid = !!planWeek || sessions.length > 0
-  // Sections déplaçables par drag & drop de leur en-tête : celles qui portent ≥ 1 séance,
-  // plus la section « Running » du plan (même sans séance à elle).
-  const draggableKeys = sections.filter(([g, list]) => list.length > 0 || (showPlanSection && g === RUN)).map(([g]) => g)
-  const canDragSections = draggableKeys.length >= 2
-  const sectionItems = canDragSections ? draggableKeys.map((g) => 'sec-' + g) : []
-
-  /** Réécrit le `sortOrder` de toutes les séances pour refléter `next` (et persiste). */
-  const persistOrder = (next: string[]) => {
-    setOrderIds(next)
-    next.forEach((sid, i) => {
-      const s = sessions.find((x) => x.id === sid)
-      if (s && s.sortOrder !== i) void updateSession(sid, { sortOrder: i })
-    })
-  }
-
-  const handleDragEnd = (e: DragEndEvent) => {
-    const { active, over } = e
-    if (!over || active.id === over.id) return
-    const aId = String(active.id)
-    const oId = String(over.id)
-
-    // Réordonner une SECTION entière (glissée par sa poignée d'en-tête).
-    // L'ordre des sections utilisateur dérive du sortOrder (réécrit par blocs) ; la
-    // section « Running » du plan (sans séance) se repositionne via son ancre.
-    if (aId.startsWith('sec-')) {
-      const displayKeys = sections.map(([g]) => g)
-      const fromKey = aId.slice(4)
-      const toKey = oId.startsWith('sec-') ? oId.slice(4) : groupOf(sessions.find((s) => s.id === oId) ?? ({} as Session))
-      const from = displayKeys.indexOf(fromKey)
-      const to = displayKeys.indexOf(toKey)
-      if (from === -1 || to === -1 || from === to) return
-      const newKeys = arrayMove(displayKeys, from, to)
-      const byKey = new Map(sections.map(([g, list]) => [g, list]))
-      // Réécrit le sortOrder des séances dans le nouvel ordre de sections (le plan, sans séance, est ignoré)
-      persistOrder(newKeys.flatMap((k) => (byKey.get(k) ?? []).map((s) => s.id)))
-      // Réancre la section du plan juste au-dessus de la section qui la suit (ou tout en bas)
-      if (showPlanSection) {
-        const idx = newKeys.indexOf(RUN)
-        if (idx >= 0) savePlanAnchor(newKeys[idx + 1] ?? '__end__')
-      }
-      return
-    }
-
-    // Déplacer une SÉANCE : réordonner, et la déposer sur une autre section l'y déplace.
-    const oldIdx = orderIds.indexOf(aId)
-    const newIdx = orderIds.indexOf(oId)
-    if (oldIdx === -1 || newIdx === -1) return
-    const a = sessions.find((s) => s.id === aId)
-    const o = sessions.find((s) => s.id === oId)
-    if (a && o && groupOf(a) !== groupOf(o)) void updateSession(a.id, { group: groupOf(o) })
-    persistOrder(arrayMove(orderIds, oldIdx, newIdx))
-  }
 
   /**
    * Toucher un rond : valide (crée un log) ou dévalide (supprime le log) la
@@ -440,7 +314,7 @@ export default function Planning() {
                   <span
                     className={
                       'flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-extrabold tabular-nums ' +
-                      (isToday ? 'bg-sage-500 text-white shadow-sm' : 'text-ink-soft')
+                      (isToday ? 'bg-sage-500 text-onaccent shadow-sm' : 'text-ink-soft')
                     }
                   >
                     {Number(weekDates[d].slice(8, 10))}
@@ -452,10 +326,12 @@ export default function Planning() {
 
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={sectionItems} strategy={verticalListSortingStrategy}>
-              {sections.map(([g, list]) => {
+              {sections.map((sec) => {
+                const g = sec.group
+                const list = sec.sessions
                 // La section « Running » porte les séances du plan (course à pied), typées
                 // par couleur, posées en tête — au-dessus des séances Running de l'utilisateur.
-                const isRun = !!planWeek && g === RUN
+                const isRun = sec.plan
                 if (!isRun && list.length === 0) return null
                 const draggable = canDragSections && (list.length > 0 || isRun)
                 // Corps de la section ; `handle` (optionnel) est la poignée de drag de l'en-tête
@@ -474,22 +350,18 @@ export default function Planning() {
                     )}
                     <div className="space-y-1.5">
                       {isRun &&
-                        planWeek.seances.map((s) => {
-                          const date = seanceDateStr(planWeek, s)
+                        planStates.map((st) => {
                           // La séance peut avoir été faite un autre jour : le rond « fait » suit la date du log
-                          const planLog = logs.find((l) => l.planRef === 'elan-' + date)
-                          const done = !!planLog || runDates.has(date)
-                          const doneDate = planLog?.date ?? date
-                          const inWeek = weekDates.indexOf(doneDate)
-                          const doneCol = !done ? -1 : inWeek >= 0 ? inWeek : s.day
+                          const inWeek = st.doneDate ? weekDates.indexOf(st.doneDate) : -1
+                          const doneCol = !st.done ? -1 : inWeek >= 0 ? inWeek : st.seance.day
                           return (
                             <PlanRow
-                              key={'plan-' + s.day}
-                              s={s}
+                              key={'plan-' + st.seance.day}
+                              s={st.seance}
                               todayIdx={todayIdx}
-                              done={done}
+                              done={st.done}
                               doneCol={doneCol}
-                              onOpen={() => setSheet(s)}
+                              onOpen={() => setSheet(st.seance)}
                             />
                           )
                         })}
@@ -501,7 +373,7 @@ export default function Planning() {
                             todayIdx={todayIdx}
                             plannedDays={plannedByDay.map((ids) => ids.has(s.id))}
                             doneDays={doneByDay.map((ids) => ids.has(s.id))}
-                            sublabel={ownerOf(s.id, sessions) ? describeSchedule(s, sessions) : undefined}
+                            sublabel={ownerOf(s.id, sessions, cycles) ? describeSchedule(s, sessions, cycles) : undefined}
                             onDay={(d) => validateDay(s, d)}
                             onEdit={() => navigate(`/session/${s.id}`)}
                           />

@@ -15,6 +15,9 @@ page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text()))
 
 try {
+  // Date figée (dim. 14/06/2026, jour de la « Sortie longue 8 km » de reprise) → test
+  // déterministe : la séance est due ce jour-là quelle que soit la date d'exécution réelle.
+  await page.clock.setFixedTime(new Date('2026-06-14T12:00:00'))
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 

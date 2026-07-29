@@ -10,7 +10,7 @@ echo.
 echo  On va te demander 2 choses : ta cle API et ton Athlete ID.
 echo  (les deux sont dans intervals.icu : Parametres - Developer Settings)
 echo.
-node scripts\push-to-intervals.mjs --clear --push
+node scripts\push-to-intervals.mjs --clear --push --future
 echo.
 echo ========================================================
 echo  Termine. Tu peux fermer cette fenetre.
