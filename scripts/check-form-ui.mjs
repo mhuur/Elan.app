@@ -45,7 +45,8 @@ try {
   await page.locator('[role="dialog"] select[aria-label="Sous-type"]').selectOption('Bras')
   await page.click('text=Créer et ajouter')
   await page.click('text=Terminé')
-  await page.waitForSelector('select:has-text("Dips sur chaise")')
+  // Le nom d'item est un simple texte (le select de remplacement a été retiré, août 2026)
+  await page.waitForSelector('p:text-is("Dips sur chaise")')
 
   // --- Séries variées : 3×12 devient 12/12/12 éditables, on passe la 1re à 30
   await page.locator('[aria-label="Varier les séries"]').first().click()

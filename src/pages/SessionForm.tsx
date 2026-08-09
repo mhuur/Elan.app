@@ -2,12 +2,15 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   DndContext,
+  DragOverlay,
+  MeasuringStrategy,
   PointerSensor,
   TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
   type DragEndEvent,
+  type Modifier,
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -67,7 +70,9 @@ function MiniNum({ value, onChange, min = 0, max = 990 }: { value: number; onCha
 type DraftItem = SessionItem & { uid: string }
 const newUid = () => crypto.randomUUID()
 
-/** Enveloppe sortable d'une ligne d'exercice — la poignée reçoit attributes/listeners */
+/** Enveloppe sortable d'une ligne d'exercice — la poignée reçoit attributes/listeners.
+ * Pendant un drag, la vignette qui suit le doigt est le DragOverlay : l'original reste
+ * dans la liste en fantôme (opacity) et matérialise l'emplacement d'atterrissage. */
 function SortableItem({
   uid,
   children,
@@ -80,12 +85,15 @@ function SortableItem({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={isDragging ? 'relative z-10' : undefined}
+      className={isDragging ? 'opacity-30' : undefined}
     >
       {children({ attributes, listeners })}
     </div>
   )
 }
+
+/** Le drag reste sur l'axe vertical : la liste est une colonne, le déplacement latéral ne fait que du bruit */
+const verticalAxis: Modifier = ({ transform }) => ({ ...transform, x: 0 })
 
 export default function SessionForm() {
   const { id } = useParams()
@@ -112,7 +120,11 @@ export default function SessionForm() {
   // Rotation en cours d'édition : un tableau de « jours », chacun regroupant
   // les séances faites ensemble ce jour-là (selfKey = cette séance).
   const [steps, setSteps] = useState<string[][]>(() => (ownerSteps.length ? ownerSteps : [[selfKey]]))
-  const [items, setItems] = useState<DraftItem[]>(() => (existing?.items ?? []).map((it) => ({ ...it, uid: newUid() })))
+  // `comment: ''` (un commentaire ajouté puis laissé vide — Firestore stocke les champs vidés
+  // comme '') redevient « pas de commentaire » : le champ ne s'affiche que s'il y a du texte.
+  const [items, setItems] = useState<DraftItem[]>(() =>
+    (existing?.items ?? []).map((it) => ({ ...it, comment: it.comment || undefined, uid: newUid() })),
+  )
   const [workSec, setWorkSec] = useState(existing?.workSec ?? 45)
   const [restSec, setRestSec] = useState(existing?.restSec ?? 15)
   const [rounds, setRounds] = useState(existing?.rounds ?? 2)
@@ -222,7 +234,11 @@ export default function SessionForm() {
     setItems((p) => p.map((it, i) => (i === idx ? { ...it, ...patch } : it)))
   const removeItem = (idx: number) => setItems((p) => p.filter((_, i) => i !== idx))
 
-  // Drag & drop de la liste d'exercices (mêmes réglages tactiles que le Planning)
+  // Drag & drop de la liste d'exercices (mêmes réglages tactiles que le Planning).
+  // Pendant un drag (`dragId` posé), toutes les cartes se replient sur leur ligne de titre :
+  // hauteurs uniformes → les échanges deviennent progressifs au lieu de sauter de la hauteur
+  // d'une carte pleine, et la liste entière reste visible pour viser.
+  const [dragId, setDragId] = useState<string | null>(null)
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
@@ -670,7 +686,20 @@ export default function SessionForm() {
 
         {hasItems && (
           <Field label={category === 'etirements' ? 'Postures de la routine' : 'Exercices de la séance'}>
-            <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <DndContext
+              sensors={dndSensors}
+              collisionDetection={closestCenter}
+              modifiers={[verticalAxis]}
+              // Les cartes se replient au dragStart : il faut re-mesurer les cibles en continu,
+              // sinon dnd-kit calcule les échanges sur les hauteurs des cartes dépliées
+              measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+              onDragStart={(e) => setDragId(String(e.active.id))}
+              onDragCancel={() => setDragId(null)}
+              onDragEnd={(e) => {
+                setDragId(null)
+                onDragEnd(e)
+              }}
+            >
               <SortableContext items={blocksArr.map((b) => 'blk-' + b[0].uid)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-2">
                   {blocksArr.map((blk, bi) => (
@@ -723,7 +752,7 @@ export default function SessionForm() {
                                   <SortableItem key={it.uid} uid={it.uid}>
                                     {(drag) => (
                                       <div>
-                    <div className="rounded-md border border-hairline bg-glass p-3 backdrop-blur-lg">
+                    <div className={'rounded-md border border-hairline bg-glass backdrop-blur-lg ' + (dragId ? 'px-3 py-1' : 'p-3')}>
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
@@ -755,7 +784,7 @@ export default function SessionForm() {
                         </button>
                       </div>
 
-                      {category === 'muscu' && (
+                      {!dragId && category === 'muscu' && (
                         <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
                           <MiniNum
                             value={it.sets ?? 3}
@@ -821,7 +850,7 @@ export default function SessionForm() {
                         </div>
                       )}
 
-                      {category === 'etirements' && (
+                      {!dragId && category === 'etirements' && (
                         <div className="mt-2 flex items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
                           {/* Séries de la posture : 2 × 30 s pour un étirement fait des deux côtés */}
                           <MiniNum
@@ -857,18 +886,23 @@ export default function SessionForm() {
                         </div>
                       )}
 
-                      {it.comment !== undefined && (
+                      {!dragId && it.comment !== undefined && (
                         <input
                           type="text"
                           value={it.comment}
                           onChange={(e) => setItem(idx, { comment: e.target.value })}
+                          onBlur={() => {
+                            // Laissé vide → le champ se replie en bouton [+], et rien n'est persisté
+                            if (!it.comment?.trim()) setItem(idx, { comment: undefined })
+                          }}
+                          autoFocus={it.comment === ''}
                           placeholder="Commentaire (tempo, consigne…)"
                           className={smallInput + ' mt-2 w-full py-2'}
                         />
                       )}
                     </div>
 
-                    {canBlocks && idx < items.length - 1 && !items[idx + 1].blockBreak && (
+                    {!dragId && canBlocks && idx < items.length - 1 && !items[idx + 1].blockBreak && (
                       <div className="-my-0.5 flex justify-center gap-1.5">
                         {category === 'muscu' && (
                           <button
@@ -911,6 +945,33 @@ export default function SessionForm() {
                   ))}
                 </div>
               </SortableContext>
+              {/* La vignette qui suit le doigt : compacte et opaque, elle ne cache plus la liste */}
+              <DragOverlay>
+                {dragId &&
+                  (() => {
+                    if (dragId.startsWith('blk-')) {
+                      const bi = blocksArr.findIndex((b) => 'blk-' + b[0].uid === dragId)
+                      if (bi === -1) return null
+                      return (
+                        <div className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 shadow-xl backdrop-blur-lg ${catMeta.soft}`}>
+                          <p className={`flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase ${catMeta.text}`}>
+                            <GripVertical className="h-3.5 w-3.5" />
+                            <LayoutGrid className="h-3.5 w-3.5" /> Bloc {bi + 1} · {blocksArr[bi].length} exo
+                            {blocksArr[bi].length > 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      )
+                    }
+                    const it = items.find((x) => x.uid === dragId)
+                    const ex = it && exOf(it.exerciseId)
+                    return (
+                      <div className="flex items-center gap-1.5 rounded-md border border-hairline bg-shoal px-3 py-1 shadow-xl">
+                        <GripVertical className="h-4 w-4 shrink-0 text-ink-soft/40" />
+                        <p className="min-w-0 flex-1 truncate py-1 text-[15px] font-extrabold text-ink">{ex?.name ?? '—'}</p>
+                      </div>
+                    )
+                  })()}
+              </DragOverlay>
             </DndContext>
             <div className="mt-2 space-y-2">
               {/* Sur mobile, le sélecteur s'ouvre en Sheet ; sur desktop il est déjà là, en volet */}
