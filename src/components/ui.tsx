@@ -135,28 +135,24 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   )
 }
 
-/** Liste déroulante au style commun de l'app (`bare` = sans cadre, pour les listes compactes) */
+/** Liste déroulante au style commun de l'app */
 export function Select({
   value,
   onChange,
   children,
   className,
-  bare,
 }: {
   value: string
   onChange: (v: string) => void
   children: ReactNode
   className?: string
-  bare?: boolean
 }) {
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={
-        (bare
-          ? 'bg-transparent py-1 text-[15px] font-extrabold text-ink outline-none '
-          : 'rounded-sm border border-hairline bg-glass-sunken px-3 py-2.5 text-sm font-bold outline-none backdrop-blur-lg focus:border-sage-500 ') +
+        'rounded-sm border border-hairline bg-glass-sunken px-3 py-2.5 text-sm font-bold outline-none backdrop-blur-lg focus:border-sage-500 ' +
         (className ?? 'w-full')
       }
     >

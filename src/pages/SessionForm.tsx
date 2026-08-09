@@ -16,11 +16,9 @@ import { useData } from '../data/DataContext'
 import {
   CATEGORIES,
   CATEGORY_META,
-  PRESET_SUBTYPES,
   setTargetsOf,
   subtypesOf,
   type Category,
-  type Exercise,
   type Measure,
   type SessionItem,
 } from '../types'
@@ -87,23 +85,6 @@ function SortableItem({
       {children({ attributes, listeners })}
     </div>
   )
-}
-
-/** Options du Select de remplacement d'un exercice (lignes d'item), en optgroups par premier sous-type */
-function groupedOptions(list: Exercise[]): [string, Exercise[]][] {
-  const map = new Map<string, Exercise[]>()
-  for (const e of list) {
-    const k = subtypesOf(e)[0] ?? ''
-    const arr = map.get(k)
-    if (arr) arr.push(e)
-    else map.set(k, [e])
-  }
-  const rank = (k: string) => {
-    if (!k) return 10000
-    const i = PRESET_SUBTYPES.indexOf(k)
-    return i === -1 ? 5000 : i
-  }
-  return [...map.entries()].sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0], 'fr'))
 }
 
 export default function SessionForm() {
@@ -753,30 +734,7 @@ export default function SessionForm() {
                         >
                           <GripVertical className="h-4 w-4" />
                         </button>
-                        <Select
-                          bare
-                          value={it.exerciseId}
-                          onChange={(v) => setItem(idx, { exerciseId: v })}
-                          className="min-w-0 flex-1"
-                        >
-                          {groupedOptions(catExercises).map(([st, exos]) => {
-                            const opts = exos.map((e) => (
-                              <option key={e.id} value={e.id}>
-                                {e.name}
-                              </option>
-                            ))
-                            return st ? (
-                              <optgroup key={st} label={st}>
-                                {opts}
-                              </optgroup>
-                            ) : (
-                              <optgroup key="autres" label="Autres">
-                                {opts}
-                              </optgroup>
-                            )
-                          })}
-                          {ex && ex.category !== category && <option value={ex.id}>{ex.name}</option>}
-                        </Select>
+                        <p className="min-w-0 flex-1 truncate py-1 text-[15px] font-extrabold text-ink">{ex?.name ?? '—'}</p>
                         {ex && subtypesOf(ex)[0] && (
                           <span className="max-w-24 shrink-0 truncate text-[11px] font-bold text-ink-soft/60">
                             {subtypesOf(ex)[0]}
