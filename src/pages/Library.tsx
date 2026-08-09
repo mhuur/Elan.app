@@ -17,7 +17,7 @@ export default function Library() {
 
   return (
     <div>
-      <PageHeader kicker="Bibliothèque de bord" title="Exercices & séances" />
+      <PageHeader kicker="Bibliothèque de bord" title="Séries" />
       <div className="flex justify-end px-5 pb-3">
         <button
           type="button"
