@@ -865,9 +865,16 @@ export default function SessionForm() {
 
                       {category === 'etirements' && (
                         <div className="mt-2 flex items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
+                          {/* Séries de la posture : 2 × 30 s pour un étirement fait des deux côtés */}
+                          <MiniNum
+                            value={it.sets ?? 1}
+                            onChange={(v) => setItem(idx, { sets: v })}
+                            min={1}
+                            max={6}
+                          />
+                          <span>×</span>
                           {!ex || isSec ? (
                             <>
-                              <span>Durée</span>
                               <MiniNum
                                 value={it.durationSec ?? 30}
                                 onChange={(v) => setItem(idx, { durationSec: v })}

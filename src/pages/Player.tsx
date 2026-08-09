@@ -113,34 +113,42 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
       for (let r = 0; r < b.rounds; r++) {
         b.items.forEach((it, i) => {
           const ex = exercises.find((e) => e.id === it.exerciseId)
-          // Bloc et tour sont affichés en permanence dans la colonne programme
-          if (ex?.measure === 'reps') {
-            steps.push({
-              type: 'work',
-              label: nameOf(it.exerciseId),
-              sec: 30,
-              manual: true,
-              reps: it.target ?? 10,
-              comment: it.comment,
-              exerciseId: it.exerciseId,
-              block: bi,
-              round: r,
-              item: i,
-            })
-          } else {
-            steps.push({
-              type: 'work',
-              label: nameOf(it.exerciseId),
-              sec: it.durationSec ?? 30,
-              comment: it.comment,
-              exerciseId: it.exerciseId,
-              block: bi,
-              round: r,
-              item: i,
-            })
+          // Séries de la posture : 2 × 30 s pour un étirement fait des deux côtés
+          const sets = Math.max(1, it.sets ?? 1)
+          for (let s = 0; s < sets; s++) {
+            // Bloc et tour sont affichés en permanence dans la colonne programme
+            const detail = sets > 1 ? `Série ${s + 1}/${sets}` : undefined
+            if (ex?.measure === 'reps') {
+              steps.push({
+                type: 'work',
+                label: nameOf(it.exerciseId),
+                sec: 30,
+                manual: true,
+                reps: it.target ?? 10,
+                comment: it.comment,
+                detail,
+                exerciseId: it.exerciseId,
+                block: bi,
+                round: r,
+                item: i,
+              })
+            } else {
+              steps.push({
+                type: 'work',
+                label: nameOf(it.exerciseId),
+                sec: it.durationSec ?? 30,
+                comment: it.comment,
+                detail,
+                exerciseId: it.exerciseId,
+                block: bi,
+                round: r,
+                item: i,
+              })
+            }
+            const veryLast =
+              bi === blocks.length - 1 && r === b.rounds - 1 && i === b.items.length - 1 && s === sets - 1
+            if (rest > 0 && !veryLast) steps.push({ type: 'rest', label: 'Transition', sec: rest })
           }
-          const veryLast = bi === blocks.length - 1 && r === b.rounds - 1 && i === b.items.length - 1
-          if (rest > 0 && !veryLast) steps.push({ type: 'rest', label: 'Transition', sec: rest })
         })
       }
     })
@@ -151,8 +159,10 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
 /** Prescription d'un exercice pour le panneau programme : « 3 × 12 », « 30 / 20 / 15 s », « 45 s », « 10 reps » */
 function itemLabel(session: Session, it: SessionItem, ex?: Exercise): string {
   if (session.category === 'hiit') return `${it.durationSec ?? session.workSec ?? 45} s`
-  if (session.category === 'etirements')
-    return ex?.measure === 'reps' ? `${it.target ?? 10} reps` : `${it.durationSec ?? 30} s`
+  if (session.category === 'etirements') {
+    const pre = (it.sets ?? 1) > 1 ? `${it.sets} × ` : ''
+    return ex?.measure === 'reps' ? `${pre}${it.target ?? 10} reps` : `${pre}${it.durationSec ?? 30} s`
+  }
   const tgs = setTargetsOf(it)
   const unit = ex?.measure === 'sec' ? ' s' : ''
   return tgs.every((t) => t === tgs[0]) ? `${tgs.length} × ${tgs[0]}${unit}` : tgs.join(' / ') + unit

@@ -25,10 +25,10 @@ export function hiitTotalSec(s: Session): number {
   return n * work + (n - 1) * rest
 }
 
-/** Durée totale d'une routine d'étirements en secondes (blocs et tours compris) */
+/** Durée totale d'une routine d'étirements en secondes (blocs, tours et séries par posture compris) */
 export function stretchTotalSec(s: Session): number {
   return muscuBlocks(s).reduce(
-    (acc, b) => acc + b.rounds * b.items.reduce((a, it) => a + (it.durationSec ?? 30), 0),
+    (acc, b) => acc + b.rounds * b.items.reduce((a, it) => a + Math.max(1, it.sets ?? 1) * (it.durationSec ?? 30), 0),
     0,
   )
 }

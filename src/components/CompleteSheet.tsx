@@ -365,9 +365,9 @@ function Inner({ session: planned, onClose, date }: { session: Session; onClose:
                     <span className="shrink-0 text-xs font-extrabold text-ink-soft">
                       {isMuscu
                         ? itemSummary(it, ex)
-                        : ex?.measure === 'reps'
-                          ? `${it.target ?? 10} reps`
-                          : `${it.durationSec ?? 30} s`}
+                        : // Étirements : « 2 × 30 s » quand la posture se fait des deux côtés
+                          ((it.sets ?? 1) > 1 ? `${it.sets} × ` : '') +
+                          (ex?.measure === 'reps' ? `${it.target ?? 10} reps` : `${it.durationSec ?? 30} s`)}
                     </span>
                   </div>
                 )

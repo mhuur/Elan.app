@@ -40,8 +40,8 @@ function plannedSlots(session: Session): Slot[] {
     for (let r = 0; r < b.rounds; r++) {
       for (const it of b.items) {
         const itemIdx = idxOf.get(it) ?? 0
-        // Étirements : une posture (ou une série de mouvements) par tour ; muscu : ses séries
-        const sets = session.category === 'etirements' ? 1 : setTargetsOf(it).length
+        // Étirements : `sets` séries de la posture par tour (2 × 30 s = deux côtés) ; muscu : ses séries
+        const sets = session.category === 'etirements' ? Math.max(1, it.sets ?? 1) : setTargetsOf(it).length
         for (let s = 0; s < sets; s++) slots.push({ itemIdx, exId: it.exerciseId, setIdx: s })
       }
     }
@@ -107,7 +107,11 @@ export function progressedSession(
     if (session.category === 'etirements') {
       const isReps = measureOf(it.exerciseId) === 'reps'
       const cur = isReps ? it.target ?? 10 : it.durationSec ?? 30
-      const next = Math.max(cur, at(0))
+      // La cible est commune aux `sets` séries de la posture (2 × 30 s = deux côtés) :
+      // on ne monte qu'au niveau du côté le plus faible, et seulement si tous ont été tenus
+      const nSets = Math.max(1, it.sets ?? 1)
+      const perfs = Array.from({ length: nSets }, (_, s) => at(s)).filter((v) => v > 0)
+      const next = perfs.length === nSets ? Math.max(cur, Math.min(...perfs)) : cur
       if (next === cur) return it
       raised = true
       return isReps ? { ...it, target: next } : { ...it, durationSec: next }
