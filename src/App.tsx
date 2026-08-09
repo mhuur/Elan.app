@@ -35,13 +35,21 @@ function Shell() {
   const fullScreen = location.pathname.startsWith('/player')
   // Écrans d'édition : pas de barre d'onglets, une barre d'action fixe les remplace
   const formScreen = location.pathname.startsWith('/session/') || location.pathname.startsWith('/exercise/')
+  // La fiche séance s'élargit sur desktop : volet banque d'exercices à droite du formulaire
+  const sessionScreen = location.pathname.startsWith('/session/')
 
   return (
     <>
       {/* Pas de fond photo sous le Player : il est immersif, opaque, et ses animations
           tournent déjà — inutile d'en faire tourner deux de plus derrière lui. */}
       {!fullScreen && <SeaBackdrop />}
-      <main className={'mx-auto w-full max-w-lg ' + (fullScreen ? '' : formScreen ? 'min-h-dvh pb-24' : 'min-h-dvh pb-28')}>
+      <main
+        className={
+          'mx-auto w-full ' +
+          (sessionScreen ? 'max-w-lg lg:max-w-[62rem] ' : 'max-w-lg ') +
+          (fullScreen ? '' : formScreen ? 'min-h-dvh pb-24' : 'min-h-dvh pb-28')
+        }
+      >
         <Routes>
           <Route path="/" element={<Today />} />
           <Route path="/planning" element={<Planning />} />

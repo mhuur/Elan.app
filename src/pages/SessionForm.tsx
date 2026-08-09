@@ -21,11 +21,13 @@ import {
   subtypesOf,
   type Category,
   type Exercise,
+  type Measure,
   type SessionItem,
 } from '../types'
 import { DAY_LETTER, DAY_NAMES, todayStr } from '../lib/dates'
 import { canonicalCycles, cycleStepsOf, ownerOf } from '../lib/schedule'
-import { CategoryIcon, Combobox, Field, FormActions, PageHeader, Seg, Select, Stepper, TextInput } from '../components/ui'
+import { CategoryIcon, Combobox, Eyebrow, Field, FormActions, PageHeader, Seg, Select, Sheet, Stepper, TextInput, glassCard } from '../components/ui'
+import ExercisePicker from '../components/ExercisePicker'
 
 const smallInput =
   'rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
@@ -87,7 +89,7 @@ function SortableItem({
   )
 }
 
-/** Options du sélecteur d'exercice, groupées par premier sous-type (comme la banque) */
+/** Options du Select de remplacement d'un exercice (lignes d'item), en optgroups par premier sous-type */
 function groupedOptions(list: Exercise[]): [string, Exercise[]][] {
   const map = new Map<string, Exercise[]>()
   for (const e of list) {
@@ -137,7 +139,8 @@ export default function SessionForm() {
   const [stretchRounds, setStretchRounds] = useState(existing?.category === 'etirements' ? (existing.rounds ?? 1) : 1)
   const [muscuRounds, setMuscuRounds] = useState(existing?.category === 'muscu' ? (existing.rounds ?? 1) : 1)
   const [group, setGroup] = useState(existing?.group ?? '')
-  const [addQuery, setAddQuery] = useState('')
+  // Sheet mobile du sélecteur d'exercices (sur desktop le volet est permanent)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   // Sections déjà utilisées dans le planning, proposées dans la combobox
   const groupSuggestions = [...new Set(sessions.map((s) => (s.group ?? '').trim()).filter(Boolean))].sort((a, b) =>
@@ -193,38 +196,46 @@ export default function SessionForm() {
   const toggleOnDay = (d: number) =>
     setOnDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d].sort((a, b) => a - b)))
 
-  /** Ajoute un exercice existant à la séance avec les réglages par défaut de la catégorie */
-  const appendItem = (exId: string) => {
+  /**
+   * Ajoute un exercice existant à la séance avec les réglages par défaut de la
+   * catégorie. `measure` évite de dépendre de `exercises` pour un exercice qui
+   * vient d'être créé (l'abonnement du store peut ne pas l'avoir encore livré).
+   */
+  const appendItem = (exId: string, measure?: Measure) => {
+    const m = measure ?? exOf(exId)?.measure
     const base: DraftItem = { exerciseId: exId, uid: newUid() }
     if (category === 'muscu') {
       base.sets = 3
-      base.target = exOf(exId)?.measure === 'sec' ? 30 : 10
+      base.target = m === 'sec' ? 30 : 10
       base.restSec = 60
     }
     if (category === 'etirements') {
       // Posture tenue (sec) ou mouvement compté (reps), selon la mesure de l'exercice
-      if (exOf(exId)?.measure === 'reps') base.target = 10
+      if (m === 'reps') base.target = 10
       else base.durationSec = 30
     }
     setItems((p) => [...p, base])
   }
 
-  /** Crée un exercice à la volée et l'ajoute à la séance, sans quitter le formulaire */
-  const quickCreate = async (nm: string) => {
+  /** Crée un exercice à la volée (mini-ligne du sélecteur) et l'ajoute à la séance */
+  const quickCreate = async ({ name: nm, subtype, measure }: { name: string; subtype: string; measure: Measure }) => {
     if (!nm) return
     const exId = await addExercise({
       name: nm,
       category,
-      subtypes: [],
+      subtypes: subtype ? [subtype] : [],
       subtype: '',
-      // Une posture d'étirement se mesure en secondes par défaut
-      measure: category === 'etirements' ? 'sec' : 'reps',
+      measure,
       description: '',
       videoUrl: '',
       createdAt: Date.now(),
     })
-    appendItem(exId)
+    appendItem(exId, measure)
   }
+
+  // Occurrences de chaque exercice déjà dans la séance (coches du sélecteur)
+  const itemCounts = new Map<string, number>()
+  for (const it of items) itemCounts.set(it.exerciseId, (itemCounts.get(it.exerciseId) ?? 0) + 1)
 
   const setItem = (idx: number, patch: Partial<SessionItem>) =>
     setItems((p) => p.map((it, i) => (i === idx ? { ...it, ...patch } : it)))
@@ -416,10 +427,20 @@ export default function SessionForm() {
   }
 
   return (
-    <div>
-      <PageHeader title={existing ? 'Modifier la séance' : 'Nouvelle séance'} onBack={() => navigate(-1)} />
+    // Avec des exercices à composer, l'écran passe en deux colonnes dès `lg` :
+    // formulaire à gauche, banque d'exercices en volet permanent à droite —
+    // l'espace desktop sert à composer au lieu de rester vide (audit août 2026).
+    <div
+      className={
+        hasItems
+          ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-start lg:gap-6 lg:pr-6'
+          : 'mx-auto max-w-lg'
+      }
+    >
+      <div className="min-w-0">
+        <PageHeader title={existing ? 'Modifier la séance' : 'Nouvelle séance'} onBack={() => navigate(-1)} />
 
-      <div className="space-y-4 px-5 pb-2">
+        <div className="space-y-4 px-5 pb-2">
         <Field label="Nom">
           <TextInput value={name} onChange={setName} placeholder="Ex. HIIT du mardi" />
         </Field>
@@ -925,23 +946,14 @@ export default function SessionForm() {
               </SortableContext>
             </DndContext>
             <div className="mt-2 space-y-2">
-              <Combobox
-                small
-                value={addQuery}
-                onChange={setAddQuery}
-                options={groupedOptions(catExercises).flatMap(([st, exos]) =>
-                  exos.map((e) => ({ id: e.id, label: e.name, group: st || 'Autres' })),
-                )}
-                onSelect={(exId) => {
-                  appendItem(exId)
-                  setAddQuery('')
-                }}
-                onCreate={(text) => {
-                  void quickCreate(text)
-                  setAddQuery('')
-                }}
-                placeholder={category === 'etirements' ? '+ Ajouter ou créer une posture…' : '+ Ajouter ou créer un exercice…'}
-              />
+              {/* Sur mobile, le sélecteur s'ouvre en Sheet ; sur desktop il est déjà là, en volet */}
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="w-full rounded-sm border border-hairline bg-glass-sunken px-4 py-3 text-left text-sm text-ink/50 backdrop-blur-lg active:bg-glass lg:hidden"
+              >
+                {category === 'etirements' ? '+ Ajouter ou créer une posture…' : '+ Ajouter ou créer un exercice…'}
+              </button>
               {category === 'hiit' && items.length > 0 && (
                 <p className="text-center text-xs font-semibold text-ink-soft">
                   {items.length} exercice{items.length > 1 ? 's' : ''} × {rounds} tour{rounds > 1 ? 's' : ''} ·{' '}
@@ -951,7 +963,48 @@ export default function SessionForm() {
             </div>
           </Field>
         )}
+        </div>
       </div>
+
+      {hasItems && (
+        <aside className="hidden lg:block lg:pt-[4.5rem]">
+          {/* Sticky : la banque reste sous les yeux pendant tout le défilement du formulaire */}
+          <div className={'sticky top-5 flex max-h-[calc(100dvh-8rem)] flex-col p-4 ' + glassCard}>
+            <Eyebrow className="mb-2.5 text-ink/50">— Banque d'exercices</Eyebrow>
+            <ExercisePicker
+              exercises={catExercises}
+              category={category}
+              counts={itemCounts}
+              onAdd={appendItem}
+              onCreate={(d) => void quickCreate(d)}
+            />
+          </div>
+        </aside>
+      )}
+
+      <Sheet
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title={category === 'etirements' ? 'Ajouter des postures' : 'Ajouter des exercices'}
+      >
+        {/* Hauteur bornée : la recherche reste en tête, seule la liste défile */}
+        <div className="flex max-h-[62dvh] min-h-[45dvh] flex-col">
+          <ExercisePicker
+            exercises={catExercises}
+            category={category}
+            counts={itemCounts}
+            onAdd={appendItem}
+            onCreate={(d) => void quickCreate(d)}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => setPickerOpen(false)}
+          className="mt-4 w-full rounded-sm bg-sage-500 py-3 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-onaccent"
+        >
+          Terminé
+        </button>
+      </Sheet>
 
       <FormActions
         onSave={() => void save()}

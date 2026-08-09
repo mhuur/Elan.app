@@ -1,5 +1,6 @@
-// Vérification visuelle des formulaires épurés : séance (liste compacte, combobox
-// d'ajout, barre d'action fixe) et exercice (sous-types en combobox).
+// Vérification visuelle des formulaires épurés : séance (liste compacte, sélecteur
+// d'exercices en Sheet mobile / volet desktop, barre d'action fixe) et exercice
+// (sous-types en combobox).
 import { chromium } from 'playwright'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
@@ -26,16 +27,24 @@ try {
   await page.locator('text=Exercices de la séance').scrollIntoViewIfNeeded()
   await page.screenshot({ path: 'screenshots/31-form-seance-exos.png' })
 
-  // --- Combobox d'ajout : filtre puis création à la volée
-  const addBox = page.getByPlaceholder('+ Ajouter ou créer un exercice…')
-  await addBox.scrollIntoViewIfNeeded()
-  await addBox.fill('pom')
-  await page.waitForSelector('button:has-text("Pompes")')
+  // --- Sélecteur d'exercices (Sheet mobile) : filtre puis création à la volée
+  const addBtn = page.getByRole('button', { name: /Ajouter ou créer un exercice/ })
+  await addBtn.scrollIntoViewIfNeeded()
+  await addBtn.click()
+  // Deux pickers dans le DOM (volet desktop masqué en CSS + Sheet) : viser le dialog
+  const search = page.locator('[role="dialog"]').getByPlaceholder('Rechercher ou créer…')
+  await search.fill('pom')
+  await page.waitForSelector('[role="dialog"] button:has-text("Pompes")')
   await page.screenshot({ path: 'screenshots/32-combobox-filtre.png' })
-  await addBox.fill('Dips sur chaise')
+  await search.fill('Dips sur chaise')
   await page.waitForSelector('text=+ Créer « Dips sur chaise »')
   await page.screenshot({ path: 'screenshots/33-combobox-creer.png' })
   await page.click('text=+ Créer « Dips sur chaise »')
+  // Mini-ligne de création : nom prérempli, on choisit le sous-type Bras (mesure reps par défaut)
+  await page.waitForSelector('[role="dialog"] >> text=Nouvel exercice')
+  await page.locator('[role="dialog"] select[aria-label="Sous-type"]').selectOption('Bras')
+  await page.click('text=Créer et ajouter')
+  await page.click('text=Terminé')
   await page.waitForSelector('select:has-text("Dips sur chaise")')
 
   // --- Séries variées : 3×12 devient 12/12/12 éditables, on passe la 1re à 30
@@ -60,6 +69,10 @@ try {
   const full = d.sessions.find((s) => s.name.includes('Full body'))
   if (!full.items.some((it) => d.exercises.find((e) => e.id === it.exerciseId)?.name === 'Dips sur chaise'))
     throw new Error("L'exercice créé à la volée devrait être dans la séance")
+  // La mini-ligne de création classe l'exercice dès sa naissance
+  const dips = d.exercises.find((e) => e.name === 'Dips sur chaise')
+  if (!(dips?.subtypes ?? []).includes('Bras'))
+    throw new Error('Dips sur chaise devrait naître avec le sous-type Bras (mini-ligne du sélecteur)')
   // Les champs retirés du formulaire sont préservés tels quels
   if (full.notes === undefined || full.metrics === undefined || full.links === undefined)
     throw new Error('notes/metrics/links devraient être conservés à la sauvegarde')
@@ -103,7 +116,30 @@ try {
   await page.waitForSelector('text=+ Créer « tri »')
   await page.screenshot({ path: 'screenshots/37-form-exercice-combobox.png' })
 
-  console.log('FORM UI OK — captures 30 à 37 dans ./screenshots')
+  // --- Desktop (≥ lg) : le volet banque est permanent à droite du formulaire,
+  //     un clic sur une ligne ajoute l'exercice sans rien fermer
+  const desk = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+  desk.on('pageerror', (e) => errors.push('desktop pageerror: ' + e.message))
+  desk.on('console', (m) => {
+    if (m.type() === 'error') errors.push('desktop console: ' + m.text())
+  })
+  await desk.goto(BASE)
+  await desk.waitForSelector('text=Routine matinale', { timeout: 20000 })
+  await desk.getByRole('link', { name: 'Séries' }).click()
+  await desk.click('p:has-text("Muscu — Full body")')
+  await desk.waitForSelector('text=Planification')
+  await desk.waitForSelector("aside >> text=Banque d'exercices")
+  const nBefore = await desk.locator('[aria-label="Varier les séries"]').count()
+  await desk.locator('aside').getByRole('button').first().click()
+  const nAfter = await desk.locator('[aria-label="Varier les séries"]').count()
+  if (nAfter !== nBefore + 1)
+    throw new Error(`Le clic dans le volet devrait ajouter un exercice (${nBefore} → ${nAfter})`)
+  // Le volet est toujours là (il ne se referme pas après un ajout)
+  await desk.waitForSelector("aside >> text=Banque d'exercices")
+  await desk.screenshot({ path: 'screenshots/40-form-desktop-volet.png' })
+  await desk.close()
+
+  console.log('FORM UI OK — captures 30 à 40 dans ./screenshots')
   if (errors.length) {
     console.error('ERREURS :')
     for (const e of errors) console.error(' -', e)
