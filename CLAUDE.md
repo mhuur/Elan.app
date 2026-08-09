@@ -34,6 +34,8 @@ Le `.env` (gitignoré) contient la config Firebase du projet `routine-sport-ca44
 
 ## Déploiement
 
+**Un commit git ne publie RIEN.** La mise en ligne est une étape à part : `npm run build` puis `npx firebase-tools deploy --only hosting`, ou double-clic sur **`publier-l-app.bat`** (qui enchaîne les deux et rappelle comment vider le cache du service worker). ⚠ Claude ne peut pas lancer ce déploiement lui-même — le contrôle de permissions de Claude Code le bloque —, donc **le dire explicitement à l'utilisateur** au lieu de laisser croire qu'un `git push` suffit : c'est exactement la confusion rencontrée le 09/08/2026 (« JE NE VOIS AUCUN CHANGEMENT » alors que 4 commits étaient bien sur GitHub).
+
 L'app vit sur **https://avel.web.app** — c'est l'URL à utiliser. Le projet Firebase garde son ID d'origine `routine-sport-ca440` (un ID de projet est **immuable**) : `avel` est un **second site Hosting** du même projet (`firebase hosting:sites:create avel`), et `firebase.json` déclare les deux sites sur le même `dist/`, si bien qu'un `npx firebase-tools deploy --only hosting` publie sur les deux. L'ancienne URL `routine-sport-ca440.web.app` reste donc valide (utile : c'est encore elle dans les PWA déjà installées).
 
 Ce qui a dû suivre le nouveau domaine, à refaire pour toute nouvelle origine :
