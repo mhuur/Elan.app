@@ -33,7 +33,7 @@ export default function Login() {
         type="button"
         disabled={busy}
         onClick={handle}
-        className="flex items-center gap-3 rounded-2xl bg-surface px-6 py-4 text-base font-bold text-ink shadow-md active:bg-sand disabled:opacity-50"
+        className="flex items-center gap-3 rounded-sm border border-hairline bg-glass px-6 py-4 font-mono text-[11px] font-bold tracking-[0.16em] uppercase text-ink backdrop-blur-lg active:bg-glass-raised disabled:opacity-50"
       >
         <svg viewBox="0 0 48 48" className="h-5 w-5">
           <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.2 6.1 29.4 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z" />

@@ -1,30 +1,58 @@
 @import "tailwindcss";
 
 /*
- * Charte « bord de mer » (juillet 2026) — ardoise & écume.
+ * Charte « bord de mer » (juillet 2026) — photo, verre dépoli, type condensée.
  *
- * La marque est l'ogive écume sur ardoise (public/icon.svg, public/icons/). L'interface
- * reprend ses deux seules matières : des fonds ardoise de plus en plus clairs à mesure
- * qu'un élément monte vers l'utilisateur, et de l'écume pour tout ce qui se lit.
+ * Source de vérité : la maquette « Élan - Bord de mer (hors ligne).html » livrée à la
+ * racine du dossier SPORT (7 écrans : Jour, Semaine, Exercices, Cap, Sillage, En mer,
+ * Journal de bord). Le kit `Élan sport en bord de mer.zip`, lui, ne contient QUE les
+ * icônes — il ne dit rien de la typographie ni des composants.
+ *
+ * Trois matières, et elles sont indissociables :
+ *   1. une PHOTO de bord de mer en fond de toute l'app (`SeaBackdrop`), voilée d'un
+ *      scrim vertical qui va de 35 % en haut à 88 % en bas ;
+ *   2. du VERRE DÉPOLI par-dessus (`bg-glass` + `backdrop-blur`) : les cartes sont
+ *      translucides et laissent voir la photo, elles ne sont plus des aplats ;
+ *   3. deux TYPOGRAPHIES qui portent tout le style — `font-display` (Big Shoulders
+ *      Display, condensée, en CAPITALES) pour les titres, `font-mono` (Space Mono,
+ *      interlettrée) pour toute métadonnée. Le corps en Nunito ne sert plus qu'aux
+ *      rares paragraphes explicatifs.
  *
  * Les NOMS des tokens n'ont pas changé (`cream`, `sand`, `surface`, `ink`, `sage-*`) :
  * ils sont sémantiques et déjà employés partout dans les écrans, seules leurs valeurs
- * basculent en sombre. Conséquence importante : **la rampe `sage-*` est inversée** —
- * en clair elle allait du fond pâle (50) vers le texte foncé (700), en sombre elle va
- * du fond profond (50) vers le texte lumineux (700). Les composants qui écrivaient
+ * bougent. Conséquence importante : **la rampe `sage-*` est inversée** — elle va du
+ * fond profond (50) vers le texte lumineux (700). Les composants qui écrivaient
  * `bg-sage-100 text-sage-700` restent donc justes sans être touchés.
+ *
+ * Attention aux RAYONS : la maquette est presque carrée (carte 6 px = `rounded-md`,
+ * bouton 4 px = `rounded-sm`, tuile de catégorie 2 px = `rounded-xs`, pilule
+ * `rounded-full`). Les `rounded-2xl`/`rounded-3xl` des écrans pas encore repris sont
+ * un reste de la charte de juin.
  */
 @theme {
   --font-sans: 'Nunito', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* Titres : condensée, TOUJOURS en capitales (`uppercase`), graisses 700 et 900 */
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', ui-sans-serif, sans-serif;
+  /* Métadonnées, compteurs, libellés d'onglets : interlettrées, en capitales */
+  --font-mono: 'Space Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* Neutres marins — du plus profond au plus clair */
   --color-abysse: #04121b;   /* fond de démarrage, immersif, voiles de modale */
-  --color-cream: #061722;    /* fond de page (ardoise) */
+  --color-cream: #071a26;    /* fond de page, sous la photo (couleur de repli) */
   --color-sand: #17323f;     /* séparateurs, bordures, fonds neutres */
-  --color-surface: #0e2634;  /* carte posée sur le fond */
+  --color-surface: #0e2634;  /* carte OPAQUE — écrans pas encore passés au verre */
   --color-shoal: #123449;    /* carte surélevée / survol (haut du dégradé ardoise) */
-  --color-ink: #e9f2f6;      /* écume : texte principal */
-  --color-ink-soft: #8fa8b6; /* écume délavée : texte secondaire */
+  --color-ink: #f4f8fa;      /* écume : texte principal */
+  --color-ink-soft: #a7b7bf; /* écume délavée : texte secondaire */
+
+  /* Verre dépoli — À UTILISER AVEC `backdrop-blur`, sinon la carte paraît sale.
+     Ces fonds sont translucides : ils ne fonctionnent que posés sur la photo. */
+  --color-glass: rgb(255 255 255 / 0.11);        /* carte */
+  --color-glass-soft: rgb(255 255 255 / 0.09);   /* carte secondaire, tuile de stat */
+  --color-glass-raised: rgb(255 255 255 / 0.15); /* survol / état actif */
+  --color-glass-sunken: rgb(255 255 255 / 0.06); /* ligne de journal, creux */
+  --color-hairline: rgb(255 255 255 / 0.16);     /* filet de carte */
+  --color-hairline-strong: rgb(255 255 255 / 0.24); /* filet de pilule, contour net */
 
   /* Accent lagon — rampe inversée : 50 = le plus sombre, 700 = le plus clair */
   --color-sage-50: #0f2a38;
@@ -32,20 +60,24 @@
   --color-sage-200: #1f4e64;
   --color-sage-300: #2c6b85;
   --color-sage-400: #4e9ebb;
-  --color-sage-500: #6fc6d6;
-  --color-sage-600: #8fd9e4;
-  --color-sage-700: #b9e9ef;
+  --color-sage-500: #7ec8e3;  /* l'accent de la maquette */
+  --color-sage-600: #a3dcee;
+  --color-sage-700: #bfe4f5;
 
   /* Texte posé SUR un aplat d'accent (bouton plein, pastille) : l'accent est clair,
      le texte doit donc être sombre — d'où ce token plutôt que `text-white`. */
-  --color-onaccent: #04121b;
+  --color-onaccent: #071a26;
 
-  /* Catégories — remontées en clarté pour tenir sur l'ardoise */
-  --color-running: #e8a15c;
-  --color-velo: #7fb6dc;
-  --color-muscu: #b99ad4;
-  --color-hiit: #f08a76;
-  --color-etirements: #86c48e;
+  /* Action destructrice / bouton flottant de création (« + SÉANCE », « + OBJECTIF ») */
+  --color-flare: #d8452f;
+  --color-flare-ink: #fff3ee;
+
+  /* Catégories — teintes de la maquette. ⚠ miroir dans `CATEGORY_META[].hex` */
+  --color-running: #f09a72;
+  --color-velo: #7ec8e3;
+  --color-muscu: #9faeda;
+  --color-hiit: #f07b68;
+  --color-etirements: #6bd0c2;
 
   /* Ombres : sur fond sombre le noir à 5 % ne se voit pas. On reprend l'ombre douce
      de la marque (0 18px 34px rgba(2,10,16,.55)), déclinée par palier. */
@@ -64,8 +96,35 @@ html {
 }
 
 body {
-  @apply bg-cream text-ink font-sans antialiased;
+  /* Pas de `bg-*` ici : le fond est la photo de `SeaBackdrop`, montée en `fixed`
+     derrière l'app. La couleur de repli est posée sur `html` ci-dessus. */
+  @apply text-ink font-sans antialiased;
   overscroll-behavior-y: none;
+}
+
+/* Animations de la maquette : grain photographique, reflet qui balaie l'image,
+   et remplissage « marée » des ronds du planning quand une séance est faite.
+   Toutes sont décoratives — coupées si l'utilisateur limite les animations. */
+@keyframes grain {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-2px, 1px); }
+  50% { transform: translate(1px, -2px); }
+  75% { transform: translate(-1px, -1px); }
+}
+@keyframes sweep {
+  from { transform: translateX(-60%); }
+  to { transform: translateX(60%); }
+}
+@keyframes tide {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 ::selection {

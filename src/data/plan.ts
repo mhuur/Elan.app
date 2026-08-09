@@ -173,15 +173,17 @@ export const TYPE_DIFFICULTY: Record<PlanType, number> = { ef: 1, sl: 2, seuil: 
 /** Identité visuelle courte d'un type d'effort (libellé + couleur) pour différencier les séances dans le planning */
 export interface PlanTypeMeta {
   short: string
+  /** Code de la tuile de catégorie (charte bord de mer) — `short` y est trop long */
+  code: string
   hex: string
 }
 export const TYPE_META: Record<PlanType, PlanTypeMeta> = {
-  ef: { short: 'Footing', hex: '#86c48e' }, // endurance — vert écume
-  sl: { short: 'Sortie longue', hex: '#7fb6dc' }, // long & régulier — bleu
-  seuil: { short: 'Seuil', hex: '#f0c060' }, // tempo — ambre
-  as: { short: 'Allure semi', hex: '#f4956a' }, // spécifique — orange
-  vma: { short: 'Fractionné', hex: '#ef7d86' }, // intervalles — corail
-  course: { short: 'Course', hex: '#b99ad4' }, // jour J — violet
+  ef: { short: 'Footing', code: 'EF', hex: '#86c48e' }, // endurance — vert écume
+  sl: { short: 'Sortie longue', code: 'SL', hex: '#7fb6dc' }, // long & régulier — bleu
+  seuil: { short: 'Seuil', code: 'SEUIL', hex: '#f0c060' }, // tempo — ambre
+  as: { short: 'Allure semi', code: 'AS', hex: '#f4956a' }, // spécifique — orange
+  vma: { short: 'Fractionné', code: 'VMA', hex: '#ef7d86' }, // intervalles — corail
+  course: { short: 'Course', code: 'COURSE', hex: '#b99ad4' }, // jour J — violet
 }
 
 /** Allure « m:ss » → secondes par km */

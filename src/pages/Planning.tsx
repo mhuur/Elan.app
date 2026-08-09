@@ -3,21 +3,46 @@ import { useNavigate } from 'react-router-dom'
 import { DndContext, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ArrowLeft, ArrowRight, Footprints, GripVertical } from 'lucide-react'
+import { ArrowLeft, ArrowRight, GripVertical } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Session } from '../types'
-import { DAY_LETTER, DAY_NAMES, addDays, formatShortFr, todayStr } from '../lib/dates'
+import { DAY_LETTER, DAY_NAMES, DAY_SHORT, addDays, formatShortFr, todayStr } from '../lib/dates'
 import { canonicalCycles, describeSchedule, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
 import { isPlanLog } from '../lib/planDay'
 import { usePlanAnchor } from '../lib/usePlanAnchor'
 import { usePlanningWeek } from '../lib/usePlanningWeek'
 import { usePlanningOrdering } from '../lib/usePlanningOrdering'
-import { CategoryIcon, EmptyState, PageHeader } from '../components/ui'
+import { DisplayTitle, EmptyState, Eyebrow, iconSquare } from '../components/ui'
 import WorkoutSheet from '../components/WorkoutSheet'
 import { TYPE_META, seanceDateStr, type PlanSeance } from '../data/plan'
 
-/** Grille commune : poignée · nom · 7 jours */
-const GRID = 'grid grid-cols-[1rem_minmax(0,1fr)_repeat(7,1.85rem)] items-center gap-x-0.5'
+/** Grille commune : poignée · nom · 7 jours — colonnes de la maquette (14 px / 30 px) */
+// 28 px par jour plutôt que les 30 de la maquette : sur 390 px de large, les 14 px
+// récupérés vont à la colonne du nom, la plus étreinte de la grille.
+const GRID = 'grid grid-cols-[0.875rem_minmax(0,1fr)_repeat(7,1.75rem)] items-center gap-x-0.5'
+
+/** Ligne de séance, en verre dépoli sur la photo (charte bord de mer) */
+const ROW = GRID + ' rounded-md border border-hairline bg-glass p-1 backdrop-blur-lg'
+
+/**
+ * Le rond d'un jour. Trois états, et c'est TOUTE la sémantique de la grille :
+ * anneau = prévu, plein = fait, point = rien ce jour-là. Le remplissage « marée »
+ * n'est pas décoratif — il signale que le plein vient d'apparaître après un tap.
+ */
+function DayDot({ state, hex }: { state: 'done' | 'planned' | 'none'; hex: string }) {
+  if (state === 'none') return <span className="h-1.5 w-1.5 rounded-full bg-ink/25" />
+  if (state === 'planned')
+    return <span className="h-[15px] w-[15px] rounded-full border-2" style={{ borderColor: hex }} />
+  return (
+    <span className="relative h-[15px] w-[15px] overflow-hidden rounded-full border" style={{ borderColor: hex }}>
+      <span className="absolute inset-0 animate-[tide_1.1s_cubic-bezier(.22,1,.36,1)_both]" style={{ backgroundColor: hex }} />
+    </span>
+  )
+}
+
+/** Cellule d'un jour : la colonne du jour courant se signale par un fond, pas par le rond */
+const dayCell = (isToday: boolean) =>
+  'flex h-[30px] items-center justify-center ' + (isToday ? 'rounded-sm bg-sage-500/15' : '')
 
 function Row({
   session,
@@ -45,53 +70,40 @@ function Row({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={
-        GRID +
-        ' rounded-2xl bg-surface px-1.5 py-1 shadow-sm ' +
-        (isDragging ? 'relative z-10 shadow-lg ring-2 ring-sage-300' : '')
-      }
+      className={ROW + (isDragging ? ' relative z-10 shadow-lg ring-2 ring-sage-300' : '')}
     >
       <button
         type="button"
         aria-label={`Déplacer ${session.name}`}
         {...attributes}
         {...listeners}
-        className="flex h-9 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
+        className="flex h-7 cursor-grab touch-none items-center justify-center text-ink/35 active:cursor-grabbing"
       >
-        <GripVertical className="h-4 w-4" />
+        <GripVertical className="h-3 w-3" />
       </button>
-      <button type="button" onClick={onEdit} className="min-w-0 px-1 py-1 text-left">
-        <span className="flex items-center gap-1 text-xs font-extrabold">
-          <CategoryIcon category={session.category} className={`h-3.5 w-3.5 shrink-0 ${meta.text}`} />
-          <span className="min-w-0 truncate">{session.name}</span>
+      <button type="button" onClick={onEdit} className="min-w-0 pl-1 text-left">
+        <span className="block truncate font-display text-[17px] leading-[1.05] font-bold uppercase">
+          {session.name}
         </span>
-        {sublabel && <span className="block truncate text-[11px] font-bold text-ink-soft">↻ {sublabel}</span>}
+        {/* « MUS · ↻ TOUS LES 2 JOURS » — le code porte la couleur, la cadence suit.
+            Le ↻ est dans la maquette, et `check-interval` le cherche tel quel. */}
+        <span className="block truncate font-mono text-[9px] tracking-[0.1em] uppercase" style={{ color: meta.hex }}>
+          {meta.code}
+          {sublabel && ` · ↻ ${sublabel}`}
+        </span>
       </button>
-      {Array.from({ length: 7 }, (_, d) => {
-        const done = doneDays[d]
-        const planned = plannedDays[d]
-        return (
-          <button
-            key={d}
-            type="button"
-            aria-label={`${session.name} — ${DAY_NAMES[d]}`}
-            aria-pressed={done || planned}
-            onClick={() => onDay(d)}
-            className={
-              'flex h-10 items-center justify-center rounded-lg transition-colors ' +
-              (d === todayIdx ? 'bg-sage-50' : '')
-            }
-          >
-            <span
-              className={
-                'rounded-full transition-all ' +
-                (done ? 'h-4 w-4 shadow-sm' : planned ? 'h-4 w-4 border-[3px] bg-surface' : 'h-2 w-2 bg-sand')
-              }
-              style={done ? { backgroundColor: meta.hex } : planned ? { borderColor: meta.hex } : undefined}
-            />
-          </button>
-        )
-      })}
+      {Array.from({ length: 7 }, (_, d) => (
+        <button
+          key={d}
+          type="button"
+          aria-label={`${session.name} — ${DAY_NAMES[d]}`}
+          aria-pressed={doneDays[d] || plannedDays[d]}
+          onClick={() => onDay(d)}
+          className={dayCell(d === todayIdx)}
+        >
+          <DayDot state={doneDays[d] ? 'done' : plannedDays[d] ? 'planned' : 'none'} hex={meta.hex} />
+        </button>
+      ))}
     </div>
   )
 }
@@ -117,17 +129,17 @@ function PlanRow({
 }) {
   const t = TYPE_META[s.type]
   return (
-    <div className={GRID + ' rounded-2xl bg-surface px-1.5 py-1 shadow-sm'}>
-      <span aria-hidden className="flex h-9 items-center justify-center">
-        <span className="h-4 w-1 rounded-full" style={{ backgroundColor: t.hex }} />
+    <div className={ROW}>
+      {/* Pas de poignée : le plan est figé. Un trait coloré tient la colonne. */}
+      <span aria-hidden className="flex h-7 items-center justify-center">
+        <span className="h-3.5 w-0.5 rounded-full" style={{ backgroundColor: t.hex }} />
       </span>
-      <button type="button" onClick={onOpen} className="min-w-0 px-1 py-1 text-left">
-        <span className="flex items-center gap-1 text-xs font-extrabold">
-          <Footprints className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} style={{ color: t.hex }} />
-          <span className="min-w-0 truncate">{s.title}</span>
-        </span>
-        <span className="block truncate text-[11px] font-bold" style={{ color: t.hex }}>
-          {t.short}
+      <button type="button" onClick={onOpen} className="min-w-0 pl-1 text-left">
+        {/* Pas d'icône ici : la colonne du nom est la plus étroite de la grille, et le
+            trait coloré + le code disent déjà la discipline. */}
+        <span className="block truncate font-display text-[17px] leading-[1.05] font-bold uppercase">{s.title}</span>
+        <span className="block truncate font-mono text-[9px] tracking-[0.1em] uppercase" style={{ color: t.hex }}>
+          {t.code} · {DAY_SHORT[s.day]}
         </span>
       </button>
       {Array.from({ length: 7 }, (_, d) => {
@@ -144,15 +156,9 @@ function PlanRow({
             type="button"
             aria-label={`${s.title} — ${DAY_NAMES[s.day]}`}
             onClick={onOpen}
-            className={'flex h-10 items-center justify-center rounded-lg ' + (d === todayIdx ? 'bg-sage-50' : '')}
+            className={dayCell(d === todayIdx)}
           >
-            {isDone ? (
-              <span className="h-4 w-4 rounded-full shadow-sm transition-all" style={{ backgroundColor: t.hex }} />
-            ) : showPlannedRing ? (
-              <span className="h-4 w-4 rounded-full border-[3px] bg-surface transition-all" style={{ borderColor: t.hex }} />
-            ) : (
-              <span className="h-2 w-2 rounded-full bg-sand" />
-            )}
+            <DayDot state={isDone ? 'done' : showPlannedRing ? 'planned' : 'none'} hex={t.hex} />
           </button>
         )
       })}
@@ -246,38 +252,36 @@ export default function Planning() {
 
   return (
     <div>
-      <PageHeader
-        title="Planning"
-        right={
-          perWeek > 0 ? (
-            <p className="text-xs font-extrabold text-sage-600">
-              {perWeek} séance{perWeek > 1 ? 's' : ''} / sem.
-            </p>
-          ) : undefined
-        }
-      />
+      {/* En-tête compact : sur cet écran la grille doit tenir sans défilement, barre
+          d'onglets comprise — c'est elle l'information, pas le titre. */}
+      <header className="px-[22px] pt-5">
+        <Eyebrow>
+          — Semaine{perWeek > 0 && ` · ${perWeek} séance${perWeek > 1 ? 's' : ''}`}
+        </Eyebrow>
+        <DisplayTitle className="mt-1.5 text-[min(12vw,44px)] leading-[0.86] tracking-tight">Planning</DisplayTitle>
+      </header>
 
       {!showGrid ? (
         <div className="px-5">
           <EmptyState emoji="🗂️" text="Créez d'abord une séance dans l'onglet Exercices." />
         </div>
       ) : (
-        <div className="px-3">
+        <div className="px-3.5 pt-3">
           {/* Navigation semaine par semaine (flèches + dates), comme l'onglet Plan */}
-          <div className="flex items-center justify-between gap-3 px-1.5 pb-1.5">
+          <div className="flex items-center justify-between gap-3 pb-1.5">
             <button
               type="button"
               aria-label="Semaine précédente"
               onClick={() => setWeekOffset((o) => o - 1)}
-              className="rounded-full bg-surface p-2 shadow-sm active:bg-sage-50"
+              className={iconSquare}
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-[18px] w-[18px]" />
             </button>
             <div className="text-center">
-              <p className="text-sm font-extrabold first-letter:uppercase">
+              <p className="font-display text-xl leading-none font-bold uppercase">
                 {weekOffset === 0 ? 'Cette semaine' : `Semaine du ${formatShortFr(weekDates[0])}`}
               </p>
-              <p className="text-[11px] font-bold text-ink-soft">
+              <p className="mt-1 font-mono text-[9px] tracking-[0.14em] uppercase text-ink/60">
                 {formatShortFr(weekDates[0])} – {formatShortFr(weekDates[6])}
               </p>
             </div>
@@ -285,9 +289,9 @@ export default function Planning() {
               type="button"
               aria-label="Semaine suivante"
               onClick={() => setWeekOffset((o) => o + 1)}
-              className="rounded-full bg-surface p-2 shadow-sm active:bg-sage-50"
+              className={iconSquare}
             >
-              <ArrowRight className="h-5 w-5" />
+              <ArrowRight className="h-[18px] w-[18px]" />
             </button>
           </div>
 
@@ -295,14 +299,14 @@ export default function Planning() {
             <button
               type="button"
               onClick={() => setWeekOffset(planStartOffset)}
-              className="mb-1.5 flex w-full items-center justify-center gap-1.5 rounded-2xl bg-sage-50 px-4 py-2 text-xs font-bold text-sage-700 active:bg-sage-100"
+              className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-sage-500/40 bg-glass-soft px-4 py-2.5 font-mono text-[10px] tracking-[0.14em] uppercase text-sage-700 backdrop-blur-lg active:bg-glass"
             >
               Le plan semi démarre {formatShortFr(firstStart)}
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
           )}
 
-          {/* En-tête des jours : lettre + numéro du jour, aujourd'hui surligné */}
+          {/* En-tête des jours : lettre + numéro du jour, aujourd'hui en pastille pleine */}
           <div className={GRID + ' px-1.5 pb-1'}>
             <span />
             <span />
@@ -310,11 +314,17 @@ export default function Planning() {
               const isToday = d === todayIdx
               return (
                 <div key={d} title={DAY_NAMES[d]} className="mx-auto flex flex-col items-center gap-0.5">
-                  <span className={'text-[10px] font-extrabold ' + (isToday ? 'text-sage-600' : 'text-ink-soft/60')}>{letter}</span>
                   <span
                     className={
-                      'flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-extrabold tabular-nums ' +
-                      (isToday ? 'bg-sage-500 text-onaccent shadow-sm' : 'text-ink-soft')
+                      'font-mono text-[10px] tracking-[0.1em] ' + (isToday ? 'text-sage-500' : 'text-ink/55')
+                    }
+                  >
+                    {letter}
+                  </span>
+                  <span
+                    className={
+                      'flex h-6 w-6 items-center justify-center rounded-full font-mono text-[10px] tabular-nums ' +
+                      (isToday ? 'bg-sage-500 text-onaccent' : 'text-ink/55')
                     }
                   >
                     {Number(weekDates[d].slice(8, 10))}
@@ -338,17 +348,12 @@ export default function Planning() {
                 const body = (handle?: ReactNode) => (
                   <div>
                     {showHeaders && (
-                      <h2 className="flex items-center gap-1.5 px-1.5 pb-1 pt-3 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
-                        {handle}
-                        {g || emptyLabel}
-                        {isRun && planWeek && (
-                          <span className="font-bold normal-case tracking-normal text-ink-soft/70">
-                            plan · sem. {planWeekIdx + 1}
-                          </span>
-                        )}
+                      <h2 className="flex items-center gap-1.5 px-1.5 pt-2.5 pb-1 font-mono text-[10px] tracking-[0.2em] uppercase text-ink/50">
+                        {handle}—&nbsp;{g || emptyLabel}
+                        {isRun && planWeek && <span className="text-ink/40">· plan sem. {planWeekIdx + 1}</span>}
                       </h2>
                     )}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       {isRun &&
                         planStates.map((st) => {
                           // La séance peut avoir été faite un autre jour : le rond « fait » suit la date du log

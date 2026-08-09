@@ -72,7 +72,7 @@ function WorkoutBars({ parts }: { parts: WorkoutPart[] }) {
   }
   if (bars.length < 2) return null
   return (
-    <div className="flex h-24 items-end gap-[3px] rounded-2xl bg-sage-50/70 px-3 pt-3 pb-0">
+    <div className="flex h-24 items-end gap-[3px] rounded-sm bg-sage-50/70 px-3 pt-3 pb-0">
       {bars.map((s, i) => (
         <span
           key={i}
@@ -95,7 +95,7 @@ function Part({ part }: { part: WorkoutPart }) {
         </div>
         <div className="absolute right-3 top-1/2 flex -translate-y-1/2 flex-col items-center text-ink-soft">
           <Repeat className="h-4 w-4" strokeWidth={2.5} />
-          <span className="text-lg font-extrabold leading-none">{part.repeat}</span>
+          <span className="font-display text-2xl leading-none font-bold uppercase leading-none">{part.repeat}</span>
         </div>
       </div>
     )
@@ -104,7 +104,7 @@ function Part({ part }: { part: WorkoutPart }) {
   return (
     <div className="relative rounded-2xl border border-sand bg-shoal px-3 py-2.5">
       {pill && (
-        <span className="absolute -top-2 left-3 rounded-full border border-sand bg-shoal px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-ink-soft">
+        <span className="absolute -top-2 left-3 rounded-full border border-sand bg-shoal px-2 py-0.5 font-mono text-[9px] tracking-[0.16em] uppercase tracking-wider text-ink-soft">
           {pill}
         </span>
       )}
@@ -170,7 +170,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
 
   if (existing) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-2xl bg-sage-50 px-4 py-3">
+      <div className="flex items-center justify-between gap-3 rounded-sm bg-sage-50 px-4 py-3">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-sm font-extrabold text-sage-700">
             <Check className="h-4 w-4" strokeWidth={3} /> Validée le {formatShortFr(existing.date)}
@@ -204,7 +204,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
         <button
           type="button"
           onClick={validate}
-          className="w-full rounded-2xl bg-sage-500 px-5 py-3.5 text-base font-extrabold text-onaccent shadow-md shadow-sage-500/25 active:bg-sage-600"
+          className="w-full rounded-sm bg-ink px-5 py-3.5 font-mono text-[11px] font-bold tracking-[0.16em] uppercase text-onaccent active:bg-sage-700"
         >
           Valider ✓
         </button>
@@ -252,7 +252,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
         <button
           type="button"
           onClick={() => pick(null)}
-          className="w-full rounded-2xl bg-sage-100 px-4 py-2.5 text-sm font-bold text-sage-700 active:bg-sage-200"
+          className="w-full rounded-sm border border-hairline-strong bg-glass-soft px-4 py-2.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-ink backdrop-blur-lg active:bg-glass"
         >
           Valider sans associer de sortie
         </button>
@@ -267,7 +267,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
     <button
       type="button"
       onClick={() => setStep('picking')}
-      className="w-full rounded-2xl bg-sage-500 px-5 py-3.5 text-base font-extrabold text-onaccent shadow-md shadow-sage-500/25 active:bg-sage-600"
+      className="w-full rounded-sm bg-ink px-5 py-3.5 font-mono text-[11px] font-bold tracking-[0.16em] uppercase text-onaccent active:bg-sage-700"
     >
       Valider ma séance ✓
     </button>
@@ -295,10 +295,10 @@ export default function WorkoutSheet({
         seance ? (
           <div className="flex items-start justify-between gap-3 pr-6">
             <div className="min-w-0">
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-sage-500">
+              <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-sage-500">
                 {DAY_NAMES[seance.day]} · Semaine {weekIdx + 1}
               </p>
-              <p className="mt-0.5 truncate text-lg font-extrabold">{seance.title}</p>
+              <p className="mt-0.5 truncate font-display text-2xl leading-none font-bold uppercase">{seance.title}</p>
             </div>
             {seance.workout.surface && (
               <span className="mt-0.5 flex shrink-0 items-center gap-1 rounded-full bg-sage-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-sage-700">

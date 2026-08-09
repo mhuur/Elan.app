@@ -615,7 +615,7 @@ export default function SessionForm() {
         </Field>
 
         {category === 'hiit' && (
-          <div className="rounded-2xl bg-surface p-3.5 shadow-sm">
+          <div className="rounded-md border border-hairline bg-glass p-3.5 backdrop-blur-lg">
             <div className="grid grid-cols-3 gap-2 text-center">
               <div>
                 <p className="mb-1 text-xs font-bold text-ink-soft">Effort</p>
@@ -634,7 +634,7 @@ export default function SessionForm() {
         )}
 
         {category === 'etirements' && (
-          <div className="space-y-3 rounded-2xl bg-surface p-3.5 shadow-sm">
+          <div className="space-y-3 rounded-md border border-hairline bg-glass p-3.5 backdrop-blur-lg">
             {!hasBreaks && (
               <div className="flex items-center justify-between gap-2">
                 <p className="flex items-center gap-2 text-sm font-extrabold" title="Refaire toute la routine à la suite">
@@ -653,7 +653,7 @@ export default function SessionForm() {
         )}
 
         {category === 'muscu' && !hasBreaks && (
-          <div className="flex items-center justify-between gap-2 rounded-2xl bg-surface p-3.5 shadow-sm">
+          <div className="flex items-center justify-between gap-2 rounded-md border border-hairline bg-glass p-3.5 backdrop-blur-lg">
             <p
               className="flex items-center gap-2 text-sm font-extrabold"
               title="Refaire toute la liste d'exercices à la suite"
@@ -675,7 +675,7 @@ export default function SessionForm() {
                         <div className="space-y-2">
                           {hasBreaks && (
                             <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-1.5 ${catMeta.soft}`}>
-                              <p className={`flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider ${catMeta.text}`}>
+                              <p className={`flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase ${catMeta.text}`}>
                                 <button
                                   type="button"
                                   aria-label={`Déplacer le bloc ${bi + 1}`}
@@ -719,7 +719,7 @@ export default function SessionForm() {
                                   <SortableItem key={it.uid} uid={it.uid}>
                                     {(drag) => (
                                       <div>
-                    <div className="rounded-2xl bg-surface p-3 shadow-sm">
+                    <div className="rounded-md border border-hairline bg-glass p-3 backdrop-blur-lg">
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"

@@ -37,6 +37,15 @@ export function formatLongFr(d: Date): string {
   return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
+/** « mardi » + « 10 juin » — le titre d'écran de la charte bord de mer s'écrit sur
+ *  deux lignes, en capitales condensées, et casse TOUJOURS au même endroit. */
+export function formatTitleFr(d: Date): [string, string] {
+  return [
+    d.toLocaleDateString('fr-FR', { weekday: 'long' }),
+    d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }),
+  ]
+}
+
 /** « 10 juin » à partir d'une date YYYY-MM-DD */
 export function formatShortFr(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00')

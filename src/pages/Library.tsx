@@ -5,7 +5,7 @@ import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, subtypesOf, type Exercise }
 import { Play, Plus } from 'lucide-react'
 import { summarizeSession } from '../lib/format'
 import { describeSchedule } from '../lib/schedule'
-import { CategoryIcon, EmptyState, Fab, PageHeader, Seg } from '../components/ui'
+import { CategoryIcon, EmptyState, Fab, PageHeader, Seg, glassCard } from '../components/ui'
 
 const norm = (s: string) =>
   s
@@ -48,7 +48,7 @@ export default function Library() {
 
   return (
     <div>
-      <PageHeader kicker="Bibliothèque" title="Exercices & séances" />
+      <PageHeader kicker="Bibliothèque de bord" title="Exercices & séances" />
       <div className="px-5 pb-4">
         <Seg
           options={[
@@ -68,22 +68,29 @@ export default function Library() {
             const meta = CATEGORY_META[cat]
             return (
               <section key={cat}>
-                <h2 className={`mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider ${meta.text}`}>
-                  <CategoryIcon category={cat} className="h-3.5 w-3.5" /> {meta.label}
+                <h2 className={`mb-1.5 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase ${meta.text}`}>
+                  <CategoryIcon category={cat} className="h-3.5 w-3.5" /> — {meta.label}
                 </h2>
-                <div className="space-y-3">
-                  {list.map((s) => (
+                {/* Lignes séparées par un filet, sans carte : la maquette laisse la photo
+                    respirer entre les sections plutôt que d'empiler des pavés. */}
+                <div>
+                  {list.map((s, i) => (
                     <button
                       key={s.id}
                       type="button"
                       onClick={() => navigate(`/session/${s.id}`)}
-                      className="flex w-full items-center gap-3 rounded-3xl bg-surface p-4 text-left shadow-sm active:scale-[0.985]"
+                      className={
+                        'flex w-full items-center gap-2.5 py-2.5 text-left ' +
+                        (i < list.length - 1 ? 'border-b border-hairline' : '')
+                      }
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-base font-extrabold">{s.name}</p>
-                        <p className="truncate text-xs font-semibold text-ink-soft">{summarizeSession(s)}</p>
+                        <p className="truncate font-display text-[21px] leading-none font-bold uppercase">{s.name}</p>
+                        <p className="mt-1 truncate font-mono text-[9px] tracking-[0.1em] uppercase text-ink/60">
+                          {summarizeSession(s)}
+                        </p>
                       </div>
-                      <span className="max-w-36 shrink-0 truncate rounded-full bg-sage-50 px-2.5 py-1 text-[11px] font-extrabold text-sage-600">
+                      <span className="max-w-36 shrink-0 truncate rounded-full border border-hairline-strong px-2.5 py-[3px] font-mono text-[9px] tracking-[0.1em] uppercase text-ink/70">
                         {describeSchedule(s, sessions)}
                       </span>
                     </button>
@@ -101,7 +108,7 @@ export default function Library() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Rechercher un exercice ou un sous-type…"
-            className="w-full rounded-2xl border border-sand bg-shoal px-4 py-3 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink-soft/60 focus:border-sage-400"
+            className="w-full rounded-sm border border-hairline bg-glass-sunken px-4 py-3 text-sm font-semibold outline-none backdrop-blur-lg placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
           />
           {CATEGORIES.map((cat) => {
             const list = visibleExercises.filter((e) => e.category === cat)
@@ -110,14 +117,14 @@ export default function Library() {
             return (
               <section key={cat}>
                 <div className="mb-2 flex items-center justify-between">
-                  <h2 className={`flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider ${meta.text}`}>
-                    <CategoryIcon category={cat} className="h-3.5 w-3.5" /> {meta.label}
+                  <h2 className={`flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase ${meta.text}`}>
+                    <CategoryIcon category={cat} className="h-3.5 w-3.5" /> — {meta.label}
                   </h2>
                   <button
                     type="button"
                     aria-label={`Nouvel exercice ${meta.label}`}
                     onClick={() => navigate(`/exercise/new?cat=${cat}`)}
-                    className="flex h-6 w-6 items-center justify-center rounded-full bg-sage-100 text-sage-700 active:bg-sage-200"
+                    className="flex h-6 w-6 items-center justify-center rounded-xs border border-hairline-strong text-ink/70 active:bg-glass"
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </button>
@@ -127,34 +134,34 @@ export default function Library() {
                     <div key={subtype || '—'}>
                       {subtype && (
                         <div className="mb-1 flex items-center justify-between px-1">
-                          <p className="text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
-                            {subtype}
-                          </p>
+                          <p className="font-mono text-[9px] tracking-[0.18em] uppercase text-ink/50">{subtype}</p>
                           <button
                             type="button"
                             aria-label={`Nouvel exercice ${subtype}`}
                             onClick={() => navigate(`/exercise/new?cat=${cat}&st=${encodeURIComponent(subtype)}`)}
-                            className="flex h-5 w-5 items-center justify-center rounded-full bg-sage-50 text-sage-600 active:bg-sage-100"
+                            className="flex h-5 w-5 items-center justify-center rounded-xs border border-hairline text-ink/60 active:bg-glass"
                           >
                             <Plus className="h-3 w-3" />
                           </button>
                         </div>
                       )}
-                      <div className="overflow-hidden rounded-3xl bg-surface shadow-sm">
+                      <div className={'overflow-hidden ' + glassCard}>
                         {exos.map((e, i) => (
                           <button
                             key={e.id}
                             type="button"
                             onClick={() => navigate(`/exercise/${e.id}`)}
                             className={
-                              'flex w-full items-center gap-2 px-4 py-3 text-left active:bg-sage-50 ' +
-                              (i > 0 ? 'border-t border-cream' : '')
+                              'flex w-full items-center gap-2 px-3.5 py-2.5 text-left active:bg-glass-raised ' +
+                              (i > 0 ? 'border-t border-hairline' : '')
                             }
                           >
-                            <span className="min-w-0 flex-1 truncate text-sm font-bold">{e.name}</span>
+                            <span className="min-w-0 flex-1 truncate font-display text-lg leading-none font-bold uppercase">
+                              {e.name}
+                            </span>
                             {e.measure === 'sec' && (
-                              <span className="shrink-0 rounded-full bg-sand px-2 py-0.5 text-[11px] font-extrabold text-ink-soft">
-                                secondes
+                              <span className="shrink-0 rounded-full border border-hairline px-2 py-[3px] font-mono text-[8px] tracking-[0.1em] uppercase text-ink/60">
+                                sec
                               </span>
                             )}
                             {e.videoUrl && (
@@ -163,12 +170,12 @@ export default function Library() {
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={(ev) => ev.stopPropagation()}
-                                className="flex shrink-0 items-center gap-1 rounded-full bg-velo/10 px-2.5 py-1 text-xs font-extrabold text-velo"
+                                className="flex shrink-0 items-center gap-1 rounded-full border border-velo/40 px-2 py-[3px] font-mono text-[8px] tracking-[0.1em] uppercase text-velo"
                               >
-                                <Play className="h-3 w-3" /> démo
+                                <Play className="h-2.5 w-2.5" /> démo
                               </a>
                             )}
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-sage-300">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-sage-500">
                               <path d="m9 18 6-6-6-6" />
                             </svg>
                           </button>

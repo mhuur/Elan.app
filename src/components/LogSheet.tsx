@@ -18,10 +18,17 @@ export default function LogSheet({ log, onClose }: { log: Log | null; onClose: (
       onClose={onClose}
       title={
         log ? (
-          <span className="flex items-center gap-2">
-            <CategoryIcon category={log.category} className={`h-5 w-5 shrink-0 ${CATEGORY_META[log.category].text}`} />
-            <span className="min-w-0 truncate">{log.sessionName}</span>
-          </span>
+          <>
+            {/* Sur-titre « — MUSCU · 29.07 » de la maquette (écran « Journal de bord ») */}
+            <span
+              className="mb-2 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase"
+              style={{ color: CATEGORY_META[log.category].hex }}
+            >
+              <CategoryIcon category={log.category} className="h-3.5 w-3.5 shrink-0" />—{' '}
+              {CATEGORY_META[log.category].label} · {log.date.slice(8, 10)}.{log.date.slice(5, 7)}
+            </span>
+            <span className="block min-w-0 truncate">{log.sessionName}</span>
+          </>
         ) : undefined
       }
     >

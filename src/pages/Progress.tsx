@@ -42,8 +42,8 @@ const TOOLTIP = {
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-3xl bg-surface p-4 shadow-sm">
-      <h2 className="mb-3 text-base font-extrabold">{title}</h2>
+    <section className="rounded-md border border-hairline bg-glass p-4 backdrop-blur-lg">
+      <h2 className="mb-3 font-display text-xl leading-none font-bold uppercase">{title}</h2>
       {children}
     </section>
   )
@@ -179,7 +179,7 @@ function ExoSheetInner({ t }: { t: ExoTracker }) {
         </p>
       )}
       {/* Dernières séances : le détail des séries, ⚠ = mal réalisée */}
-      <div className="overflow-hidden rounded-2xl bg-sage-50">
+      <div className="overflow-hidden rounded-sm bg-sage-50">
         {t.points
           .slice(-5)
           .reverse()
@@ -254,7 +254,7 @@ function MetricsSheetInner({ t }: { t: MetricTracker }) {
         </p>
       )}
       {/* Petits multiples : tous les paramètres, tap = afficher en grand */}
-      <div className="overflow-hidden rounded-2xl bg-sage-50">
+      <div className="overflow-hidden rounded-sm bg-sage-50">
         {t.defs.map((def, i) => {
           const serie = t.series[def.key] ?? []
           const values = serie.map((p) => p.value)

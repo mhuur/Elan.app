@@ -41,7 +41,9 @@ try {
   // --- Séries variées : 3×12 devient 12/12/12 éditables, on passe la 1re à 30
   await page.locator('[aria-label="Varier les séries"]').first().click()
   await page.screenshot({ path: 'screenshots/38-series-variees.png' })
-  const firstCard = page.locator('div.rounded-2xl.bg-surface').filter({ hasText: 'reps' }).first()
+  // Carte d'item de la fiche séance. ⚠ dépend de la classe du conteneur : c'était
+  // `.rounded-2xl.bg-surface` avant la charte bord de mer, c'est le verre dépoli depuis.
+  const firstCard = page.locator('div.rounded-md.bg-glass').filter({ hasText: 'reps' }).first()
   await firstCard.locator('input[inputmode="numeric"]').nth(1).fill('30')
 
   // --- Section du planning : suggestions filtrées dans la combobox

@@ -43,7 +43,7 @@ function Metric({ label, value, unit }: { label: string; value: string; unit?: s
   return (
     <div>
       <p className="text-xs font-semibold text-ink-soft">{label}</p>
-      <p className="mt-0.5 text-lg font-extrabold tabular-nums leading-none">
+      <p className="mt-0.5 font-display text-2xl leading-none font-bold uppercase tabular-nums leading-none">
         {value}
         {unit && <span className="ml-0.5 text-xs font-bold text-ink-soft">{unit}</span>}
       </p>
@@ -91,19 +91,19 @@ function SeanceCard({
   const diff = TYPE_DIFFICULTY[s.type]
   const t = TYPE_META[s.type]
   return (
-    <button type="button" onClick={onOpen} className="w-full rounded-2xl bg-surface text-left shadow-sm active:bg-sage-50/50">
+    <button type="button" onClick={onOpen} className="w-full rounded-md border border-hairline bg-glass text-left backdrop-blur-lg active:bg-glass-raised">
       <div className="flex items-center gap-3 px-4 pt-3.5">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: t.hex + '22', color: t.hex }}>
           <Footprints className="h-6 w-6" strokeWidth={2.25} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className={'rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ' + st.cls}>{st.label}</span>
+            <span className={'rounded-full px-2 py-0.5 font-mono text-[9px] tracking-[0.16em] uppercase tracking-wide ' + st.cls}>{st.label}</span>
             <span className="text-xs font-bold text-ink-soft">
               Séance {idx + 1}/{total} · {DAY_NAMES[s.day]}
             </span>
           </div>
-          <p className="mt-0.5 truncate text-base font-extrabold">{s.title}</p>
+          <p className="mt-0.5 truncate font-display text-xl leading-none font-bold uppercase">{s.title}</p>
           <p className="text-[11px] font-bold" style={{ color: t.hex }}>{t.short}</p>
         </div>
         <ChevronRight className="h-5 w-5 shrink-0 text-ink-soft/40" />
@@ -133,7 +133,7 @@ function DoneSeanceRow({
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-center gap-3 rounded-2xl bg-surface/70 px-4 py-3 text-left shadow-sm active:bg-sage-50/50"
+      className="flex w-full items-center gap-3 rounded-md border border-hairline bg-glass-soft px-4 py-3 text-left backdrop-blur-lg active:bg-glass"
     >
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage-500 text-onaccent">
         <Check className="h-4 w-4" strokeWidth={3} />
@@ -197,7 +197,7 @@ export default function Plan() {
         right={
           dtr >= 0 ? (
             <div className="text-right">
-              <p className="text-2xl font-extrabold text-ink">J-{dtr}</p>
+              <p className="font-display text-3xl leading-none font-black uppercase text-ink">J-{dtr}</p>
               <p className="text-[11px] font-bold text-ink-soft">dim. {formatShortFr(PLAN_SEMI.raceDate)}</p>
             </div>
           ) : undefined
@@ -216,7 +216,7 @@ export default function Plan() {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="text-center">
-          <p className="text-base font-extrabold">
+          <p className="font-display text-xl leading-none font-bold uppercase">
             {weekIdx === cur ? 'Cette semaine' : weekIdx >= planStart ? `Semaine ${weekIdx - planStart + 1}` : 'Préparation juin'}
           </p>
           <p className="text-xs font-bold text-ink-soft">
@@ -235,9 +235,9 @@ export default function Plan() {
       </div>
 
       {/* Aperçu hebdomadaire */}
-      <section className="rounded-2xl bg-surface px-4 py-3.5 shadow-sm">
+      <section className="rounded-md border border-hairline bg-glass px-4 py-3.5 backdrop-blur-lg">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-base font-extrabold">Ton aperçu hebdomadaire</p>
+          <p className="font-display text-xl leading-none font-bold uppercase">Ton aperçu hebdomadaire</p>
           <span className="shrink-0 rounded-full bg-sage-50 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-sage-700">
             {week.phase}
           </span>
@@ -269,7 +269,7 @@ export default function Plan() {
           />
         ))}
         {todo.length === 0 && (
-          <div className="rounded-2xl bg-sage-100 px-6 py-5 text-center">
+          <div className="rounded-md border border-hairline bg-glass px-6 py-5 text-center backdrop-blur-lg">
             <p className="text-sm font-extrabold text-sage-700">Semaine bouclée, bravo ! 🎉</p>
           </div>
         )}
@@ -277,7 +277,7 @@ export default function Plan() {
 
       {done.length > 0 && (
         <section className="mt-5">
-          <h2 className="mb-2 px-1 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">Terminées</h2>
+          <h2 className="mb-2 px-1 font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">Terminées</h2>
           <div className="space-y-2">
             {done.map(({ s, i }) => (
               <DoneSeanceRow key={s.day} s={s} idx={i} total={week.seances.length} onOpen={() => setSheet(s)} />
@@ -287,13 +287,13 @@ export default function Plan() {
       )}
 
       {/* Mes allures & zones — dépliable, calculé sur les données COROS */}
-      <section className="mt-4 overflow-hidden rounded-2xl bg-sage-50">
+      <section className="mt-4 overflow-hidden rounded-sm bg-sage-50">
         <button
           type="button"
           onClick={() => setZonesOpen((o) => !o)}
           className="flex w-full items-center justify-between px-4 py-3 active:bg-sage-100/50"
         >
-          <span className="text-[11px] font-extrabold uppercase tracking-widest text-sage-600">Mes allures &amp; zones</span>
+          <span className="font-mono text-[10px] tracking-[0.22em] uppercase text-sage-600">Mes allures &amp; zones</span>
           <ChevronDown className={'h-4 w-4 text-sage-600 transition-transform ' + (zonesOpen ? 'rotate-180' : '')} />
         </button>
         {zonesOpen && (

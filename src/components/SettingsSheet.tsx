@@ -48,7 +48,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
     <Sheet open={open} onClose={onClose} title="Réglages">
       <div className="space-y-3">
         {mode === 'cloud' ? (
-          <div className="flex items-start gap-2.5 rounded-2xl bg-sage-50 p-4 text-sm font-semibold text-ink-soft">
+          <div className="flex items-start gap-2.5 rounded-sm bg-sage-50 p-4 text-sm font-semibold text-ink-soft">
             <Cloud className="mt-0.5 h-4 w-4 shrink-0 text-sage-600" />
             <span>
               Connecté en tant que <span className="text-ink">{user?.email}</span>
@@ -57,7 +57,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
             </span>
           </div>
         ) : (
-          <div className="flex items-start gap-2.5 rounded-2xl bg-sage-50 p-4 text-sm font-semibold text-ink-soft">
+          <div className="flex items-start gap-2.5 rounded-sm bg-sage-50 p-4 text-sm font-semibold text-ink-soft">
             <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-sage-600" />
             <span>
               <span className="text-ink">Mode local</span> : vos données restent sur cet appareil.
@@ -69,8 +69,8 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
         )}
 
         {strava.configured && (
-          <div className="rounded-2xl bg-sage-50 p-4">
-            <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+          <div className="rounded-sm bg-sage-50 p-4">
+            <h3 className="mb-2 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
               <RefreshCw className="h-3.5 w-3.5" /> Courses Strava
             </h3>
             <button
@@ -89,8 +89,8 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
         )}
 
         {rappels.configured && (
-          <div className="rounded-2xl bg-sage-50 p-4">
-            <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+          <div className="rounded-sm bg-sage-50 p-4">
+            <h3 className="mb-2 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
               <Bell className="h-3.5 w-3.5" /> Rappels de séance
             </h3>
             {rappels.supported ? (
@@ -175,8 +175,8 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
           </div>
         )}
 
-        <section className="rounded-2xl bg-sage-50 p-4">
-          <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+        <section className="rounded-sm bg-sage-50 p-4">
+          <h3 className="mb-2 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
             <Bug className="h-3.5 w-3.5" /> Bugs & idées d'amélioration
           </h3>
           <div className="flex items-center gap-2">

@@ -28,10 +28,10 @@ export default function ResultTimeline({
   return (
     <>
       {groups.map((g, giIdx) => (
-        <div key={giIdx} className="overflow-hidden rounded-2xl bg-sage-50">
+        <div key={giIdx} className="overflow-hidden rounded-sm bg-sage-50">
           {g.header && (
             <p
-              className={`px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-wider ${CATEGORY_META[category].soft} ${CATEGORY_META[category].text}`}
+              className={`px-4 py-1.5 font-mono text-[10px] tracking-[0.2em] uppercase ${CATEGORY_META[category].soft} ${CATEGORY_META[category].text}`}
             >
               {g.header}
             </p>

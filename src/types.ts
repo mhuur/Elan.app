@@ -277,6 +277,8 @@ export const CATEGORIES: Category[] = ['running', 'velo', 'muscu', 'hiit', 'etir
 
 export interface CategoryMeta {
   label: string
+  /** Code court des tuiles de catégorie (charte bord de mer) — 3 à 5 signes, capitales */
+  code: string
   text: string
   bg: string
   soft: string
@@ -287,9 +289,9 @@ export interface CategoryMeta {
 /** `hex` doit rester le miroir exact des tokens `--color-{catégorie}` de index.css
  *  (charte bord de mer) : il sert aux graphes Recharts et aux aplats en style inline. */
 export const CATEGORY_META: Record<Category, CategoryMeta> = {
-  running: { label: 'Running', text: 'text-running', bg: 'bg-running', soft: 'bg-running/10', hex: '#e8a15c' },
-  velo: { label: 'Vélo', text: 'text-velo', bg: 'bg-velo', soft: 'bg-velo/10', hex: '#7fb6dc' },
-  muscu: { label: 'Muscu', text: 'text-muscu', bg: 'bg-muscu', soft: 'bg-muscu/10', hex: '#b99ad4' },
-  hiit: { label: 'HIIT', text: 'text-hiit', bg: 'bg-hiit', soft: 'bg-hiit/10', hex: '#f08a76' },
-  etirements: { label: 'Étirements', text: 'text-etirements', bg: 'bg-etirements', soft: 'bg-etirements/10', hex: '#86c48e' },
+  running: { label: 'Running', code: 'RUN', text: 'text-running', bg: 'bg-running', soft: 'bg-running/10', hex: '#f09a72' },
+  velo: { label: 'Vélo', code: 'VÉLO', text: 'text-velo', bg: 'bg-velo', soft: 'bg-velo/10', hex: '#7ec8e3' },
+  muscu: { label: 'Muscu', code: 'MUS', text: 'text-muscu', bg: 'bg-muscu', soft: 'bg-muscu/10', hex: '#9faeda' },
+  hiit: { label: 'HIIT', code: 'HIIT', text: 'text-hiit', bg: 'bg-hiit', soft: 'bg-hiit/10', hex: '#f07b68' },
+  etirements: { label: 'Étirements', code: 'ÉTIR', text: 'text-etirements', bg: 'bg-etirements', soft: 'bg-etirements/10', hex: '#6bd0c2' },
 }

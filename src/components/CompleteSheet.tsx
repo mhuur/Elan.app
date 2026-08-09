@@ -219,7 +219,7 @@ function Inner({ session: planned, onClose, date }: { session: Session; onClose:
     return (
       <div className="flex flex-col items-center gap-4 py-6 text-center">
         <div className="text-6xl">{rewards.length ? '🎁' : '🎉'}</div>
-        <h3 className="text-xl font-extrabold">{rewards.length ? 'Palier franchi, bravo !' : 'Objectif atteint, bravo !'}</h3>
+        <h3 className="font-display text-2xl leading-none font-bold uppercase">{rewards.length ? 'Palier franchi, bravo !' : 'Objectif atteint, bravo !'}</h3>
         <div className="space-y-1.5">
           {celebrate.map((a, i) => (
             <div key={i}>
@@ -244,9 +244,9 @@ function Inner({ session: planned, onClose, date }: { session: Session; onClose:
   return (
     <div className="space-y-4">
       {lastLog && (
-        <div className="rounded-2xl bg-sage-50 px-4 py-3">
+        <div className="rounded-sm bg-sage-50 px-4 py-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-sage-600">
+            <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-sage-600">
               Dernière fois · {relativeDayFr(lastLog.date)}
             </p>
             {feelingOf(lastLog.feeling) && (
@@ -266,14 +266,14 @@ function Inner({ session: planned, onClose, date }: { session: Session; onClose:
       {session.notes && <p className="text-sm font-semibold text-ink-soft">{session.notes}</p>}
 
       {raised && (
-        <p className="flex items-center gap-2 rounded-2xl bg-sage-50 px-4 py-2.5 text-xs font-bold text-sage-600">
+        <p className="flex items-center gap-2 rounded-sm bg-sage-50 px-4 py-2.5 text-xs font-bold text-sage-600">
           <TrendingUp className="h-4 w-4 shrink-0" />
           Objectifs relevés à hauteur de ta dernière perf.
         </p>
       )}
 
       {program.length > 0 && (
-        <p className="flex items-center gap-2 rounded-2xl bg-sage-50 px-4 py-2.5 text-sm font-bold">
+        <p className="flex items-center gap-2 rounded-sm bg-sage-50 px-4 py-2.5 text-sm font-bold">
           <ClipboardList className="h-4 w-4 shrink-0 text-sage-600" />
           <span>Programme : {program.map((m) => `${m.label} ${m.target}${m.unit ? ' ' + m.unit : ''}`).join(' · ')}</span>
         </p>
@@ -302,7 +302,7 @@ function Inner({ session: planned, onClose, date }: { session: Session; onClose:
       )}
 
       {session.category === 'hiit' && session.items.length > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-sage-50">
+        <div className="overflow-hidden rounded-sm bg-sage-50">
           {session.items.map((it, i) => {
             const ex = exOf(it.exerciseId)
             return (
@@ -333,10 +333,10 @@ function Inner({ session: planned, onClose, date }: { session: Session; onClose:
       {!entering && (isMuscu || isStretch) && session.items.length > 0 && (
         <div className="space-y-2">
           {blocks.map((b, bi) => (
-            <div key={bi} className="overflow-hidden rounded-2xl bg-sage-50">
+            <div key={bi} className="overflow-hidden rounded-sm bg-sage-50">
               {(blocks.length > 1 || b.rounds > 1) && (
                 <p
-                  className={`flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-extrabold uppercase tracking-wider ${CATEGORY_META[session.category].soft} ${CATEGORY_META[session.category].text}`}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 font-mono text-[10px] tracking-[0.2em] uppercase ${CATEGORY_META[session.category].soft} ${CATEGORY_META[session.category].text}`}
                 >
                   <Repeat className="h-3 w-3" />
                   {blocks.length > 1 ? `Bloc ${bi + 1}` : 'Circuit'}

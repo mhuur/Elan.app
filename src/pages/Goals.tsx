@@ -184,10 +184,10 @@ export default function Goals() {
           const unit = e.measure === 'sec' ? 's' : 'reps'
           const next = levels.find((l) => cur < l.value)
           return (
-            <div key={e.id} className="rounded-3xl bg-surface p-4 shadow-sm">
+            <div key={e.id} className="rounded-md border border-hairline bg-glass p-4 backdrop-blur-lg">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-base font-extrabold">
+                  <p className="flex items-center gap-1.5 font-display text-xl leading-none font-bold uppercase">
                     <CategoryIcon category="muscu" className="h-4 w-4 shrink-0 text-muscu" />
                     <span className="min-w-0 truncate">{e.name}</span>
                   </p>
@@ -249,10 +249,10 @@ export default function Goals() {
           const levels = objectiveLevels(s)
           const next = levels.find((lv) => !sessionLevelReached(s, lv))
           return (
-            <div key={s.id} className="rounded-3xl bg-surface p-4 shadow-sm">
+            <div key={s.id} className="rounded-md border border-hairline bg-glass p-4 backdrop-blur-lg">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-base font-extrabold">
+                  <p className="flex items-center gap-1.5 font-display text-xl leading-none font-bold uppercase">
                     <CategoryIcon category={s.category} className={`h-4 w-4 shrink-0 ${CATEGORY_META[s.category].text}`} />
                     <span className="min-w-0 truncate">{s.name}</span>
                   </p>
@@ -370,9 +370,9 @@ export default function Goals() {
               <Field label="Paliers à atteindre">
                 <div className="space-y-2">
                   {exDrafts.map((d, i) => (
-                    <div key={i} className="space-y-2 rounded-2xl bg-sage-50 p-3">
+                    <div key={i} className="space-y-2 rounded-sm bg-sage-50 p-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+                        <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
                           Palier {i + 1}
                         </p>
                         {exDrafts.length > 1 && (
@@ -419,9 +419,9 @@ export default function Goals() {
                 {sessDrafts.map((d, i) => {
                   const visible = i === 0 ? selMetrics : selMetrics.filter((m) => level1Keys.includes(m.key))
                   return (
-                    <div key={i} className="space-y-2 rounded-2xl bg-sage-50 p-3">
+                    <div key={i} className="space-y-2 rounded-sm bg-sage-50 p-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-ink-soft">
+                        <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
                           Palier {i + 1}
                         </p>
                         {sessDrafts.length > 1 && (
