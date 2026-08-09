@@ -137,6 +137,12 @@ try {
   // Le volet est toujours là (il ne se referme pas après un ajout)
   await desk.waitForSelector("aside >> text=Banque d'exercices")
   await desk.screenshot({ path: 'screenshots/40-form-desktop-volet.png' })
+  // Sticky : après un long défilement, le panneau reste visible en haut du viewport
+  await desk.mouse.wheel(0, 1600)
+  await desk.waitForTimeout(300)
+  const panel = await desk.locator('aside > div').boundingBox()
+  if (!panel || panel.y < 0 || panel.y > 200)
+    throw new Error(`Le volet banque devrait rester collé en défilant (y = ${panel?.y})`)
   await desk.close()
 
   console.log('FORM UI OK — captures 30 à 40 dans ./screenshots')

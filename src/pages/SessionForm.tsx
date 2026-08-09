@@ -433,7 +433,9 @@ export default function SessionForm() {
     <div
       className={
         hasItems
-          ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-start lg:gap-6 lg:pr-6'
+          ? // Pas de `items-start` : l'aside doit s'étirer sur toute la hauteur de la
+            // colonne formulaire, sinon son panneau sticky n'a aucune course pour coller
+            'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-6 lg:pr-6'
           : 'mx-auto max-w-lg'
       }
     >
