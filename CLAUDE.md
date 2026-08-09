@@ -34,7 +34,14 @@ Le `.env` (gitignoré) contient la config Firebase du projet `routine-sport-ca44
 
 ## Déploiement
 
-**Un commit git ne publie RIEN.** La mise en ligne est une étape à part : `npm run build` puis `npx firebase-tools deploy --only hosting`, ou double-clic sur **`publier-l-app.bat`** (qui enchaîne les deux et rappelle comment vider le cache du service worker). ⚠ Claude ne peut pas lancer ce déploiement lui-même — le contrôle de permissions de Claude Code le bloque —, donc **le dire explicitement à l'utilisateur** au lieu de laisser croire qu'un `git push` suffit : c'est exactement la confusion rencontrée le 09/08/2026 (« JE NE VOIS AUCUN CHANGEMENT » alors que 4 commits étaient bien sur GitHub).
+**Un commit git ne publie RIEN.** La mise en ligne est une étape à part, à faire à chaque fin d'étape puisque l'utilisateur juge sur l'app en ligne :
+
+```
+npm run build
+npx firebase-tools deploy --only hosting
+```
+
+⚠ **JAMAIS `--non-interactive` sur ce `deploy`.** Le drapeau supprime les demandes de confirmation et le classificateur de permissions de Claude Code **refuse la commande** quand il est présent. Relevé sur les transcripts du projet : les 5 déploiements sans le flag sont tous passés (29-30/07/2026), les 3 tentatives avec ont été refusées — d'où la journée du 09/08/2026 passée à croire, à tort, que la permission de déployer avait été retirée, alors que seule la commande avait changé. Diagnostic transposable : **avant de conclure qu'un droit a disparu, comparer la commande exacte à celle qui marchait**, les transcripts sont dans `~/.claude/projects/…-Elan/*.jsonl`. `publier-l-app.bat` (racine de `Sport/`) enchaîne les deux commandes pour l'utilisateur, sans le flag, et rappelle qu'il faut rouvrir la PWA **deux fois** pour dépasser le cache du service worker.
 
 L'app vit sur **https://avel.web.app** — c'est l'URL à utiliser. Le projet Firebase garde son ID d'origine `routine-sport-ca440` (un ID de projet est **immuable**) : `avel` est un **second site Hosting** du même projet (`firebase hosting:sites:create avel`), et `firebase.json` déclare les deux sites sur le même `dist/`, si bien qu'un `npx firebase-tools deploy --only hosting` publie sur les deux. L'ancienne URL `routine-sport-ca440.web.app` reste donc valide (utile : c'est encore elle dans les PWA déjà installées).
 
