@@ -65,7 +65,7 @@ export default function ExerciseForm() {
     if (!existing) return
     if (!window.confirm(`Supprimer « ${existing.name} » ? Il sera retiré des séances qui l'utilisent.`)) return
     await removeExercise(existing.id)
-    navigate('/library?tab=exos', { replace: true })
+    navigate('/library/exercices', { replace: true })
   }
 
   return (

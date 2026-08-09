@@ -39,7 +39,9 @@ try {
   await page.waitForSelector('button:has-text("Crunch inversé")')
 
   // --- Séance Full body : superset entre les 2 premiers exercices
-  await page.getByRole('button', { name: 'Mes séances', exact: true }).click()
+  // La banque est un sous-écran depuis août 2026 : on en sort par Retour, plus par un
+  // segment « Mes séances » (le Seg moitié-moitié a disparu).
+  await page.click('[aria-label="Retour"]')
   await page.click('text=Full body')
   await page.waitForSelector('text=Tours du circuit')
   await page.locator('button:has-text("superset")').first().click()

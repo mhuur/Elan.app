@@ -5,6 +5,7 @@ import SeaBackdrop from './components/SeaBackdrop'
 import Today from './pages/Today'
 import Planning from './pages/Planning'
 import Library from './pages/Library'
+import ExerciseBank from './pages/ExerciseBank'
 import Progress from './pages/Progress'
 import Goals from './pages/Goals'
 import Plan from './pages/Plan'
@@ -45,6 +46,7 @@ function Shell() {
           <Route path="/" element={<Today />} />
           <Route path="/planning" element={<Planning />} />
           <Route path="/library" element={<Library />} />
+          <Route path="/library/exercices" element={<ExerciseBank />} />
           <Route path="/exercise/new" element={<ExerciseForm />} />
           <Route path="/exercise/:id" element={<ExerciseForm />} />
           <Route path="/session/new" element={<SessionForm />} />
