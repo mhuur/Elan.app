@@ -27,7 +27,7 @@ import {
 } from '../types'
 import { DAY_LETTER, DAY_NAMES, todayStr } from '../lib/dates'
 import { canonicalCycles, cycleStepsOf, ownerOf } from '../lib/schedule'
-import { CategoryIcon, Combobox, Eyebrow, Field, FormActions, PageHeader, Seg, Select, Sheet, Stepper, TextInput, glassCard } from '../components/ui'
+import { CategoryIcon, Combobox, Eyebrow, Fab, Field, FormActions, PageHeader, Seg, Select, Sheet, Stepper, TextInput, glassCard } from '../components/ui'
 import ExercisePicker from '../components/ExercisePicker'
 
 const smallInput =
@@ -61,7 +61,7 @@ function MiniNum({ value, onChange, min = 0, max = 990 }: { value: number; onCha
         editingRef.current = false
         setText(String(value))
       }}
-      className="w-11 rounded-lg border border-sand bg-sage-50/60 py-1.5 text-center text-sm font-extrabold tabular-nums outline-none focus:border-sage-400 focus:bg-shoal"
+      className="w-11 rounded-lg border border-sand bg-sage-50/60 py-1 text-center text-sm font-extrabold tabular-nums outline-none focus:border-sage-400 focus:bg-shoal"
     />
   )
 }
@@ -247,7 +247,30 @@ export default function SessionForm() {
 
   const setItem = (idx: number, patch: Partial<SessionItem>) =>
     setItems((p) => p.map((it, i) => (i === idx ? { ...it, ...patch } : it)))
-  const removeItem = (idx: number) => setItems((p) => p.filter((_, i) => i !== idx))
+
+  // Retrait avec filet : le dernier exercice retiré reste annulable 6 s (un ✕ pendant
+  // un drag raté coûtait la re-création de l'item et de tous ses réglages)
+  const [removed, setRemoved] = useState<{ item: DraftItem; idx: number } | null>(null)
+  const removedTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(removedTimer.current), [])
+  const removeItem = (idx: number) => {
+    const item = items[idx]
+    if (!item) return
+    setRemoved({ item, idx })
+    window.clearTimeout(removedTimer.current)
+    removedTimer.current = window.setTimeout(() => setRemoved(null), 6000)
+    setItems((p) => p.filter((_, i) => i !== idx))
+  }
+  const undoRemove = () => {
+    if (!removed) return
+    window.clearTimeout(removedTimer.current)
+    setItems((p) => {
+      const list = [...p]
+      list.splice(Math.min(removed.idx, list.length), 0, removed.item)
+      return list
+    })
+    setRemoved(null)
+  }
 
   // Drag & drop de la liste d'exercices (mêmes réglages tactiles que le Planning).
   // Pendant un drag (`dragId` posé), toutes les cartes se replient sur leur ligne de titre :
@@ -716,13 +739,13 @@ export default function SessionForm() {
               }}
             >
               <SortableContext items={blocksArr.map((b) => 'blk-' + b[0].uid)} strategy={verticalListSortingStrategy}>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {blocksArr.map((blk, bi) => (
                     <SortableItem key={'blk-' + blk[0].uid} uid={'blk-' + blk[0].uid}>
                       {(blockDrag) => (
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           {hasBreaks && (
-                            <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-1.5 ${catMeta.soft}`}>
+                            <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-1 ${catMeta.soft}`}>
                               <p className={`flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase ${catMeta.text}`}>
                                 <button
                                   type="button"
@@ -758,7 +781,7 @@ export default function SessionForm() {
                             </div>
                           )}
                           <SortableContext items={blk.map((x) => x.uid)} strategy={verticalListSortingStrategy}>
-                            <div className="space-y-2">
+                            <div className="space-y-1.5">
                               {blk.map((it, ii) => {
                                 const idx = blockStarts[bi] + ii
                                 const ex = exOf(it.exerciseId)
@@ -767,18 +790,18 @@ export default function SessionForm() {
                                   <SortableItem key={it.uid} uid={it.uid}>
                                     {(drag) => (
                                       <div>
-                    <div className={'rounded-md border border-hairline bg-glass backdrop-blur-lg ' + (dragId ? 'px-3 py-1' : 'p-3')}>
+                    <div className={'rounded-md border border-hairline bg-glass backdrop-blur-lg ' + (dragId ? 'px-3 py-1' : 'px-3 py-2')}>
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           aria-label={`Réordonner ${ex?.name ?? 'cet exercice'}`}
                           {...drag.attributes}
                           {...drag.listeners}
-                          className="-ml-1.5 flex h-8 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
+                          className="-ml-1.5 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
                         >
                           <GripVertical className="h-4 w-4" />
                         </button>
-                        <p className="min-w-0 flex-1 truncate py-1 text-[15px] font-extrabold text-ink">{ex?.name ?? '—'}</p>
+                        <p className="min-w-0 flex-1 truncate py-0.5 text-[15px] font-extrabold text-ink">{ex?.name ?? '—'}</p>
                         {ex && subtypesOf(ex)[0] && (
                           <span className="max-w-24 shrink-0 truncate text-[11px] font-bold text-ink-soft/60">
                             {subtypesOf(ex)[0]}
@@ -800,7 +823,7 @@ export default function SessionForm() {
                       </div>
 
                       {!dragId && category === 'muscu' && (
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
                           <MiniNum
                             value={it.sets ?? 3}
                             onChange={(v) => {
@@ -866,7 +889,7 @@ export default function SessionForm() {
                       )}
 
                       {!dragId && category === 'etirements' && (
-                        <div className="mt-2 flex items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
+                        <div className="mt-1.5 flex items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
                           {/* Séries de la posture : 2 × 30 s pour un étirement fait des deux côtés */}
                           <MiniNum
                             value={it.sets ?? 1}
@@ -912,13 +935,13 @@ export default function SessionForm() {
                           }}
                           autoFocus={it.comment === ''}
                           placeholder="Commentaire (tempo, consigne…)"
-                          className={smallInput + ' mt-2 w-full py-2'}
+                          className={smallInput + ' mt-1.5 w-full py-1.5'}
                         />
                       )}
                     </div>
 
                     {!dragId && canBlocks && idx < items.length - 1 && !items[idx + 1].blockBreak && (
-                      <div className="-my-0.5 flex justify-center gap-1.5">
+                      <div className="-my-1 flex justify-center gap-1.5">
                         {category === 'muscu' && (
                           <button
                             type="button"
@@ -1048,6 +1071,33 @@ export default function SessionForm() {
           Terminé
         </button>
       </Sheet>
+
+      {/* Ajout accessible sans défiler jusqu'au bas de la liste (le volet remplit ce rôle sur desktop) */}
+      {hasItems && !pickerOpen && !removed && (
+        <div className="lg:hidden">
+          <Fab
+            onClick={() => setPickerOpen(true)}
+            label={category === 'etirements' ? '+ Posture' : '+ Exercice'}
+          />
+        </div>
+      )}
+
+      {removed && (
+        <div className="fixed inset-x-0 bottom-20 z-50 flex justify-center px-5">
+          <div className="flex items-center gap-3 rounded-sm border border-hairline-strong bg-shoal px-4 py-2.5 shadow-xl">
+            <p className="max-w-56 truncate text-sm font-semibold text-ink">
+              {exOf(removed.item.exerciseId)?.name ?? 'Exercice'} retiré
+            </p>
+            <button
+              type="button"
+              onClick={undoRemove}
+              className="shrink-0 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-sage-600"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
 
       <FormActions
         onSave={() => void save()}
