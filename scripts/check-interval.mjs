@@ -19,7 +19,7 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // Passer « Vélo d'appartement » en intervalle (tous les 2 jours) + alternance avec HIIT
-  await page.click('text=Exercices')
+  await page.getByRole('link', { name: 'Séries' }).click()
   await page.waitForSelector('text=Bibliothèque')
   await page.click('text=appartement')
   await page.waitForSelector('text=Planification')

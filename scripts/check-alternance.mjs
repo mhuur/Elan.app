@@ -27,7 +27,7 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // --- Donner des jours fixes au HIIT via sa fiche (ils devront être nettoyés par l'alternance)
-  await page.getByRole('link', { name: 'Exercices' }).click()
+  await page.getByRole('link', { name: 'Séries' }).click()
   await page.waitForSelector('text=Bibliothèque')
   await page.click('p:has-text("HIIT — Cardio express")')
   await page.waitForSelector('text=Planification')
@@ -38,7 +38,7 @@ try {
   if (!(hiit0.days ?? []).includes(0)) throw new Error('Le HIIT devrait avoir le lundi en jour fixe')
 
   // --- Vélo : tous les 2 jours ; jour 1 = Vélo + Full body, jour 2 = HIIT
-  await page.getByRole('link', { name: 'Exercices' }).click()
+  await page.getByRole('link', { name: 'Séries' }).click()
   await page.waitForSelector('text=Bibliothèque')
   await page.click('p:has-text("Vélo d’appartement")')
   await page.waitForSelector('text=Planification')
@@ -77,7 +77,7 @@ try {
   await page.screenshot({ path: 'screenshots/25-deux-seances-meme-jour.png' })
 
   // --- Côté membre : la fiche du Full body montre toute la rotation, la re-sauvegarde la préserve
-  await page.getByRole('link', { name: 'Exercices' }).click()
+  await page.getByRole('link', { name: 'Séries' }).click()
   await page.waitForSelector('text=Bibliothèque')
   await page.click('p:has-text("Muscu — Full body")')
   await page.waitForSelector('text=Planification')
@@ -109,7 +109,7 @@ try {
   if ((await page.locator('main p:text-is("HIIT — Cardio express")').count()) > 0)
     throw new Error("Le HIIT ne devrait pas être planifié aujourd'hui (doublon du cycle corrompu)")
   // À l'écriture : re-sauver le vélo répare les données (le repeat parasite disparaît)
-  await page.getByRole('link', { name: 'Exercices' }).click()
+  await page.getByRole('link', { name: 'Séries' }).click()
   await page.waitForSelector('text=Bibliothèque')
   await page.click('p:has-text("Vélo d’appartement")')
   await page.waitForSelector('text=Planification')

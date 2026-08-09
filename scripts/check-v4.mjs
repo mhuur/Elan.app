@@ -18,7 +18,7 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // --- Pompes : 2e sous-type (Bras) → visible dans les deux groupes
-  await page.click('text=Exercices')
+  await page.getByRole('link', { name: 'Séries' }).click()
   await page.getByRole('button', { name: "Banque d'exercices", exact: true }).click()
   await page.click('button:has-text("Pompes")')
   await page.waitForSelector("text=Modifier l'exercice")

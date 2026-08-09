@@ -18,7 +18,7 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // --- Couper Full body après le 1er exercice : bloc 2 = circuit × 2 tours
-  await page.getByRole('link', { name: 'Exercices' }).click()
+  await page.getByRole('link', { name: 'Séries' }).click()
   await page.waitForSelector('text=Bibliothèque')
   await page.click('p:has-text("Muscu — Full body")')
   await page.waitForSelector('text=Planification')

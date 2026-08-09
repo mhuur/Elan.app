@@ -18,7 +18,7 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // --- Fiche séance muscu : liste d'exercices compacte
-  await page.getByRole('link', { name: 'Exercices' }).click()
+  await page.getByRole('link', { name: 'Séries' }).click()
   await page.waitForSelector('text=Bibliothèque')
   await page.click('p:has-text("Muscu — Full body")')
   await page.waitForSelector('text=Planification')
@@ -85,7 +85,7 @@ try {
   await page.waitForSelector('text=Bloc 2')
   await page.screenshot({ path: 'screenshots/39-etirements-blocs.png' })
   await page.click('text=Fermer sans valider')
-  await page.getByRole('link', { name: 'Exercices' }).click()
+  await page.getByRole('link', { name: 'Séries' }).click()
   await page.waitForSelector('text=Bibliothèque')
 
   // --- Nouvelle séance : écran épuré

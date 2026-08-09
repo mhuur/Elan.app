@@ -96,7 +96,7 @@ try {
   await shot('08-planning')
 
   // --- Bibliothèque : séances, formulaire de séance épuré
-  await page.click('text=Exercices')
+  await page.getByRole('link', { name: 'Séries' }).click()
   await page.waitForSelector('text=Bibliothèque')
   await shot('09-bibliotheque-seances')
   await page.click('text=appartement')
