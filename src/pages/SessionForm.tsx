@@ -13,7 +13,7 @@ import {
   type Modifier,
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { CSS, getEventCoordinates } from '@dnd-kit/utilities'
 import { GripVertical, LayoutGrid, Link2, MessageSquarePlus, Plus, Repeat, SlidersHorizontal, Timer, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import {
@@ -92,8 +92,23 @@ function SortableItem({
   )
 }
 
-/** Le drag reste sur l'axe vertical : la liste est une colonne, le déplacement latéral ne fait que du bruit */
-const verticalAxis: Modifier = ({ transform }) => ({ ...transform, x: 0 })
+/**
+ * La vignette reste centrée sous le curseur, alignée sur la colonne (x figé).
+ * Indispensable avec le repli des cartes : dnd-kit ancre l'overlay sur le rect
+ * mesuré AVANT le repli, et la liste remonte de toute la hauteur perdue — sans
+ * cette compensation la vignette flotte à des centimètres du pointeur et le
+ * dépôt devient imprécis. Même transform pour la détection de collision.
+ */
+const followCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+  if (!draggingNodeRect || !activatorEvent) return { ...transform, x: 0 }
+  const grab = getEventCoordinates(activatorEvent)
+  if (!grab) return { ...transform, x: 0 }
+  return {
+    ...transform,
+    x: 0,
+    y: transform.y + (grab.y - draggingNodeRect.top) - draggingNodeRect.height / 2,
+  }
+}
 
 export default function SessionForm() {
   const { id } = useParams()
@@ -689,7 +704,7 @@ export default function SessionForm() {
             <DndContext
               sensors={dndSensors}
               collisionDetection={closestCenter}
-              modifiers={[verticalAxis]}
+              modifiers={[followCursor]}
               // Les cartes se replient au dragStart : il faut re-mesurer les cibles en continu,
               // sinon dnd-kit calcule les échanges sur les hauteurs des cartes dépliées
               measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
