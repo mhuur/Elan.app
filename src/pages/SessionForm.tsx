@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS, getEventCoordinates } from '@dnd-kit/utilities'
-import { GripVertical, LayoutGrid, Link2, MessageSquare, MessageSquarePlus, Plus, Repeat, SlidersHorizontal, Timer, X } from 'lucide-react'
+import { ChevronDown, ExternalLink, GripVertical, LayoutGrid, Link2, MessageSquare, MessageSquarePlus, Plus, Repeat, SlidersHorizontal, Timer, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import {
   CATEGORIES,
@@ -277,14 +277,11 @@ export default function SessionForm() {
   // hauteurs uniformes → les échanges deviennent progressifs au lieu de sauter de la hauteur
   // d'une carte pleine, et la liste entière reste visible pour viser.
   const [dragId, setDragId] = useState<string | null>(null)
-  // Cartes repliées par défaut, une seule dépliée à la fois : au survol sur desktop,
-  // au tap sur mobile (demande utilisateur août 2026). Le dépliage est un VRAI dépliage
-  // dans le flux (les cartes suivantes descendent) ; le délai d'intention évite que la
-  // simple traversée de la liste à la souris ouvre chaque carte et fasse danser le layout.
+  // Cartes repliées par défaut, une seule dépliée à la fois, au CLIC partout — le survol
+  // ouvrait les cartes au passage de la souris et faisait danser le layout (abandonné
+  // août 2026). Le dépli se justifie par ce que la ligne repliée ne montre pas :
+  // consignes de l'exercice, lien démo, accès à sa fiche.
   const [openUid, setOpenUid] = useState<string | null>(null)
-  const canHover = useRef(window.matchMedia('(hover: hover)').matches).current
-  const hoverTimer = useRef<number | undefined>(undefined)
-  useEffect(() => () => window.clearTimeout(hoverTimer.current), [])
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
@@ -740,7 +737,6 @@ export default function SessionForm() {
               // re-mesurer les cibles en continu, sinon dnd-kit garde les rects d'avant fermeture
               measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
               onDragStart={(e) => {
-                window.clearTimeout(hoverTimer.current)
                 setOpenUid(null)
                 setDragId(String(e.active.id))
               }}
@@ -813,41 +809,16 @@ export default function SessionForm() {
                           <SortableItem key={it.uid} uid={it.uid}>
                             {(drag) => (
                               <div>
-                    {/* Carte repliée : la rangée de titre porte un résumé des réglages ; l'édition
-                        se déplie dans le flux après 180 ms de survol (tap sur mobile). Sans ce
-                        délai d'intention, traverser la liste ouvrait chaque carte au passage et
-                        les positions dansaient sous le pointeur. Le dépliage s'ouvre SOUS la ligne
-                        de titre : la poignée qu'on s'apprête à saisir ne bouge jamais. */}
+                    {/* Carte repliée : la rangée de titre porte le résumé complet des réglages.
+                        Le clic déplie SOUS la ligne de titre (vrai dépli dans le flux, les cartes
+                        suivantes descendent) l'édition + les infos de l'exercice. */}
                     <div
-                      className="rounded-md border border-hairline bg-glass px-3 py-1.5 backdrop-blur-lg"
-                      onMouseEnter={
-                        canHover
-                          ? () => {
-                              if (dragId) return
-                              window.clearTimeout(hoverTimer.current)
-                              hoverTimer.current = window.setTimeout(() => setOpenUid(it.uid), 180)
-                            }
-                          : undefined
-                      }
-                      onMouseLeave={
-                        canHover
-                          ? (e) => {
-                              window.clearTimeout(hoverTimer.current)
-                              // Ne pas replier pendant une saisie dans la carte
-                              if (!e.currentTarget.contains(document.activeElement))
-                                setOpenUid((u) => (u === it.uid ? null : u))
-                            }
-                          : undefined
-                      }
-                      onClick={
-                        canHover
-                          ? undefined
-                          : (e) => {
-                              const t = e.target as Element
-                              if (t.closest('button,input,select') || t.closest('[data-edit-zone]')) return
-                              setOpenUid((u) => (u === it.uid ? null : it.uid))
-                            }
-                      }
+                      className="cursor-pointer rounded-md border border-hairline bg-glass px-3 py-1.5 backdrop-blur-lg"
+                      onClick={(e) => {
+                        const t = e.target as Element
+                        if (t.closest('button,input,select,a') || t.closest('[data-edit-zone]')) return
+                        setOpenUid((u) => (u === it.uid ? null : it.uid))
+                      }}
                     >
                       <div className="flex items-center gap-1.5">
                         <button
@@ -894,6 +865,12 @@ export default function SessionForm() {
                         <button type="button" aria-label="Retirer" onClick={() => removeItem(idx)} className="px-0.5 text-ink-soft/40">
                           <X className="h-4 w-4" />
                         </button>
+                        <ChevronDown
+                          className={
+                            'h-4 w-4 shrink-0 text-ink-soft/40 transition-transform duration-150 ' +
+                            (isOpen ? 'rotate-180' : '')
+                          }
+                        />
                       </div>
 
                       {/* Vrai dépliage : les cartes suivantes descendent (transition 150 ms) */}
@@ -901,7 +878,7 @@ export default function SessionForm() {
                         data-edit-zone
                         className={
                           'overflow-hidden transition-all duration-150 ' +
-                          (isOpen ? 'max-h-44 opacity-100' : 'max-h-0 opacity-0')
+                          (isOpen ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0')
                         }
                       >
                       {category === 'muscu' && (
@@ -1019,6 +996,32 @@ export default function SessionForm() {
                           placeholder="Commentaire (tempo, consigne…)"
                           className={smallInput + ' mt-1.5 w-full py-1.5'}
                         />
+                      )}
+
+                      {/* Infos de l'exercice : ce que la ligne repliée ne montre pas */}
+                      {ex && (
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-hairline pt-1.5 pb-0.5 pl-1">
+                          {ex.description && (
+                            <p className="w-full text-xs font-medium text-ink-soft/80">{ex.description}</p>
+                          )}
+                          {ex.videoUrl && (
+                            <a
+                              href={ex.videoUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-sage-600"
+                            >
+                              <ExternalLink className="h-3 w-3" /> Démo
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/exercise/${ex.id}`)}
+                            className="font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-ink-soft/60"
+                          >
+                            Fiche exercice ›
+                          </button>
+                        </div>
                       )}
                       </div>
                     </div>

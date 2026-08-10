@@ -49,9 +49,10 @@ try {
   await page.waitForSelector('p:text-is("Dips sur chaise")')
 
   // --- Séries variées : 3×12 devient 12/12/12 éditables, on passe la 1re à 30
-  // Les cartes sont repliées par défaut (août 2026) : le survol ouvre le panneau d'édition
-  // flottant, et la carte survolée passe de bg-glass à bg-shoal (opaque)
-  await page.locator('div.rounded-md p.truncate').first().hover()
+  // Les cartes sont repliées par défaut et se déplient au CLIC (plus de survol, août 2026) :
+  // la carte ouverte montre l'édition + les infos de l'exercice (lien démo, fiche)
+  await page.locator('div.rounded-md p.truncate').first().click()
+  await page.waitForSelector('a:has-text("Démo")')
   await page.locator('[aria-label="Varier les séries"]').first().click()
   await page.screenshot({ path: 'screenshots/38-series-variees.png' })
   const firstCard = page.locator('div.rounded-md').filter({ hasText: 'reps' }).first()
@@ -132,7 +133,7 @@ try {
   await desk.click('p:has-text("Muscu — Full body")')
   await desk.waitForSelector('text=Planification')
   await desk.waitForSelector("aside >> text=Banque d'exercices")
-  // Compter les poignées : les réglages vivent dans le panneau flottant, monté au survol seulement
+  // Compter les poignées : une par carte d'exercice, toujours dans le DOM
   const nBefore = await desk.locator('[aria-label^="Réordonner"]').count()
   await desk.locator('aside').getByRole('button').first().click()
   const nAfter = await desk.locator('[aria-label^="Réordonner"]').count()
