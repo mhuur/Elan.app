@@ -1023,34 +1023,19 @@ export default function SessionForm() {
                       </div>
                     </div>
 
-                    {canBlocks && idx < items.length - 1 && !items[idx + 1].blockBreak && (
-                      <div className="-my-1 flex justify-center gap-1.5">
-                        {category === 'muscu' && (
-                          <button
-                            type="button"
-                            onClick={() => setItem(idx, { linkNext: !it.linkNext })}
-                            className={
-                              'relative z-10 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-extrabold transition-colors ' +
-                              (it.linkNext ? 'bg-muscu text-onaccent shadow-sm' : 'bg-sage-100 text-ink-soft')
-                            }
-                          >
-                            <Link2 className="h-3 w-3" />
-                            {it.linkNext ? 'Superset — enchaîné sans repos' : 'superset'}
-                          </button>
-                        )}
-                        {!it.linkNext && (
-                          <button
-                            type="button"
-                            title="Couper la séance ici : la suite forme un bloc avec ses propres tours"
-                            onClick={() => {
-                              setItem(idx + 1, { blockBreak: true, blockRounds: items[idx + 1].blockRounds ?? 1 })
-                              setItem(idx, { linkNext: false })
-                            }}
-                            className="relative z-10 flex items-center gap-1 rounded-full bg-sage-100 px-3 py-1 text-[11px] font-extrabold text-ink-soft"
-                          >
-                            <LayoutGrid className="h-3 w-3" /> nouveau bloc
-                          </button>
-                        )}
+                    {category === 'muscu' && idx < items.length - 1 && !items[idx + 1].blockBreak && (
+                      <div className="-my-1 flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setItem(idx, { linkNext: !it.linkNext })}
+                          className={
+                            'relative z-10 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-extrabold transition-colors ' +
+                            (it.linkNext ? 'bg-muscu text-onaccent shadow-sm' : 'bg-sage-100 text-ink-soft')
+                          }
+                        >
+                          <Link2 className="h-3 w-3" />
+                          {it.linkNext ? 'Superset — enchaîné sans repos' : 'superset'}
+                        </button>
                       </div>
                     )}
                               </div>
@@ -1091,6 +1076,24 @@ export default function SessionForm() {
               </DragOverlay>
             </DndContext>
             <div className="mt-2 space-y-2">
+              {/* Un seul point de découpe, en bas : le dernier exercice démarre le nouveau bloc,
+                  le drag & drop fait le reste (remplace les pilules entre chaque paire d'exercices) */}
+              {canBlocks && items.length >= 2 && !items[items.length - 1].blockBreak && (
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    title="Le dernier exercice démarre un nouveau bloc — glisses-y les autres"
+                    onClick={() => {
+                      const last = items.length - 1
+                      setItem(last, { blockBreak: true, blockRounds: items[last].blockRounds ?? 1 })
+                      setItem(last - 1, { linkNext: false })
+                    }}
+                    className="flex items-center gap-1 rounded-full bg-sage-100 px-3 py-1 text-[11px] font-extrabold text-ink-soft"
+                  >
+                    <LayoutGrid className="h-3 w-3" /> nouveau bloc
+                  </button>
+                </div>
+              )}
               {/* Sur mobile, le sélecteur s'ouvre en Sheet ; sur desktop il est déjà là, en volet */}
               <button
                 type="button"

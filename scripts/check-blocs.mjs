@@ -17,12 +17,12 @@ try {
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
-  // --- Couper Full body après le 1er exercice : bloc 2 = circuit × 2 tours
+  // --- Découper Full body : le bouton unique du bas isole le dernier exercice en bloc 2 × 2 tours
   await page.getByRole('link', { name: 'Séries' }).click()
   await page.waitForSelector('text=Bibliothèque')
   await page.click('p:has-text("Muscu — Full body")')
   await page.waitForSelector('text=Planification')
-  await page.locator('button:has-text("nouveau bloc")').first().click()
+  await page.locator('button:has-text("nouveau bloc")').click()
   await page.waitForSelector('text=Bloc 2 — tours')
   await page.waitForSelector('text=Bloc 1 — tours')
   // Le bloc 2 fait 2 tours (saisie directe dans le stepper du séparateur)
@@ -31,11 +31,12 @@ try {
   await page.click('text=Enregistrer')
   await page.waitForSelector('text=Bibliothèque')
 
-  // --- Données : flags posés sur le 2e exercice
+  // --- Données : flags posés sur le dernier exercice (Pont fessier, 5e du seed)
   const d = await page.evaluate(() => JSON.parse(localStorage.getItem('elan-data-v1')))
   const full = d.sessions.find((s) => s.name.includes('Full body'))
-  if (!full.items[1].blockBreak || full.items[1].blockRounds !== 2)
-    throw new Error('Le 2e exercice devrait démarrer un bloc × 2 tours')
+  const lastIt = full.items[full.items.length - 1]
+  if (!lastIt.blockBreak || lastIt.blockRounds !== 2)
+    throw new Error('Le dernier exercice devrait démarrer un bloc × 2 tours')
 
   // --- Feuille : programme par blocs en lecture seule, saisie du résultat par tours
   await page.getByRole('link', { name: "Aujourd'hui" }).click()
@@ -58,7 +59,7 @@ try {
   await page.click('[aria-label="Programme"]') // déplie le tiroir programme
   await page.waitForSelector('aside >> text=Bloc 1') // tiroir : bloc courant
   await page.waitForSelector('aside >> text=×2') // tiroir : tours du bloc 2 à venir
-  await page.waitForSelector('aside >> text=Squats') // tiroir : exos du bloc à venir listés
+  await page.waitForSelector('aside >> text=Pont fessier') // tiroir : l'exo du bloc 2 listé
   await page.waitForSelector('text=Série faite ✓')
   await page.click('[aria-label="Quitter"]')
   await page.waitForSelector('text=Séance libre')
