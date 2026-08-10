@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   DndContext,
   DragOverlay,
+  MeasuringStrategy,
   PointerSensor,
   TouchSensor,
   closestCenter,
@@ -277,9 +278,13 @@ export default function SessionForm() {
   // d'une carte pleine, et la liste entière reste visible pour viser.
   const [dragId, setDragId] = useState<string | null>(null)
   // Cartes repliées par défaut, une seule dépliée à la fois : au survol sur desktop,
-  // au tap sur mobile (demande utilisateur août 2026)
+  // au tap sur mobile (demande utilisateur août 2026). Le dépliage est un VRAI dépliage
+  // dans le flux (les cartes suivantes descendent) ; le délai d'intention évite que la
+  // simple traversée de la liste à la souris ouvre chaque carte et fasse danser le layout.
   const [openUid, setOpenUid] = useState<string | null>(null)
   const canHover = useRef(window.matchMedia('(hover: hover)').matches).current
+  const hoverTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(hoverTimer.current), [])
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
@@ -731,8 +736,11 @@ export default function SessionForm() {
               sensors={dndSensors}
               collisionDetection={closestCenter}
               modifiers={[followCursor]}
+              // La carte dépliée se referme au dragStart (les rangées du dessous remontent) :
+              // re-mesurer les cibles en continu, sinon dnd-kit garde les rects d'avant fermeture
+              measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
               onDragStart={(e) => {
-                // Le panneau d'édition est un overlay : le fermer ne déplace aucune rangée
+                window.clearTimeout(hoverTimer.current)
                 setOpenUid(null)
                 setDragId(String(e.active.id))
               }}
@@ -805,26 +813,26 @@ export default function SessionForm() {
                           <SortableItem key={it.uid} uid={it.uid}>
                             {(drag) => (
                               <div>
-                    {/* Carte repliée : la rangée de titre porte un résumé des réglages. L'édition
-                        s'ouvre au survol (desktop) ou au tap (mobile) dans un PANNEAU FLOTTANT qui
-                        ne pousse pas le layout — un dépliage dans le flux faisait danser la liste
-                        sous le pointeur (chaque carte traversée s'ouvrait), rendant poignées et
-                        drag inatteignables. */}
+                    {/* Carte repliée : la rangée de titre porte un résumé des réglages ; l'édition
+                        se déplie dans le flux après 180 ms de survol (tap sur mobile). Sans ce
+                        délai d'intention, traverser la liste ouvrait chaque carte au passage et
+                        les positions dansaient sous le pointeur. Le dépliage s'ouvre SOUS la ligne
+                        de titre : la poignée qu'on s'apprête à saisir ne bouge jamais. */}
                     <div
-                      className={
-                        'rounded-md border border-hairline px-3 py-1.5 backdrop-blur-lg ' +
-                        (isOpen ? 'relative z-20 rounded-b-none border-b-0 bg-shoal' : 'bg-glass')
-                      }
+                      className="rounded-md border border-hairline bg-glass px-3 py-1.5 backdrop-blur-lg"
                       onMouseEnter={
                         canHover
                           ? () => {
-                              if (!dragId) setOpenUid(it.uid)
+                              if (dragId) return
+                              window.clearTimeout(hoverTimer.current)
+                              hoverTimer.current = window.setTimeout(() => setOpenUid(it.uid), 180)
                             }
                           : undefined
                       }
                       onMouseLeave={
                         canHover
                           ? (e) => {
+                              window.clearTimeout(hoverTimer.current)
                               // Ne pas replier pendant une saisie dans la carte
                               if (!e.currentTarget.contains(document.activeElement))
                                 setOpenUid((u) => (u === it.uid ? null : u))
@@ -836,7 +844,7 @@ export default function SessionForm() {
                           ? undefined
                           : (e) => {
                               const t = e.target as Element
-                              if (t.closest('button,input,select') || t.closest('[data-edit-panel]')) return
+                              if (t.closest('button,input,select') || t.closest('[data-edit-zone]')) return
                               setOpenUid((u) => (u === it.uid ? null : it.uid))
                             }
                       }
@@ -888,11 +896,14 @@ export default function SessionForm() {
                         </button>
                       </div>
 
-                      {isOpen && (
-                        <div
-                          data-edit-panel
-                          className="absolute inset-x-[-1px] top-full z-30 rounded-b-md border border-t-0 border-hairline bg-shoal px-3 pb-2 shadow-xl"
-                        >
+                      {/* Vrai dépliage : les cartes suivantes descendent (transition 150 ms) */}
+                      <div
+                        data-edit-zone
+                        className={
+                          'overflow-hidden transition-all duration-150 ' +
+                          (isOpen ? 'max-h-44 opacity-100' : 'max-h-0 opacity-0')
+                        }
+                      >
                       {category === 'muscu' && (
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
                           <MiniNum
@@ -1009,8 +1020,7 @@ export default function SessionForm() {
                           className={smallInput + ' mt-1.5 w-full py-1.5'}
                         />
                       )}
-                        </div>
-                      )}
+                      </div>
                     </div>
 
                     {canBlocks && idx < items.length - 1 && !items[idx + 1].blockBreak && (
