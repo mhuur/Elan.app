@@ -74,7 +74,7 @@ export interface PlanWeek {
  * Mis à jour à chaque re-analyse COROS (l'app ne lit pas COROS en direct — CORS).
  */
 export const PLAN_METRICS = {
-  vo2max: 49,
+  vo2max: 50,
   fcMax: 186,
   fcRest: 52,
 }
@@ -294,25 +294,37 @@ export const PLAN_SEMI = {
       mk(4, 'seuil', 'Seuil 20 min', '20 min continu à 5:18', seuilContinu(20, '5:18')),
       mk(6, 'sl', 'Sortie longue 13 km', '13 km en EF', longRun(13)),
     ] },
-    { start: '2026-08-10', phase: 'Développement', label: 'allégée', km: 32, seances: [
+    // Semaine du 03/08 manquée (mal de dos, 0 sortie du 03 au 09/08) → reprise EF pure le 10/08,
+    // puis décalage d'une semaine du plan initial. La 2e semaine Spécifique (ex-14/09) saute :
+    // on garde le pic, la répétition générale et l'affûtage complet.
+    { start: '2026-08-10', phase: 'Reconstruction', label: 'reprise', km: 26, seances: [
+      mk(1, 'ef', 'Footing test 5 km', '5 km en EF · stop si le dos proteste', {
+        surface: 'route',
+        parts: [{ kind: 'steady', label: 'EF', distanceM: 5000, pace: EF, hr: HR.ef, note: 'reprise après mal de dos : stop net si la douleur revient' }],
+      }),
+      mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
+      mk(4, 'ef', 'Footing 6 km', '6 km en EF · 5 lignes droites', footing(6, 5)),
+      mk(6, 'sl', 'Sortie longue 9 km', '9 km en EF', longRun(9, 'dernier test du dos avant de reprendre l’intensité')),
+    ] },
+    { start: '2026-08-17', phase: 'Développement', label: 'retour en intensité', km: 34, seances: [
       mk(1, 'vma', 'VMA 8×300 m', '8×300 m à 4:35, récup 1:00', vma(8, 300, '4:35', 60)),
       mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
       mk(4, 'seuil', 'Seuil 2×8 min', '2×8 min à 5:15, récup 2 min', seuilInt(2, 8, '5:15', 120)),
-      mk(6, 'sl', 'Sortie longue 11 km', '11 km en EF', longRun(11)),
+      mk(6, 'sl', 'Sortie longue 12 km', '12 km en EF', longRun(12)),
     ] },
-    { start: '2026-08-17', phase: 'Développement', km: 40, seances: [
+    { start: '2026-08-24', phase: 'Développement', km: 40, seances: [
       mk(1, 'vma', 'VMA 6×600 m', '6×600 m à 4:40, récup 1:15', vma(6, 600, '4:40', 75)),
       mk(2, 'ef', 'Footing 8 km', '8 km en EF', footing(8)),
       mk(4, 'seuil', 'Seuil 2×10 min', '2×10 min à 5:12, récup 2 min', seuilInt(2, 10, '5:12', 120)),
       mk(6, 'sl', 'Sortie longue 14 km', '12 km EF + 2 km EA', longRunEA(12, 2)),
     ] },
-    { start: '2026-08-24', phase: 'Développement', km: 43, seances: [
+    { start: '2026-08-31', phase: 'Développement', km: 43, seances: [
       mk(1, 'vma', 'VMA 5×800 m', '5×800 m à 4:45, récup 1:30', vma(5, 800, '4:45', 90)),
       mk(2, 'ef', 'Footing 8 km', '8 km en EF', footing(8)),
       mk(4, 'seuil', 'Seuil 25 min', '25 min continu à 5:10', seuilContinu(25, '5:10')),
       mk(6, 'sl', 'Sortie longue 15 km', '13 km EF + 2 km EA', longRunEA(13, 2)),
     ] },
-    { start: '2026-08-31', phase: 'Spécifique', km: 44, seances: [
+    { start: '2026-09-07', phase: 'Spécifique', km: 44, seances: [
       mk(1, 'vma', 'VMA 5×1000 m', '5×1000 m à 4:48, récup 1:30', vma(5, 1000, '4:48', 90)),
       mk(2, 'ef', 'Footing 7 km', '7 km en EF', footing(7)),
       mk(4, 'as', 'Allure semi 3×2 km', '3×2 km à 5:10, récup 2 min', asInt(3, 2000, '5:10', 120)),
@@ -327,7 +339,7 @@ export const PLAN_SEMI = {
         ],
       }),
     ] },
-    { start: '2026-09-07', phase: 'Spécifique', label: 'pic de volume', km: 45, seances: [
+    { start: '2026-09-14', phase: 'Spécifique', label: 'pic de volume', km: 45, seances: [
       mk(1, 'vma', 'VMA 4×1200 m', '4×1200 m à 4:48, récup 2 min', vma(4, 1200, '4:48', 120)),
       mk(2, 'ef', 'Footing 8 km', '8 km en EF', footing(8)),
       mk(4, 'seuil', 'Seuil 2×10 min', '2×10 min à 5:10, récup 2:30', seuilInt(2, 10, '5:10', 150)),
@@ -337,21 +349,6 @@ export const PLAN_SEMI = {
           { kind: 'steady', label: 'EF', distanceM: 7000, pace: EF, hr: HR.ef },
           { kind: 'work', label: 'Allure semi', distanceM: 6000, pace: p('5:10'), hr: HR.as, note: 'teste ravito, allure et tenue du jour J' },
           { kind: 'steady', label: 'EF', distanceM: 4000, pace: EF, hr: HR.ef },
-        ],
-      }),
-    ] },
-    { start: '2026-09-14', phase: 'Spécifique', km: 40, seances: [
-      mk(1, 'vma', 'VMA 5×800 m', '5×800 m à 4:42, récup 1:30', vma(5, 800, '4:42', 90)),
-      mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
-      mk(4, 'as', 'Allure semi 3×2 km', '3×2 km à 5:08, récup 2 min', asInt(3, 2000, '5:08', 120)),
-      mk(6, 'sl', 'Sortie longue 14 km', '14 km dont 2×4 km à allure semi', {
-        surface: 'route',
-        parts: [
-          { kind: 'steady', label: 'EF', distanceM: 3000, pace: EF, hr: HR.ef },
-          { kind: 'work', label: 'Allure semi', distanceM: 4000, pace: p('5:10'), hr: HR.as },
-          { kind: 'recovery', label: 'EF', distanceM: 1000, pace: EF, hr: HR.ef },
-          { kind: 'work', label: 'Allure semi', distanceM: 4000, pace: p('5:10'), hr: HR.as },
-          { kind: 'steady', label: 'EF', distanceM: 2000, pace: EF, hr: HR.ef },
         ],
       }),
     ] },
