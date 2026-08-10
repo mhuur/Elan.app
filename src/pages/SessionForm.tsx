@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   DndContext,
   DragOverlay,
-  MeasuringStrategy,
   PointerSensor,
   TouchSensor,
   closestCenter,
@@ -14,7 +13,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS, getEventCoordinates } from '@dnd-kit/utilities'
-import { GripVertical, LayoutGrid, Link2, MoreVertical, Plus, Repeat, SlidersHorizontal, Timer, X } from 'lucide-react'
+import { GripVertical, LayoutGrid, Link2, MessageSquare, MessageSquarePlus, Plus, Repeat, SlidersHorizontal, Timer, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import {
   CATEGORIES,
@@ -252,16 +251,7 @@ export default function SessionForm() {
   // un drag raté coûtait la re-création de l'item et de tous ses réglages)
   const [removed, setRemoved] = useState<{ item: DraftItem; idx: number } | null>(null)
   const removedTimer = useRef<number | undefined>(undefined)
-  // Après un dépôt, les cartes restent compactes le temps de la dropAnimation (~250 ms) :
-  // se redéployer au même instant déplaçait la cible pendant le vol de la vignette
-  const dropTimer = useRef<number | undefined>(undefined)
-  useEffect(
-    () => () => {
-      window.clearTimeout(removedTimer.current)
-      window.clearTimeout(dropTimer.current)
-    },
-    [],
-  )
+  useEffect(() => () => window.clearTimeout(removedTimer.current), [])
   const removeItem = (idx: number) => {
     const item = items[idx]
     if (!item) return
@@ -286,19 +276,10 @@ export default function SessionForm() {
   // hauteurs uniformes → les échanges deviennent progressifs au lieu de sauter de la hauteur
   // d'une carte pleine, et la liste entière reste visible pour viser.
   const [dragId, setDragId] = useState<string | null>(null)
-  // Menu ⋯ d'une carte (commentaire, superset, blocs) — remplace les pilules inter-cartes.
-  // Fermeture au tap hors du menu par écouteur global : un overlay DOM resterait piégé
-  // dans le stacking context de la carte (backdrop-blur) et les cartes voisines le couvriraient.
-  const [menuIdx, setMenuIdx] = useState<number | null>(null)
-  useEffect(() => {
-    if (menuIdx === null) return
-    const close = (e: PointerEvent) => {
-      if ((e.target as Element).closest?.('[data-item-menu]')) return
-      setMenuIdx(null)
-    }
-    document.addEventListener('pointerdown', close, true)
-    return () => document.removeEventListener('pointerdown', close, true)
-  }, [menuIdx])
+  // Cartes repliées par défaut, une seule dépliée à la fois : au survol sur desktop,
+  // au tap sur mobile (demande utilisateur août 2026)
+  const [openUid, setOpenUid] = useState<string | null>(null)
+  const canHover = useRef(window.matchMedia('(hover: hover)').matches).current
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
@@ -750,27 +731,34 @@ export default function SessionForm() {
               sensors={dndSensors}
               collisionDetection={closestCenter}
               modifiers={[followCursor]}
-              // Les cartes se replient au dragStart : il faut re-mesurer les cibles en continu,
-              // sinon dnd-kit calcule les échanges sur les hauteurs des cartes dépliées
-              measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
               onDragStart={(e) => {
-                window.clearTimeout(dropTimer.current)
-                setMenuIdx(null)
+                // Le panneau d'édition est un overlay : le fermer ne déplace aucune rangée
+                setOpenUid(null)
                 setDragId(String(e.active.id))
               }}
               onDragCancel={() => setDragId(null)}
               onDragEnd={(e) => {
+                setDragId(null)
                 onDragEnd(e)
-                dropTimer.current = window.setTimeout(() => setDragId(null), 260)
               }}
             >
-              <SortableContext items={blocksArr.map((b) => 'blk-' + b[0].uid)} strategy={verticalListSortingStrategy}>
+              {/* UN SEUL SortableContext plat (en-têtes de bloc + cartes) : les contexts imbriqués
+                  appliquaient un transform au bloc entier EN PLUS de celui des cartes — d'où les
+                  trous géants et les chevauchements pendant le drag (retour utilisateur août 2026). */}
+              <SortableContext
+                items={
+                  hasBreaks
+                    ? blocksArr.flatMap((b) => ['blk-' + b[0].uid, ...b.map((x) => x.uid)])
+                    : items.map((x) => x.uid)
+                }
+                strategy={verticalListSortingStrategy}
+              >
                 <div className="space-y-1.5">
                   {blocksArr.map((blk, bi) => (
-                    <SortableItem key={'blk-' + blk[0].uid} uid={'blk-' + blk[0].uid}>
-                      {(blockDrag) => (
-                        <div className="space-y-1.5">
-                          {hasBreaks && (
+                    <div key={'blk-' + blk[0].uid} className="space-y-1.5">
+                      {hasBreaks && (
+                        <SortableItem uid={'blk-' + blk[0].uid}>
+                          {(blockDrag) => (
                             <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-1 ${catMeta.soft}`}>
                               <p className={`flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase ${catMeta.text}`}>
                                 <button
@@ -806,23 +794,51 @@ export default function SessionForm() {
                               </div>
                             </div>
                           )}
-                          <SortableContext items={blk.map((x) => x.uid)} strategy={verticalListSortingStrategy}>
-                            <div className="space-y-1.5">
-                              {blk.map((it, ii) => {
-                                const idx = blockStarts[bi] + ii
-                                const ex = exOf(it.exerciseId)
-                                const isSec = ex?.measure === 'sec'
-                                return (
-                                  <SortableItem key={it.uid} uid={it.uid}>
-                                    {(drag) => (
-                                      <div>
+                        </SortableItem>
+                      )}
+                      {blk.map((it, ii) => {
+                        const idx = blockStarts[bi] + ii
+                        const ex = exOf(it.exerciseId)
+                        const isSec = ex?.measure === 'sec'
+                        const isOpen = openUid === it.uid && !dragId
+                        return (
+                          <SortableItem key={it.uid} uid={it.uid}>
+                            {(drag) => (
+                              <div>
+                    {/* Carte repliée : la rangée de titre porte un résumé des réglages. L'édition
+                        s'ouvre au survol (desktop) ou au tap (mobile) dans un PANNEAU FLOTTANT qui
+                        ne pousse pas le layout — un dépliage dans le flux faisait danser la liste
+                        sous le pointeur (chaque carte traversée s'ouvrait), rendant poignées et
+                        drag inatteignables. */}
                     <div
                       className={
-                        'rounded-md border border-hairline bg-glass backdrop-blur-lg transition-[padding] duration-150 ' +
-                        (dragId ? 'px-3 py-1' : 'px-3 py-2') +
-                        // Le backdrop-blur des cartes crée un stacking context par carte : celle dont
-                        // le menu ⋯ est ouvert doit s'élever, sinon les cartes suivantes le recouvrent
-                        (menuIdx === idx ? ' relative z-20' : '')
+                        'rounded-md border border-hairline px-3 py-1.5 backdrop-blur-lg ' +
+                        (isOpen ? 'relative z-20 rounded-b-none border-b-0 bg-shoal' : 'bg-glass')
+                      }
+                      onMouseEnter={
+                        canHover
+                          ? () => {
+                              if (!dragId) setOpenUid(it.uid)
+                            }
+                          : undefined
+                      }
+                      onMouseLeave={
+                        canHover
+                          ? (e) => {
+                              // Ne pas replier pendant une saisie dans la carte
+                              if (!e.currentTarget.contains(document.activeElement))
+                                setOpenUid((u) => (u === it.uid ? null : u))
+                            }
+                          : undefined
+                      }
+                      onClick={
+                        canHover
+                          ? undefined
+                          : (e) => {
+                              const t = e.target as Element
+                              if (t.closest('button,input,select') || t.closest('[data-edit-panel]')) return
+                              setOpenUid((u) => (u === it.uid ? null : it.uid))
+                            }
                       }
                     >
                       <div className="flex items-center gap-1.5">
@@ -836,98 +852,48 @@ export default function SessionForm() {
                           <GripVertical className="h-4 w-4" />
                         </button>
                         <p className="min-w-0 flex-1 truncate py-0.5 text-[15px] font-extrabold text-ink">{ex?.name ?? '—'}</p>
+                        {/* Résumé des réglages, lisible sans déplier */}
+                        {category === 'muscu' && (
+                          <span className="shrink-0 text-[11px] font-bold tabular-nums text-ink-soft">
+                            {it.sets ?? 3} × {it.targets ? setTargetsOf(it).join('/') : (it.target ?? 10)}
+                            {isSec ? ' s' : ''}
+                          </span>
+                        )}
+                        {category === 'etirements' && (
+                          <span className="shrink-0 text-[11px] font-bold tabular-nums text-ink-soft">
+                            {it.sets ?? 1} × {!ex || isSec ? `${it.durationSec ?? 30} s` : `${it.target ?? 10} reps`}
+                          </span>
+                        )}
+                        {it.comment ? <MessageSquare className="h-3.5 w-3.5 shrink-0 text-ink-soft/50" /> : null}
                         {ex && subtypesOf(ex)[0] && (
                           <span className="max-w-24 shrink-0 truncate text-[11px] font-bold text-ink-soft/60">
                             {subtypesOf(ex)[0]}
                           </span>
                         )}
-                        {(() => {
-                          const nextInBlock = idx < items.length - 1 && !items[idx + 1].blockBreak
-                          const hasMenu =
-                            it.comment === undefined || (category === 'muscu' && nextInBlock) || (canBlocks && idx > 0)
-                          if (!hasMenu) return null
-                          const entry =
-                            'block w-full rounded-sm px-3 py-2 text-left text-sm font-semibold text-ink active:bg-glass'
-                          return (
-                            <div className="relative shrink-0" data-item-menu>
-                              <button
-                                type="button"
-                                aria-label="Options de l'exercice"
-                                onClick={() => setMenuIdx(menuIdx === idx ? null : idx)}
-                                className="px-0.5 text-ink-soft/40"
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </button>
-                              {menuIdx === idx && (
-                                  <div className="absolute top-full right-0 z-30 mt-1 w-64 rounded-md border border-hairline-strong bg-shoal p-1 shadow-xl">
-                                    {it.comment === undefined && (
-                                      <button
-                                        type="button"
-                                        className={entry}
-                                        onClick={() => {
-                                          setItem(idx, { comment: '' })
-                                          setMenuIdx(null)
-                                        }}
-                                      >
-                                        Ajouter un commentaire
-                                      </button>
-                                    )}
-                                    {category === 'muscu' && nextInBlock && (
-                                      <button
-                                        type="button"
-                                        className={entry}
-                                        onClick={() => {
-                                          setItem(idx, { linkNext: !it.linkNext })
-                                          setMenuIdx(null)
-                                        }}
-                                      >
-                                        {it.linkNext ? 'Rompre le superset' : 'Superset avec le suivant'}
-                                      </button>
-                                    )}
-                                    {canBlocks &&
-                                      idx > 0 &&
-                                      (it.blockBreak ? (
-                                        <button
-                                          type="button"
-                                          className={entry}
-                                          onClick={() => {
-                                            setItem(idx, { blockBreak: false })
-                                            setMenuIdx(null)
-                                          }}
-                                        >
-                                          Fusionner avec le bloc précédent
-                                        </button>
-                                      ) : (
-                                        <button
-                                          type="button"
-                                          className={entry}
-                                          onClick={() => {
-                                            // La coupe rompt un éventuel superset à cheval sur la frontière
-                                            setItem(idx - 1, { linkNext: false })
-                                            setItem(idx, { blockBreak: true, blockRounds: it.blockRounds ?? 1 })
-                                            setMenuIdx(null)
-                                          }}
-                                        >
-                                          Démarrer un nouveau bloc ici
-                                        </button>
-                                      ))}
-                                  </div>
-                              )}
-                            </div>
-                          )
-                        })()}
+                        {it.comment === undefined && (
+                          <button
+                            type="button"
+                            aria-label="Ajouter un commentaire"
+                            onClick={() => {
+                              setItem(idx, { comment: '' })
+                              setOpenUid(it.uid)
+                            }}
+                            className="px-0.5 text-ink-soft/40"
+                          >
+                            <MessageSquarePlus className="h-4 w-4" />
+                          </button>
+                        )}
                         <button type="button" aria-label="Retirer" onClick={() => removeItem(idx)} className="px-0.5 text-ink-soft/40">
                           <X className="h-4 w-4" />
                         </button>
                       </div>
 
-                      {category === 'muscu' && (
+                      {isOpen && (
                         <div
-                          className={
-                            'overflow-hidden transition-all duration-150 ' +
-                            (dragId ? 'max-h-0 opacity-0' : 'max-h-28 opacity-100')
-                          }
+                          data-edit-panel
+                          className="absolute inset-x-[-1px] top-full z-30 rounded-b-md border border-t-0 border-hairline bg-shoal px-3 pb-2 shadow-xl"
                         >
+                      {category === 'muscu' && (
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
                           <MiniNum
                             value={it.sets ?? 3}
@@ -991,16 +957,9 @@ export default function SessionForm() {
                             <span>s</span>
                           </span>
                         </div>
-                        </div>
                       )}
 
                       {category === 'etirements' && (
-                        <div
-                          className={
-                            'overflow-hidden transition-all duration-150 ' +
-                            (dragId ? 'max-h-0 opacity-0' : 'max-h-28 opacity-100')
-                          }
-                        >
                         <div className="mt-1.5 flex items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
                           {/* Séries de la posture : 2 × 30 s pour un étirement fait des deux côtés */}
                           <MiniNum
@@ -1034,50 +993,62 @@ export default function SessionForm() {
                             {isSec ? 'sec' : 'reps'}
                           </button>
                         </div>
-                        </div>
                       )}
 
                       {it.comment !== undefined && (
-                        <div
-                          className={
-                            'overflow-hidden transition-all duration-150 ' +
-                            (dragId ? 'max-h-0 opacity-0' : 'max-h-14 opacity-100')
-                          }
-                        >
-                          <input
-                            type="text"
-                            value={it.comment}
-                            onChange={(e) => setItem(idx, { comment: e.target.value })}
-                            onBlur={() => {
-                              // Laissé vide → le champ disparaît (retour au menu ⋯), rien n'est persisté
-                              if (!it.comment?.trim()) setItem(idx, { comment: undefined })
-                            }}
-                            autoFocus={it.comment === ''}
-                            placeholder="Commentaire (tempo, consigne…)"
-                            className={smallInput + ' mt-1.5 w-full py-1.5'}
-                          />
+                        <input
+                          type="text"
+                          value={it.comment}
+                          onChange={(e) => setItem(idx, { comment: e.target.value })}
+                          onBlur={() => {
+                            // Laissé vide → le champ disparaît (retour au bouton [+]), rien n'est persisté
+                            if (!it.comment?.trim()) setItem(idx, { comment: undefined })
+                          }}
+                          autoFocus={it.comment === ''}
+                          placeholder="Commentaire (tempo, consigne…)"
+                          className={smallInput + ' mt-1.5 w-full py-1.5'}
+                        />
+                      )}
                         </div>
                       )}
                     </div>
 
-                    {/* État superset : simple témoin entre les deux cartes, l'action vit dans le menu ⋯ */}
-                    {!dragId && category === 'muscu' && it.linkNext && idx < items.length - 1 && !items[idx + 1].blockBreak && (
-                      <div className="relative z-10 -my-1 flex justify-center">
-                        <span className="flex items-center gap-1 rounded-full bg-muscu px-2.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.12em] uppercase text-onaccent">
-                          <Link2 className="h-3 w-3" /> superset
-                        </span>
+                    {canBlocks && idx < items.length - 1 && !items[idx + 1].blockBreak && (
+                      <div className="-my-1 flex justify-center gap-1.5">
+                        {category === 'muscu' && (
+                          <button
+                            type="button"
+                            onClick={() => setItem(idx, { linkNext: !it.linkNext })}
+                            className={
+                              'relative z-10 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-extrabold transition-colors ' +
+                              (it.linkNext ? 'bg-muscu text-onaccent shadow-sm' : 'bg-sage-100 text-ink-soft')
+                            }
+                          >
+                            <Link2 className="h-3 w-3" />
+                            {it.linkNext ? 'Superset — enchaîné sans repos' : 'superset'}
+                          </button>
+                        )}
+                        {!it.linkNext && (
+                          <button
+                            type="button"
+                            title="Couper la séance ici : la suite forme un bloc avec ses propres tours"
+                            onClick={() => {
+                              setItem(idx + 1, { blockBreak: true, blockRounds: items[idx + 1].blockRounds ?? 1 })
+                              setItem(idx, { linkNext: false })
+                            }}
+                            className="relative z-10 flex items-center gap-1 rounded-full bg-sage-100 px-3 py-1 text-[11px] font-extrabold text-ink-soft"
+                          >
+                            <LayoutGrid className="h-3 w-3" /> nouveau bloc
+                          </button>
+                        )}
                       </div>
                     )}
-                                      </div>
-                                    )}
-                                  </SortableItem>
-                                )
-                              })}
-                            </div>
-                          </SortableContext>
-                        </div>
-                      )}
-                    </SortableItem>
+                              </div>
+                            )}
+                          </SortableItem>
+                        )
+                      })}
+                    </div>
                   ))}
                 </div>
               </SortableContext>
@@ -1171,7 +1142,7 @@ export default function SessionForm() {
       </Sheet>
 
       {/* Ajout accessible sans défiler jusqu'au bas de la liste (le volet remplit ce rôle sur desktop) */}
-      {hasItems && !pickerOpen && !removed && menuIdx === null && (
+      {hasItems && !pickerOpen && !removed && (
         <div className="lg:hidden">
           <Fab
             onClick={() => setPickerOpen(true)}

@@ -44,10 +44,8 @@ try {
   await page.click('[aria-label="Retour"]')
   await page.click('text=Full body')
   await page.waitForSelector('text=Tours du circuit')
-  // Le superset se pose depuis le menu ⋯ de l'exercice ; un témoin apparaît entre les cartes (août 2026)
-  await page.locator('[aria-label="Options de l\'exercice"]').first().click()
-  await page.click('text=Superset avec le suivant')
-  await page.waitForSelector('span:has-text("superset")')
+  await page.locator('button:has-text("superset")').first().click()
+  await page.waitForSelector('text=Superset — enchaîné sans repos')
   await page.click('text=Enregistrer')
 
   // --- Onglet Objectifs : objectif Pompes à 2 paliers avec récompenses

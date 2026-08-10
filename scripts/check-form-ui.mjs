@@ -49,11 +49,12 @@ try {
   await page.waitForSelector('p:text-is("Dips sur chaise")')
 
   // --- Séries variées : 3×12 devient 12/12/12 éditables, on passe la 1re à 30
+  // Les cartes sont repliées par défaut (août 2026) : le survol ouvre le panneau d'édition
+  // flottant, et la carte survolée passe de bg-glass à bg-shoal (opaque)
+  await page.locator('div.rounded-md p.truncate').first().hover()
   await page.locator('[aria-label="Varier les séries"]').first().click()
   await page.screenshot({ path: 'screenshots/38-series-variees.png' })
-  // Carte d'item de la fiche séance. ⚠ dépend de la classe du conteneur : c'était
-  // `.rounded-2xl.bg-surface` avant la charte bord de mer, c'est le verre dépoli depuis.
-  const firstCard = page.locator('div.rounded-md.bg-glass').filter({ hasText: 'reps' }).first()
+  const firstCard = page.locator('div.rounded-md').filter({ hasText: 'reps' }).first()
   await firstCard.locator('input[inputmode="numeric"]').nth(1).fill('30')
 
   // --- Section du planning : suggestions filtrées dans la combobox
@@ -86,9 +87,7 @@ try {
   await page.click('text=Routine matinale')
   await page.waitForSelector('text=Planification')
   await page.waitForSelector('text=Tours de la routine')
-  // Le découpage passe par le menu ⋯ de l'exercice qui démarre le bloc (août 2026)
-  await page.locator('[aria-label="Options de l\'exercice"]').nth(1).click()
-  await page.click('text=Démarrer un nouveau bloc ici')
+  await page.locator('button:has-text("nouveau bloc")').first().click()
   await page.waitForSelector('text=Bloc 2 — tours')
   await page.click('text=Enregistrer')
   await page.waitForSelector('text=Bibliothèque')
@@ -132,9 +131,10 @@ try {
   await desk.click('p:has-text("Muscu — Full body")')
   await desk.waitForSelector('text=Planification')
   await desk.waitForSelector("aside >> text=Banque d'exercices")
-  const nBefore = await desk.locator('[aria-label="Varier les séries"]').count()
+  // Compter les poignées : les réglages vivent dans le panneau flottant, monté au survol seulement
+  const nBefore = await desk.locator('[aria-label^="Réordonner"]').count()
   await desk.locator('aside').getByRole('button').first().click()
-  const nAfter = await desk.locator('[aria-label="Varier les séries"]').count()
+  const nAfter = await desk.locator('[aria-label^="Réordonner"]').count()
   if (nAfter !== nBefore + 1)
     throw new Error(`Le clic dans le volet devrait ajouter un exercice (${nBefore} → ${nAfter})`)
   // Le volet est toujours là (il ne se referme pas après un ajout)
