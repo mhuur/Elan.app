@@ -216,7 +216,8 @@ export function workoutStats(w: Workout): { sec: number; distM: number } {
   return { sec, distM }
 }
 
-// Jours : Mardi = 1, Mercredi = 2, Vendredi = 4, Dimanche = 6
+// Jours : Lundi = 0, Mardi = 1, Mercredi = 2, Jeudi = 3, Vendredi = 4, Samedi = 5, Dimanche = 6
+// (le squelette habituel est mar/mer/ven/dim, les autres jours servent aux semaines refaites)
 export const PLAN_SEMI = {
   name: 'Plan semi — sub 1h50',
   race: 'Tout Rennes Court',
@@ -297,13 +298,16 @@ export const PLAN_SEMI = {
     // Semaine du 03/08 manquée (mal de dos, 0 sortie du 03 au 09/08) → reprise EF pure le 10/08,
     // puis décalage d'une semaine du plan initial. La 2e semaine Spécifique (ex-14/09) saute :
     // on garde le pic, la répétition générale et l'affûtage complet.
-    { start: '2026-08-10', phase: 'Reconstruction', label: 'reprise', km: 26, seances: [
+    // Semaine refaite le 12/08 sur 3 jours de course (mar 11, mer 12, jeu 13, dim 16) : le seuil
+    // 2×8 min passe au mercredi 12 — c'est la séance déjà planifiée sur la montre COROS — et le
+    // footing du vendredi 14 devient le jeudi 13, en récupération du seuil de la veille.
+    { start: '2026-08-10', phase: 'Reconstruction', label: 'reprise · 1 séance de qualité', km: 28, seances: [
       mk(1, 'ef', 'Footing test 5 km', '5 km en EF · stop si le dos proteste', {
         surface: 'route',
         parts: [{ kind: 'steady', label: 'EF', distanceM: 5000, pace: EF, hr: HR.ef, note: 'reprise après mal de dos : stop net si la douleur revient' }],
       }),
-      mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
-      mk(4, 'ef', 'Footing 6 km', '6 km en EF · 5 lignes droites', footing(6, 5)),
+      mk(2, 'seuil', 'Seuil 2×8 min', '2×8 min à 5:15, récup 2 min', seuilInt(2, 8, '5:15', 120)),
+      mk(3, 'ef', 'Footing 6 km', '6 km en EF · récup du seuil de la veille', footing(6)),
       mk(6, 'sl', 'Sortie longue 9 km', '9 km en EF', longRun(9, 'dernier test du dos avant de reprendre l’intensité')),
     ] },
     { start: '2026-08-17', phase: 'Développement', label: 'retour en intensité', km: 34, seances: [
@@ -358,7 +362,7 @@ export const PLAN_SEMI = {
       mk(4, 'as', 'Allure semi 2×2 km', '2×2 km à 5:08, récup 2 min', asInt(2, 2000, '5:08', 120)),
       mk(6, 'sl', 'Sortie longue 11 km', '11 km en EF', longRun(11)),
     ] },
-    { start: '2026-09-28', phase: 'Affûtage', label: 'semaine de course', km: 37, seances: [
+    { start: '2026-09-28', phase: 'Affûtage', label: 'semaine de course', km: 35, seances: [
       mk(1, 'ef', 'Footing 6 km', '6 km en EF · 4 lignes droites', footing(6, 4)),
       mk(2, 'ef', 'Footing court 4 km', '4 km en EF, ou repos complet', {
         surface: 'route',
