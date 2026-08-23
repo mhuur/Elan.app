@@ -70,7 +70,7 @@ try {
   await page.getByRole('link', { name: "Aujourd'hui" }).click()
   await page.click('text=Séance libre')
   await page.click('text=Full body')
-  await page.waitForSelector('text=Entrer le résultat')
+  await page.click('[aria-label="Options"]') // la saisie du résultat vit dans le menu ⋮
   await page.click('text=Entrer le résultat')
   await page.waitForSelector('text=Série 1')
   await page.click('text=Valider la séance ✓')
@@ -111,15 +111,6 @@ try {
   await page.waitForSelector('text=Tous les paliers atteints !')
   await page.screenshot({ path: 'screenshots/23-objectif-multi-atteint.png' })
 
-  // --- Progrès : « Mes suivis » + fiche d'exercice (palier suivant avec récompense)
-  await page.click('text=Progrès')
-  await page.waitForSelector('text=Mes suivis')
-  await page.locator('button:has-text("Pompes")').first().click() // ligne du suivi → fiche
-  await page.waitForSelector('text=Palier 20')
-  await page.waitForSelector('text=🎁 Lunettes de soleil')
-  await page.screenshot({ path: 'screenshots/18-progres-v4.png' })
-  await page.mouse.click(10, 10) // referme la fiche (backdrop)
-
   // --- Saisie rétroactive : naviguer à hier depuis Aujourd'hui et valider une sortie
   await page.getByRole('link', { name: "Aujourd'hui" }).click()
   await page.waitForSelector('text=Séance libre')
@@ -132,9 +123,6 @@ try {
   await page.click('text=Marquer comme faite')
   await page.waitForSelector('text=Terminées')
   await page.screenshot({ path: 'screenshots/19-retro.png' })
-  // Retour sur Progrès : la page se recharge bien après la saisie rétroactive
-  await page.click('text=Progrès')
-  await page.waitForSelector('text=Mes suivis')
 
   console.log('V5 OK — sous-types multiples, + de section, Objectifs, superset, rétroactif par dates')
   if (errors.length) {

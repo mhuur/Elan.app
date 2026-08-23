@@ -101,7 +101,7 @@ try {
   await page.click('text=Routine matinale')
   await page.waitForSelector('text=Bloc 2')
   await page.screenshot({ path: 'screenshots/39-etirements-blocs.png' })
-  await page.click('text=Fermer sans valider')
+  await page.click('[aria-label="Fermer"]') // la croix ✕ remplace « Fermer sans valider »
   await page.getByRole('link', { name: 'Séries' }).click()
   await page.waitForSelector('text=Bibliothèque')
 

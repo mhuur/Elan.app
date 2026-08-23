@@ -22,9 +22,9 @@ try {
   // --- Minuteur muscu « Full body » (Pompes 3 × 12) : première série poussée à 14 reps
   await page.click('text=Séance libre')
   await page.locator('[role="dialog"] button:has-text("Full body")').click()
-  await page.waitForSelector('text=Lancer le minuteur')
+  await page.waitForSelector('text=Démarrer')
   await page.waitForSelector('[role="dialog"] >> text=3 × 12 reps') // objectif d'origine
-  await page.click('text=Lancer le minuteur')
+  await page.click('text=Démarrer')
   await page.waitForSelector("text=C'est parti")
   await page.click("text=C'est parti")
   await page.waitForSelector('text=Préparation')
@@ -40,12 +40,13 @@ try {
   // --- Réouverture : la série faite vaut 14, les deux non faites gardent 12
   await page.click('text=Séance libre')
   await page.locator('[role="dialog"] button:has-text("Full body")').click()
-  await page.waitForSelector('[role="dialog"] >> text=Objectifs relevés')
+  // Le bandeau « Objectifs relevés » a été retiré (refonte août 2026) : la progression
+  // se lit directement dans les cibles affichées
   await page.waitForSelector('[role="dialog"] >> text=14 / 12 / 12 reps')
   await page.screenshot({ path: 'screenshots/52-objectifs-releves.png' })
 
   // --- Le minuteur part sur la nouvelle cible
-  await page.click('text=Lancer le minuteur')
+  await page.click('text=Démarrer')
   await page.waitForSelector("text=C'est parti")
   await page.click("text=C'est parti")
   await page.waitForSelector('text=Préparation')

@@ -6,7 +6,6 @@ import Today from './pages/Today'
 import Planning from './pages/Planning'
 import Library from './pages/Library'
 import ExerciseBank from './pages/ExerciseBank'
-import Progress from './pages/Progress'
 import Goals from './pages/Goals'
 import Plan from './pages/Plan'
 import ExerciseForm from './pages/ExerciseForm'
@@ -61,7 +60,6 @@ function Shell() {
           <Route path="/session/:id" element={<SessionForm />} />
           <Route path="/plan" element={<Plan />} />
           <Route path="/goals" element={<Goals />} />
-          <Route path="/progress" element={<Progress />} />
           <Route path="/player/:id" element={<Player />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

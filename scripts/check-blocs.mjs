@@ -44,13 +44,14 @@ try {
   await page.locator('[role="dialog"] button:has-text("Full body")').click()
   await page.waitForSelector('text=Bloc 1')
   await page.waitForSelector('text=Bloc 2 · × 2 tours')
+  await page.click('[aria-label="Options"]') // la saisie du résultat vit dans le menu ⋮
   await page.click('text=Entrer le résultat')
   await page.waitForSelector('text=Tour 2/2')
   await page.screenshot({ path: 'screenshots/28-blocs-completion.png' })
   await page.click('text=← Retour à la séance')
 
   // --- Minuteur guidé : série courante au centre, structure (blocs/tours/exos) dans la colonne programme
-  await page.click('text=Lancer le minuteur')
+  await page.click('text=Démarrer')
   await page.waitForSelector("text=C'est parti")
   await page.click("text=C'est parti")
   await page.waitForSelector('text=Préparation')

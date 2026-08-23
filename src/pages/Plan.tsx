@@ -1,9 +1,16 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, Footprints, Zap } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Bike, Check, ChevronDown, ChevronRight, Footprints, Zap } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { PageHeader } from '../components/ui'
+import { PageHeader, Seg, Sheet } from '../components/ui'
 import WorkoutSheet from '../components/WorkoutSheet'
-import { DAY_NAMES, addDays, formatShortFr, toDateStr, todayStr } from '../lib/dates'
+import { DAY_NAMES, addDays, formatShortFr, mondayIndex, toDateStr, todayStr } from '../lib/dates'
+import {
+  PLAN_VELO,
+  currentVeloWeekIndex,
+  veloWeekStates,
+  type VeloSeanceState,
+  type VeloWeek,
+} from '../data/planVelo'
 import {
   PLAN_METRICS,
   PLAN_ZONES,
@@ -149,7 +156,27 @@ function DoneSeanceRow({
   )
 }
 
+/** Onglet Plan : deux plans côte à côte — le semi (course) et le vélo d'appartement */
 export default function Plan() {
+  const [view, setView] = useState<'21k' | 'velo'>('21k')
+  return (
+    <div>
+      <div className="px-4 pt-5">
+        <Seg
+          options={[
+            { value: '21k', label: 'Course · 21K' },
+            { value: 'velo', label: 'Vélo' },
+          ]}
+          value={view}
+          onChange={setView}
+        />
+      </div>
+      {view === '21k' ? <PlanSemi /> : <PlanVelo />}
+    </div>
+  )
+}
+
+function PlanSemi() {
   const { logs } = useData()
   const today = todayStr()
   const weeks = PLAN_SEMI.weeks
@@ -333,6 +360,260 @@ export default function Plan() {
         plannedDate={sheet ? seanceDateStr(week, sheet) : ''}
         onClose={() => setSheet(null)}
       />
+    </div>
+  )
+}
+
+/* ── Plan vélo d'appartement ─────────────────────────────────────────────────
+ * Endurance de base sur 12 semaines, aux dates réelles de l'alternance vélo/HIIT
+ * (lun/jeu/sam). Le plan ne crée AUCUNE séance dans Aujourd'hui/Planning : la
+ * séance « Vélo d'appartement » de l'utilisateur y est déjà planifiée, et
+ * CompleteSheet surcharge ses cibles depuis `veloSeanceOn` les jours du plan.
+ * Ici : la vue d'ensemble, la progression et la validation manuelle (Campus).
+ */
+
+const VELO_HEX = '#7ec8e3' // miroir du token `--color-velo`
+
+function VeloSeanceCard({ st, idx, total, today, onOpen }: { st: VeloSeanceState; idx: number; total: number; today: string; onOpen: () => void }) {
+  const se = st.seance
+  const status: Status = st.done ? 'done' : se.date === today ? 'today' : se.date < today ? 'missed' : 'todo'
+  const meta = STATUS_META[status]
+  const day = mondayIndex(new Date(se.date + 'T12:00:00'))
+  return (
+    <button type="button" onClick={onOpen} className="w-full rounded-md border border-hairline bg-glass text-left backdrop-blur-lg active:bg-glass-raised">
+      <div className="flex items-center gap-3 px-4 pt-3.5">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: VELO_HEX + '22', color: VELO_HEX }}>
+          <Bike className="h-6 w-6" strokeWidth={2.25} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className={'rounded-full px-2 py-0.5 font-mono text-[9px] tracking-[0.16em] uppercase ' + meta.cls}>{meta.label}</span>
+            <span className="text-xs font-bold text-ink-soft">
+              Séance {idx + 1}/{total} · {DAY_NAMES[day]} {formatShortFr(se.date)}
+            </span>
+          </div>
+          <p className="mt-0.5 truncate font-display text-xl leading-none font-bold uppercase">{se.title}</p>
+          <p className="text-[11px] font-bold" style={{ color: VELO_HEX }}>Endurance de base</p>
+        </div>
+        <ChevronRight className="h-5 w-5 shrink-0 text-ink-soft/40" />
+      </div>
+      <div className="mt-2.5 grid grid-cols-3 gap-2 border-t border-sand/60 px-4 py-3">
+        <Metric label="Durée" value={String(se.durationMin)} unit="min" />
+        <Metric label="Résistance" value={String(se.resistance)} />
+        <Metric label="FC guide" value={se.hr} unit="bpm" />
+      </div>
+    </button>
+  )
+}
+
+/** Fiche d'une séance du plan vélo : programme + validation manuelle (comme le plan semi, sans sélecteur de sortie) */
+function VeloSheet({ st, week, onClose }: { st: VeloSeanceState | null; week: VeloWeek; onClose: () => void }) {
+  const { logs, addLog, removeLog } = useData()
+  const [confirming, setConfirming] = useState(false)
+  const [date, setDate] = useState('')
+  if (!st) return null
+  const se = st.seance
+  const existing = logs.find((l) => l.planRef === st.planRef)
+  const validate = () => {
+    void addLog({
+      date: date || se.date,
+      sessionId: '',
+      sessionName: `Vélo — ${se.title}`,
+      category: 'velo',
+      planRef: st.planRef,
+      metrics: [
+        { key: 'power', label: 'Résistance', unit: '', value: se.resistance },
+        { key: 'duration', label: 'Durée', unit: 'min', value: se.durationMin },
+      ],
+      note: '',
+      createdAt: Date.now(),
+    })
+    setConfirming(false)
+    onClose()
+  }
+  return (
+    <Sheet
+      open={!!st}
+      onClose={onClose}
+      title={
+        <span className="flex items-center gap-2">
+          <Bike className="h-5 w-5 shrink-0 text-velo" />
+          <span className="min-w-0 truncate">{se.title}</span>
+        </span>
+      }
+    >
+      <div className="space-y-4">
+        <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
+          {week.phase}
+          {week.label ? ` · ${week.label}` : ''} · {DAY_NAMES[mondayIndex(new Date(se.date + 'T12:00:00'))]} {formatShortFr(se.date)}
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          <Metric label="Durée" value={String(se.durationMin)} unit="min" />
+          <Metric label="Résistance" value={String(se.resistance)} />
+          <Metric label="FC guide" value={se.hr} unit="bpm" />
+        </div>
+        {se.note && <p className="text-sm font-semibold text-ink-soft">{se.note}</p>}
+
+        {existing ? (
+          <div className="flex items-center justify-between gap-3 rounded-sm bg-sage-50 px-4 py-3">
+            <p className="flex items-center gap-1.5 text-sm font-extrabold text-sage-700">
+              <Check className="h-4 w-4" strokeWidth={3} /> Validée le {formatShortFr(existing.date)}
+            </p>
+            <button type="button" onClick={() => void removeLog(existing.id)} className="shrink-0 text-xs font-bold text-hiit active:opacity-70">
+              Annuler
+            </button>
+          </div>
+        ) : st.done ? (
+          <p className="flex items-center gap-1.5 rounded-sm bg-sage-50 px-4 py-3 text-sm font-extrabold text-sage-700">
+            <Check className="h-4 w-4" strokeWidth={3} /> Séance vélo journalisée le {formatShortFr(st.doneDate ?? se.date)}
+          </p>
+        ) : confirming ? (
+          <div className="space-y-3">
+            <p className="text-xs font-bold text-ink-soft">Quel jour as-tu fait cette séance ?</p>
+            <input
+              type="date"
+              aria-label="Date de la séance"
+              value={date || se.date}
+              onChange={(e) => setDate(e.target.value || se.date)}
+              className="w-full rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-bold text-ink outline-none focus:border-sage-400"
+            />
+            <button
+              type="button"
+              onClick={validate}
+              className="w-full rounded-sm bg-ink px-5 py-3.5 font-mono text-[11px] font-bold tracking-[0.16em] uppercase text-onaccent active:bg-sage-700"
+            >
+              Valider ✓
+            </button>
+            <button type="button" onClick={() => setConfirming(false)} className="w-full py-1 text-center text-xs font-bold text-ink-soft">
+              Retour
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className="w-full rounded-sm bg-ink px-5 py-3.5 font-mono text-[11px] font-bold tracking-[0.16em] uppercase text-onaccent active:bg-sage-700"
+          >
+            Valider ma séance
+          </button>
+        )}
+      </div>
+    </Sheet>
+  )
+}
+
+function PlanVelo() {
+  const { logs } = useData()
+  const today = todayStr()
+  const weeks = PLAN_VELO.weeks
+  const [weekIdx, setWeekIdx] = useState(() => currentVeloWeekIndex(today))
+  const [sheet, setSheet] = useState<VeloSeanceState | null>(null)
+  const week = weeks[weekIdx]
+  const states = useMemo(() => veloWeekStates(week, logs), [week, logs])
+  const todo = states.filter((st) => !st.done)
+  const done = states.filter((st) => st.done)
+  const end = toDateStr(addDays(new Date(week.start + 'T12:00:00'), 6))
+  const totalMin = week.seances.reduce((a, se) => a + se.durationMin, 0)
+  const cur = currentVeloWeekIndex(today)
+
+  return (
+    <div className="px-4 pb-4">
+      <PageHeader kicker="Plan vélo · endurance de base" title="Vélo indoor" />
+
+      {/* Navigation semaine par semaine */}
+      <div className="flex items-center justify-between gap-3 pb-3 pt-1">
+        <button
+          type="button"
+          aria-label="Semaine précédente"
+          disabled={weekIdx === 0}
+          onClick={() => setWeekIdx((i) => Math.max(0, i - 1))}
+          className="rounded-full bg-surface p-2.5 shadow-sm active:bg-sage-50 disabled:opacity-30"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <div className="text-center">
+          <p className="font-display text-xl leading-none font-bold uppercase">
+            {weekIdx === cur && today >= weeks[0].start ? 'Cette semaine' : `Semaine ${weekIdx + 1}`}
+          </p>
+          <p className="text-xs font-bold text-ink-soft">{weekIdx + 1} sur {weeks.length}</p>
+        </div>
+        <button
+          type="button"
+          aria-label="Semaine suivante"
+          disabled={weekIdx === weeks.length - 1}
+          onClick={() => setWeekIdx((i) => Math.min(weeks.length - 1, i + 1))}
+          className="rounded-full bg-surface p-2.5 shadow-sm active:bg-sage-50 disabled:opacity-30"
+        >
+          <ArrowRight className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Aperçu hebdomadaire */}
+      <section className="rounded-md border border-hairline bg-glass px-4 py-3.5 backdrop-blur-lg">
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-display text-xl leading-none font-bold uppercase">Ton aperçu hebdomadaire</p>
+          <span className="shrink-0 rounded-full bg-sage-50 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-sage-700">
+            {week.phase}
+          </span>
+        </div>
+        <p className="mt-0.5 text-xs font-semibold text-ink-soft">
+          {formatShortFr(week.start)} – {formatShortFr(end)}
+          {week.label && <span className="text-ink-soft"> · {week.label}</span>}
+        </p>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <Metric label="Activités" value={String(week.seances.length)} />
+          <Metric label="Durée" value={String(totalMin)} unit="min" />
+          <Metric label="Résistance" value={week.seances.map((se) => se.resistance).join(' · ')} />
+        </div>
+      </section>
+
+      {/* Séances restant à faire (les validées passent en « Terminées », comme le 21K) */}
+      <div className="mt-3 space-y-3">
+        {todo.map((st) => (
+          <VeloSeanceCard
+            key={st.seance.date}
+            st={st}
+            idx={states.indexOf(st)}
+            total={states.length}
+            today={today}
+            onOpen={() => setSheet(st)}
+          />
+        ))}
+        {todo.length === 0 && (
+          <div className="rounded-md border border-hairline bg-glass px-6 py-5 text-center backdrop-blur-lg">
+            <p className="text-sm font-extrabold text-sage-700">Semaine bouclée, bravo ! 🎉</p>
+          </div>
+        )}
+      </div>
+
+      {done.length > 0 && (
+        <section className="mt-5">
+          <h2 className="mb-2 px-1 font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">Terminées</h2>
+          <div className="space-y-2">
+            {done.map((st) => (
+              <button
+                key={st.seance.date}
+                type="button"
+                onClick={() => setSheet(st)}
+                className="flex w-full items-center gap-3 rounded-md border border-hairline bg-glass-soft px-4 py-3 text-left backdrop-blur-lg active:bg-glass"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage-500 text-onaccent">
+                  <Check className="h-4 w-4" strokeWidth={3} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold text-ink-soft">
+                    Séance {states.indexOf(st) + 1}/{states.length} · {DAY_NAMES[mondayIndex(new Date(st.seance.date + 'T12:00:00'))]}
+                  </p>
+                  <p className="truncate text-sm font-extrabold">{st.seance.title}</p>
+                </div>
+                <ChevronRight className="h-5 w-5 shrink-0 text-ink-soft/40" />
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <VeloSheet st={sheet} week={week} onClose={() => setSheet(null)} />
     </div>
   )
 }

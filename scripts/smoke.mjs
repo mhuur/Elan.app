@@ -26,7 +26,7 @@ try {
 
   // --- Compléter la routine d'étirements sans minuteur
   await page.click('text=Routine matinale')
-  await page.waitForSelector('text=Lancer le minuteur')
+  await page.waitForSelector('text=Démarrer')
   await shot('02-sheet-etirements')
   await page.click('text=Marquer comme faite')
   await page.waitForSelector('text=Terminées')
@@ -48,8 +48,9 @@ try {
   await page.click('text=Séance libre')
   await page.click('text=Full body')
   await page.waitForSelector('text=Dos bien droit')
-  await page.waitForSelector('text=Entrer le résultat')
+  await page.waitForSelector('text=Démarrer')
   await shot('04-sheet-muscu')
+  await page.click('[aria-label="Options"]') // la saisie du résultat vit dans le menu ⋮
   await page.click('text=Entrer le résultat')
   await page.waitForSelector('text=Série 1')
   await shot('04b-sheet-muscu-saisie')
@@ -60,8 +61,8 @@ try {
   // --- Minuteur HIIT
   await page.click('text=Séance libre')
   await page.click('text=Cardio express')
-  await page.waitForSelector('text=Lancer le minuteur')
-  await page.click('text=Lancer le minuteur')
+  await page.waitForSelector('text=Démarrer')
+  await page.click('text=Démarrer')
   await page.waitForSelector("text=C'est parti")
   await shot('06-player-pret')
   await page.click("text=C'est parti")
@@ -74,8 +75,8 @@ try {
   // --- Minuteur guidé muscu : séries manuelles + repos automatique
   await page.click('text=Séance libre')
   await page.locator('[role="dialog"] button:has-text("Full body")').click()
-  await page.waitForSelector('text=Lancer le minuteur')
-  await page.click('text=Lancer le minuteur')
+  await page.waitForSelector('text=Démarrer')
+  await page.click('text=Démarrer')
   await page.waitForSelector("text=C'est parti")
   await page.click("text=C'est parti")
   await page.waitForSelector('text=Préparation')
@@ -113,12 +114,6 @@ try {
   await page.waitForSelector("text=Modifier l'exercice")
   await shot('12-fiche-exercice')
   await page.click('[aria-label="Retour"]')
-
-  // --- Progrès : suivis par exercice
-  await page.click('text=Progrès')
-  await page.waitForSelector('text=Mes suivis')
-  await page.waitForTimeout(800)
-  await shot('13-progres')
 
   if (errors.length) {
     console.error('ERREURS DÉTECTÉES :')

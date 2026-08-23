@@ -20,16 +20,16 @@ try {
 
   // --- Programme visible dans la feuille étirements (homogène avec vélo/muscu)
   await page.click('text=Routine matinale')
-  await page.waitForSelector('text=Lancer le minuteur')
+  await page.waitForSelector('text=Démarrer')
   await page.waitForSelector('text=Chat-vache') // une posture du seed listée avec sa durée
   await page.screenshot({ path: 'screenshots/40-sheet-etirements-programme.png' })
-  await page.click('text=Fermer sans valider')
+  await page.click('[aria-label="Fermer"]') // la croix ✕ remplace « Fermer sans valider »
 
   // --- Minuteur muscu : ajuster les reps réelles (12 → 14) puis valider la série
   await page.click('text=Séance libre')
   await page.locator('[role="dialog"] button:has-text("Full body")').click()
-  await page.waitForSelector('text=Lancer le minuteur')
-  await page.click('text=Lancer le minuteur')
+  await page.waitForSelector('text=Démarrer')
+  await page.click('text=Démarrer')
   await page.waitForSelector("text=C'est parti")
   await page.click("text=C'est parti")
   await page.waitForSelector('text=Préparation')

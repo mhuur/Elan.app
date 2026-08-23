@@ -110,7 +110,7 @@ export function PageHeader({ kicker, title, right, onBack }: { kicker?: string; 
   )
 }
 
-export function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title?: ReactNode; children: ReactNode }) {
+export function Sheet({ open, onClose, title, actions, children }: { open: boolean; onClose: () => void; title?: ReactNode; actions?: ReactNode; children: ReactNode }) {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true">
@@ -119,7 +119,12 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
           rester visibles par-dessus — c'est le piège d'empilement du thème sombre. */}
       <div className="relative max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-xl border-t border-hairline bg-cream/95 px-5 pt-3 pb-10 shadow-2xl backdrop-blur-xl">
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-hairline-strong" />
-        {title && <h2 className="mb-4 font-display text-2xl leading-none font-bold uppercase">{title}</h2>}
+        {(title || actions) && (
+          <div className="mb-4 flex items-center gap-2.5">
+            {title && <h2 className="min-w-0 flex-1 font-display text-2xl leading-none font-bold uppercase">{title}</h2>}
+            {actions}
+          </div>
+        )}
         {children}
       </div>
     </div>

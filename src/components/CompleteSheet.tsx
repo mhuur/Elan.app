@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, Lightbulb, Link2, Play, Repeat, TrendingUp } from 'lucide-react'
+import { Check, ClipboardList, Lightbulb, Link2, MoreVertical, Pencil, Play, Repeat, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, feelingOf, setTargetsOf, type Exercise, type Log, type MetricValue, type Session, type SessionItem } from '../types'
 import { relativeDayFr, todayStr } from '../lib/dates'
@@ -9,7 +9,8 @@ import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { muscuBlocks } from '../lib/blocks'
 import { buildTimeline, collectSets, stopPoint, type SetStatus } from '../lib/timeline'
 import { progressedSession } from '../lib/progression'
-import { CategoryIcon, Field, GhostButton, NumInput, PrimaryButton, Sheet, TextArea } from './ui'
+import { veloSeanceOn } from '../data/planVelo'
+import { CategoryIcon, Eyebrow, Field, GhostButton, iconSquare, NumInput, PrimaryButton, Sheet, TextArea } from './ui'
 import FeelingPicker from './FeelingPicker'
 import ResultTimeline from './ResultTimeline'
 
@@ -24,10 +25,30 @@ export default function CompleteSheet({
   /** Date du log (YYYY-MM-DD), aujourd'hui par défaut — permet la saisie rétroactive */
   date?: string
 }) {
+  const navigate = useNavigate()
+  // La saisie du résultat vit dans le menu ⋮ de l'en-tête, rendu par le parent :
+  // son état remonte donc ici, et se réinitialise à chaque séance ouverte
+  const [entering, setEntering] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(() => {
+    setEntering(false)
+    setMenuOpen(false)
+  }, [session?.id])
+  const close = () => {
+    setEntering(false)
+    setMenuOpen(false)
+    onClose()
+  }
+  const logDate = date ?? todayStr()
+  const canEnter =
+    !!session &&
+    (session.category === 'muscu' || session.category === 'hiit') &&
+    session.items.length > 0 &&
+    logDate <= todayStr()
   return (
     <Sheet
       open={!!session}
-      onClose={onClose}
+      onClose={close}
       title={
         session ? (
           <span className="flex items-center gap-2">
@@ -39,39 +60,164 @@ export default function CompleteSheet({
           </span>
         ) : undefined
       }
+      actions={
+        session ? (
+          <>
+            <div className="relative shrink-0">
+              <button type="button" aria-label="Options" onClick={() => setMenuOpen((v) => !v)} className={iconSquare}>
+                <MoreVertical className="h-[18px] w-[18px]" />
+              </button>
+              {menuOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                  <div className="absolute top-10 right-0 z-20 w-56 overflow-hidden rounded-md border border-hairline-strong bg-shoal shadow-xl">
+                    {canEnter && !entering && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false)
+                          setEntering(true)
+                        }}
+                        className="flex w-full items-center gap-3 border-b border-hairline px-4 py-3 text-left text-sm font-bold active:bg-glass"
+                      >
+                        <Check className="h-4 w-4 shrink-0 text-sage-500" /> Entrer le résultat
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        close()
+                        navigate(`/session/${session.id}`)
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold active:bg-glass"
+                    >
+                      <Pencil className="h-4 w-4 shrink-0 text-sage-500" /> Modifier la séance
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <button type="button" aria-label="Fermer" onClick={close} className={iconSquare}>
+              <X className="h-[18px] w-[18px]" />
+            </button>
+          </>
+        ) : undefined
+      }
     >
-      {session && <Inner key={session.id} session={session} onClose={onClose} date={date} />}
+      {session && (
+        <Inner key={session.id} session={session} onClose={close} date={date} entering={entering} setEntering={setEntering} />
+      )}
     </Sheet>
   )
 }
 
-/** Résumé du programme d'un exercice : « 3 × 20 reps » ou « 30 / 20 / 15 reps » */
-function itemSummary(it: SessionItem, ex?: Exercise): string {
+/** Cible du programme d'un exercice, valeur et unité séparées : « 3 × 20 | reps » ou « 30 / 20 / 15 | reps » */
+function itemTarget(it: SessionItem, ex: Exercise | undefined, isStretch: boolean): { value: string; unit: string } {
+  if (isStretch) {
+    // Étirements : « 2 × 30 s » quand la posture se fait des deux côtés
+    const pre = (it.sets ?? 1) > 1 ? `${it.sets} × ` : ''
+    return ex?.measure === 'reps'
+      ? { value: pre + String(it.target ?? 10), unit: 'reps' }
+      : { value: pre + String(it.durationSec ?? 30), unit: 's' }
+  }
   const tgs = setTargetsOf(it)
   const unit = ex?.measure === 'sec' ? 's' : 'reps'
   const uniform = tgs.every((t) => t === tgs[0])
-  return uniform ? `${tgs.length} × ${tgs[0]} ${unit}` : `${tgs.join(' / ')} ${unit}`
+  return { value: uniform ? `${tgs.length} × ${tgs[0]}` : tgs.join(' / '), unit }
+}
+
+/** Ligne du programme : nom à gauche, ▷ démo si l'exercice a une vidéo, cible en display à droite */
+function ProgramRow({
+  name,
+  comment,
+  linkNext,
+  videoUrl,
+  value,
+  unit,
+}: {
+  name: string
+  comment?: string
+  linkNext?: boolean
+  videoUrl?: string
+  value: string
+  unit: string
+}) {
+  return (
+    <div className="flex items-center gap-2.5 py-2.5">
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1.5 text-sm font-bold">
+          <span className="min-w-0 truncate">{name}</span>
+          {linkNext && <Link2 className="h-3 w-3 shrink-0 text-muscu" />}
+        </p>
+        {comment && (
+          <p className="flex items-center gap-1 text-xs font-semibold text-ink-soft">
+            <Lightbulb className="h-3 w-3 shrink-0" />
+            <span className="min-w-0 truncate">{comment}</span>
+          </p>
+        )}
+      </div>
+      {videoUrl && (
+        <a
+          href={videoUrl}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`Démo ${name}`}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm text-sage-500 active:bg-glass"
+        >
+          <Play className="h-4 w-4" fill="currentColor" />
+        </a>
+      )}
+      <p className="shrink-0 font-display text-2xl leading-none font-black text-ink">
+        {value} <span className="font-sans text-[13px] font-bold text-ink-soft">{unit}</span>
+      </p>
+    </div>
+  )
 }
 
 
-function Inner({ session: planned, onClose, date }: { session: Session; onClose: () => void; date?: string }) {
+function Inner({
+  session: planned,
+  onClose,
+  date,
+  entering,
+  setEntering,
+}: {
+  session: Session
+  onClose: () => void
+  date?: string
+  entering: boolean
+  setEntering: (v: boolean) => void
+}) {
   const { addLog, logs, exercises } = useData()
   const navigate = useNavigate()
   const [note, setNote] = useState('')
   const [feeling, setFeeling] = useState<number | undefined>(undefined)
-  const [entering, setEntering] = useState(false)
   const [celebrate, setCelebrate] = useState<{ text: string; reward?: string }[] | null>(null)
   const logDate = date ?? todayStr()
   // Saisie interdite sur une date future (aperçu seulement) — on ne journalise pas l'avenir
   const isFuture = logDate > todayStr()
 
   // Objectifs relevés à hauteur de la dernière perf (dérivé : la fiche de séance n'est pas touchée)
-  const { session, raised } = useMemo(
+  const { session } = useMemo(
     () => progressedSession(planned, exercises, logs, logDate),
     [planned, exercises, logs, logDate],
   )
 
-  const metrics = useMemo(() => effectiveMetrics(session), [session])
+  // Jour de plan vélo : la durée et la résistance cibles viennent du plan (progression
+  // semaine par semaine), pas des cibles fixes de la fiche — même esprit que progressedSession
+  const veloPlanSeance = session.category === 'velo' ? veloSeanceOn(logDate) : undefined
+  const metrics = useMemo(() => {
+    const base = effectiveMetrics(session)
+    if (!veloPlanSeance) return base
+    return base.map((m) =>
+      m.key === 'duration'
+        ? { ...m, target: veloPlanSeance.durationMin }
+        : m.key === 'power'
+          ? { ...m, target: veloPlanSeance.resistance }
+          : m,
+    )
+  }, [session, veloPlanSeance])
   const links = session.links ?? []
   const isMuscu = session.category === 'muscu'
   const isHiit = session.category === 'hiit'
@@ -241,36 +387,12 @@ function Inner({ session: planned, onClose, date }: { session: Session; onClose:
 
   const program = metrics.filter((m) => m.target != null)
 
+  // Le programme du jour est l'info principale — sur une autre date, le mot « aujourd'hui » mentirait
+  const programLabel = logDate === todayStr() ? "À faire aujourd'hui" : 'Programme'
+
   return (
     <div className="space-y-4">
-      {lastLog && (
-        <div className="rounded-sm bg-sage-50 px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-sage-600">
-              Dernière fois · {relativeDayFr(lastLog.date)}
-            </p>
-            {feelingOf(lastLog.feeling) && (
-              <span className="text-lg" title={feelingOf(lastLog.feeling)!.label}>
-                {feelingOf(lastLog.feeling)!.emoji}
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-sm font-bold text-ink">{lastPerfLine(lastLog, session, exercises)}</p>
-          {lastStop && <p className="mt-0.5 text-xs font-semibold text-ink-soft">{lastDetailLine(lastLog)}</p>}
-          {lastLog.note && (
-            <p className="mt-0.5 text-xs font-semibold italic text-ink-soft">« {lastLog.note} »</p>
-          )}
-        </div>
-      )}
-
       {session.notes && <p className="text-sm font-semibold text-ink-soft">{session.notes}</p>}
-
-      {raised && (
-        <p className="flex items-center gap-2 rounded-sm bg-sage-50 px-4 py-2.5 text-xs font-bold text-sage-600">
-          <TrendingUp className="h-4 w-4 shrink-0" />
-          Objectifs relevés à hauteur de ta dernière perf.
-        </p>
-      )}
 
       {program.length > 0 && (
         <p className="flex items-center gap-2 rounded-sm bg-sage-50 px-4 py-2.5 text-sm font-bold">
@@ -302,28 +424,24 @@ function Inner({ session: planned, onClose, date }: { session: Session; onClose:
       )}
 
       {session.category === 'hiit' && session.items.length > 0 && (
-        <div className="overflow-hidden rounded-sm bg-sage-50">
-          {session.items.map((it, i) => {
-            const ex = exOf(it.exerciseId)
-            return (
-              <div
-                key={i}
-                className={'flex items-center justify-between gap-2 px-4 py-2.5 ' + (i > 0 ? 'border-t border-surface' : '')}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold">{ex?.name ?? 'Exercice'}</p>
-                  {it.comment && (
-                    <p className="flex items-center gap-1 text-xs font-semibold text-ink-soft">
-                      <Lightbulb className="h-3 w-3 shrink-0" />
-                      <span className="min-w-0 truncate">{it.comment}</span>
-                    </p>
-                  )}
-                </div>
-                <span className="shrink-0 text-xs font-extrabold text-ink-soft">{it.durationSec ?? session.workSec ?? 45} s</span>
-              </div>
-            )
-          })}
-          <p className="border-t border-surface px-4 py-2 text-xs font-extrabold text-ink-soft">
+        <div>
+          <Eyebrow>{programLabel}</Eyebrow>
+          <div className="divide-y divide-hairline">
+            {session.items.map((it, i) => {
+              const ex = exOf(it.exerciseId)
+              return (
+                <ProgramRow
+                  key={i}
+                  name={ex?.name ?? 'Exercice'}
+                  comment={it.comment}
+                  videoUrl={ex?.videoUrl}
+                  value={String(it.durationSec ?? session.workSec ?? 45)}
+                  unit="s"
+                />
+              )
+            })}
+          </div>
+          <p className="border-t border-hairline pt-2 font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
             × {session.rounds ?? 1} tour{(session.rounds ?? 1) > 1 ? 's' : ''} · {session.restSec ?? 15} s de repos
           </p>
         </div>
@@ -331,49 +449,58 @@ function Inner({ session: planned, onClose, date }: { session: Session; onClose:
 
       {/* Muscu / étirements — programme en lecture seule : les tours et le détail d'UN tour */}
       {!entering && (isMuscu || isStretch) && session.items.length > 0 && (
-        <div className="space-y-2">
+        <div>
+          <Eyebrow>{programLabel}</Eyebrow>
           {blocks.map((b, bi) => (
-            <div key={bi} className="overflow-hidden rounded-sm bg-sage-50">
+            <div key={bi}>
               {(blocks.length > 1 || b.rounds > 1) && (
                 <p
-                  className={`flex items-center gap-1.5 px-4 py-1.5 font-mono text-[10px] tracking-[0.2em] uppercase ${CATEGORY_META[session.category].soft} ${CATEGORY_META[session.category].text}`}
+                  className={`flex items-center gap-1.5 pt-2.5 font-mono text-[10px] tracking-[0.2em] uppercase ${CATEGORY_META[session.category].text}`}
                 >
                   <Repeat className="h-3 w-3" />
                   {blocks.length > 1 ? `Bloc ${bi + 1}` : 'Circuit'}
                   {b.rounds > 1 ? ` · × ${b.rounds} tours` : ''}
                 </p>
               )}
-              {b.items.map((it, i) => {
-                const ex = exOf(it.exerciseId)
-                return (
-                  <div
-                    key={i}
-                    className={'flex items-center justify-between gap-2 px-4 py-2.5 ' + (i > 0 ? 'border-t border-surface' : '')}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1.5 text-sm font-bold">
-                        <span className="min-w-0 truncate">{ex?.name ?? 'Exercice'}</span>
-                        {it.linkNext && <Link2 className="h-3 w-3 shrink-0 text-muscu" />}
-                      </p>
-                      {it.comment && (
-                        <p className="flex items-center gap-1 text-xs font-semibold text-ink-soft">
-                          <Lightbulb className="h-3 w-3 shrink-0" />
-                          <span className="min-w-0 truncate">{it.comment}</span>
-                        </p>
-                      )}
-                    </div>
-                    <span className="shrink-0 text-xs font-extrabold text-ink-soft">
-                      {isMuscu
-                        ? itemSummary(it, ex)
-                        : // Étirements : « 2 × 30 s » quand la posture se fait des deux côtés
-                          ((it.sets ?? 1) > 1 ? `${it.sets} × ` : '') +
-                          (ex?.measure === 'reps' ? `${it.target ?? 10} reps` : `${it.durationSec ?? 30} s`)}
-                    </span>
-                  </div>
-                )
-              })}
+              <div className="divide-y divide-hairline">
+                {b.items.map((it, i) => {
+                  const ex = exOf(it.exerciseId)
+                  const t = itemTarget(it, ex, isStretch)
+                  return (
+                    <ProgramRow
+                      key={i}
+                      name={ex?.name ?? 'Exercice'}
+                      comment={it.comment}
+                      linkNext={it.linkNext}
+                      videoUrl={ex?.videoUrl}
+                      value={t.value}
+                      unit={t.unit}
+                    />
+                  )
+                })}
+              </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {lastLog && (
+        <div className="border-t border-hairline pt-3.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
+              Dernière fois · {relativeDayFr(lastLog.date)}
+            </p>
+            {feelingOf(lastLog.feeling) && (
+              <span className="text-lg" title={feelingOf(lastLog.feeling)!.label}>
+                {feelingOf(lastLog.feeling)!.emoji}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-sm font-extrabold text-ink">{lastPerfLine(lastLog, session, exercises)}</p>
+          {lastStop && <p className="mt-0.5 text-xs font-semibold text-ink-soft">{lastDetailLine(lastLog)}</p>}
+          {lastLog.note && (
+            <p className="mt-0.5 text-xs font-semibold italic text-ink-soft">« {lastLog.note} »</p>
+          )}
         </div>
       )}
 
@@ -386,14 +513,9 @@ function Inner({ session: planned, onClose, date }: { session: Session; onClose:
       {!isFuture && !entering && hasTimer && (
         <PrimaryButton onClick={() => navigate(`/player/${session.id}`)}>
           <span className="flex items-center justify-center gap-2">
-            <Play className="h-4 w-4" /> Lancer le minuteur guidé
+            <Play className="h-4 w-4" /> Démarrer
           </span>
         </PrimaryButton>
-      )}
-
-      {/* Muscu/HIIT — saisie du résultat : timeline à curseur (un tap marque où on s'est arrêté) */}
-      {!isFuture && !entering && (isMuscu || isHiit) && session.items.length > 0 && (
-        <GhostButton onClick={() => setEntering(true)}>Entrer le résultat ✓</GhostButton>
       )}
 
       {entering && (
@@ -449,13 +571,16 @@ function Inner({ session: planned, onClose, date }: { session: Session; onClose:
           </PrimaryButton>
         ))}
 
-      <button
-        type="button"
-        onClick={() => (entering ? setEntering(false) : onClose())}
-        className="w-full py-1 text-center text-sm font-bold text-ink-soft active:text-ink"
-      >
-        {entering ? '← Retour à la séance' : 'Fermer sans valider'}
-      </button>
+      {/* La fermeture sans valider passe par la croix ✕ de l'en-tête */}
+      {entering && (
+        <button
+          type="button"
+          onClick={() => setEntering(false)}
+          className="w-full py-1 text-center text-sm font-bold text-ink-soft active:text-ink"
+        >
+          ← Retour à la séance
+        </button>
+      )}
     </div>
   )
 }

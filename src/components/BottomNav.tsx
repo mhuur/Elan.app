@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { CalendarDays, Dumbbell, Route, Sun, TrendingUp } from 'lucide-react'
+import { CalendarDays, Dumbbell, Route, Sun } from 'lucide-react'
 
 const items = [
   { to: '/', label: "Aujourd'hui", icon: Sun },
@@ -7,7 +7,7 @@ const items = [
   { to: '/plan', label: '21K', icon: Route },
   { to: '/library', label: 'Séries', icon: Dumbbell },
   // Onglet « Objectifs » masqué pour l'instant (route /goals conservée) — non utilisé
-  { to: '/progress', label: 'Progrès', icon: TrendingUp },
+  // Onglet « Progrès » supprimé (août 2026, demande utilisateur) — page retirée avec lui
 ]
 
 export default function BottomNav() {
