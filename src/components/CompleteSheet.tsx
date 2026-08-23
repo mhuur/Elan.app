@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Check, ClipboardList, Lightbulb, Link2, MoreVertical, Pencil, Play, Repeat, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, feelingOf, setTargetsOf, type Exercise, type Log, type MetricValue, type Session, type SessionItem } from '../types'
-import { relativeDayFr, todayStr } from '../lib/dates'
+import { formatShortFr, relativeDayFr, todayStr } from '../lib/dates'
 import { lastDetailLine, lastPerfLine } from '../lib/format'
 import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { muscuBlocks } from '../lib/blocks'
@@ -39,12 +39,9 @@ export default function CompleteSheet({
     setMenuOpen(false)
     onClose()
   }
-  const logDate = date ?? todayStr()
+  // Saisie possible même sur une date future (validation anticipée, août 2026)
   const canEnter =
-    !!session &&
-    (session.category === 'muscu' || session.category === 'hiit') &&
-    session.items.length > 0 &&
-    logDate <= todayStr()
+    !!session && (session.category === 'muscu' || session.category === 'hiit') && session.items.length > 0
   return (
     <Sheet
       open={!!session}
@@ -506,7 +503,8 @@ function Inner({
 
       {isFuture && (
         <p className="rounded-2xl bg-sand/60 px-4 py-3 text-sm font-semibold text-ink-soft">
-          📅 Séance à venir — reviens le jour J pour la lancer et enregistrer ton résultat.
+          📅 Séance à venir — le minuteur n'est disponible que le jour J, mais tu peux la valider en
+          avance : elle sera journalisée au {formatShortFr(logDate)}.
         </p>
       )}
 
@@ -534,7 +532,7 @@ function Inner({
         </>
       )}
 
-      {!isFuture && (!isMuscu || entering) && metrics.length > 0 && (
+      {(!isMuscu || entering) && metrics.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
           {metrics.map((d) => (
             <Field key={d.key} label={d.label}>
@@ -549,7 +547,7 @@ function Inner({
         </div>
       )}
 
-      {!isFuture && (entering || (!isMuscu && hasForm)) && (
+      {(entering || (!isMuscu && hasForm)) && (
         <>
           <FeelingPicker value={feeling} onChange={setFeeling} />
           <Field label="Note (optionnel)">
@@ -558,16 +556,17 @@ function Inner({
         </>
       )}
 
-      {entering && <PrimaryButton onClick={() => void save()}>Valider la séance ✓</PrimaryButton>}
+      {entering && (
+        <PrimaryButton onClick={() => void save()}>{isFuture ? 'Valider en avance ✓' : 'Valider la séance ✓'}</PrimaryButton>
+      )}
 
-      {!isFuture &&
-        !isMuscu &&
+      {!isMuscu &&
         !entering &&
         (hasTimer ? (
           <GhostButton onClick={() => void save()}>Marquer comme faite ✓ (sans minuteur)</GhostButton>
         ) : (
           <PrimaryButton onClick={() => void save()}>
-            {hasForm ? 'Valider la séance ✓' : 'Marquer comme faite ✓'}
+            {isFuture ? 'Valider en avance ✓' : hasForm ? 'Valider la séance ✓' : 'Marquer comme faite ✓'}
           </PrimaryButton>
         ))}
 
