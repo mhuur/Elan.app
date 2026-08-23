@@ -210,6 +210,12 @@ export interface Session {
   group?: string
   /** Objectif à atteindre sur une mesure (null = aucun) */
   objective?: SessionObjective | null
+  /**
+   * Échauffement automatique : la séance s'invite dans Aujourd'hui les jours où une
+   * séance de cette catégorie est prévue et pas encore faite — courses du plan semi
+   * comprises (null = jamais). Indépendant de `days`/`repeat`.
+   */
+  warmupFor?: Category | null
   /** Vélo (hérité) : puissance cible en watts */
   targetPowerW?: number
   /** Vélo (hérité) : durée cible en minutes */

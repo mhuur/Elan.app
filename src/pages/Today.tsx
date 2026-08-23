@@ -5,7 +5,7 @@ import { CATEGORIES, CATEGORY_META, feelingOf, type Category, type Log, type Ses
 import { addDays, formatTitleFr, toDateStr } from '../lib/dates'
 import { logSummary, summarizeSession } from '../lib/format'
 import { canonicalCycles, plannedSessionIdsOn } from '../lib/schedule'
-import { isPlanLog, planToDoOn, planWeekFor, type PlanSeanceState } from '../lib/planDay'
+import { isPlanLog, planToDoOn, planWeekFor, warmupsDueOn, type PlanSeanceState } from '../lib/planDay'
 import { planningSections } from '../lib/planningLayout'
 import { usePlanAnchor } from '../lib/usePlanAnchor'
 import { TYPE_META } from '../data/plan'
@@ -79,6 +79,9 @@ export default function Today() {
   const toDoSet = new Set(toDo.map((s) => s.id))
   const sections = planningSections(sessions, !!planInfo, planAnchor)
   const dayItems: DayItem[] = []
+  // Échauffements automatiques (warmupFor) : invités par une séance à faire de leur
+  // catégorie cible, placés en tête — un échauffement se fait avant le reste.
+  for (const s of warmupsDueOn(sessions, planToDo, plannedIds, doneIds)) dayItems.push({ kind: 'session', s })
   for (const sec of sections) {
     if (sec.plan) for (const st of planToDo) dayItems.push({ kind: 'plan', st })
     for (const s of sec.sessions) if (toDoSet.has(s.id)) dayItems.push({ kind: 'session', s })

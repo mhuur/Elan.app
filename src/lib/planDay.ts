@@ -1,4 +1,4 @@
-import type { Log } from '../types'
+import type { Category, Log, Session } from '../types'
 import { PLAN_SEMI, seanceDateStr, type PlanSeance, type PlanWeek } from '../data/plan'
 import { mondayIndex, startOfWeek, toDateStr } from './dates'
 
@@ -55,6 +55,27 @@ export function planWeekStates(week: PlanWeek, logs: Log[]): PlanSeanceState[] {
       doneDate: planLog?.date ?? (freeRun ? date : undefined),
     }
   })
+}
+
+/**
+ * Séances « échauffement automatique » dues ce jour : une séance dont `warmupFor`
+ * désigne une catégorie s'invite les jours où une séance de cette catégorie est à
+ * faire — course du plan semi (`planToDo`) ou séance utilisateur planifiée
+ * (`plannedIds`). Elle disparaît une fois journalisée (elle passe en « Terminées »)
+ * ou quand plus rien ne la déclenche (la séance déclencheuse est faite).
+ */
+export function warmupsDueOn(
+  sessions: Session[],
+  planToDo: PlanSeanceState[],
+  plannedIds: Set<string>,
+  doneIds: Set<string>,
+): Session[] {
+  const dueCats = new Set<Category>()
+  if (planToDo.length) dueCats.add('running')
+  for (const s of sessions) if (plannedIds.has(s.id) && !doneIds.has(s.id)) dueCats.add(s.category)
+  return sessions
+    .filter((s) => s.warmupFor && dueCats.has(s.warmupFor) && !plannedIds.has(s.id) && !doneIds.has(s.id))
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 }
 
 /** Séances du plan dues à `date` et PAS encore faites (to-do d'Aujourd'hui). */

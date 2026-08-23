@@ -147,6 +147,8 @@ export default function SessionForm() {
   const [stretchRounds, setStretchRounds] = useState(existing?.category === 'etirements' ? (existing.rounds ?? 1) : 1)
   const [muscuRounds, setMuscuRounds] = useState(existing?.category === 'muscu' ? (existing.rounds ?? 1) : 1)
   const [group, setGroup] = useState(existing?.group ?? '')
+  // Échauffement automatique : s'inviter dans Aujourd'hui les jours de telle catégorie
+  const [warmupFor, setWarmupFor] = useState<Category | ''>(existing?.warmupFor ?? '')
   // Sheet mobile du sélecteur d'exercices (sur desktop le volet est permanent)
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -427,6 +429,8 @@ export default function SessionForm() {
       links: existing?.links ?? [],
       notes: existing?.notes ?? '',
       group: group.trim(),
+      // Firestore ne supprime pas les champs absents : null pour désactiver
+      warmupFor: warmupFor && warmupFor !== category ? warmupFor : null,
       sortOrder: existing?.sortOrder ?? maxOrder + 1,
       createdAt: existing?.createdAt ?? Date.now(),
       ...(category === 'hiit' ? { workSec, restSec, rounds } : {}),
@@ -675,6 +679,21 @@ export default function SessionForm() {
               </div>
             </div>
           )}
+        </Field>
+
+        <Field label="Échauffement automatique">
+          <Select value={warmupFor} onChange={(v) => setWarmupFor(v as Category | '')}>
+            <option value="">Jamais</option>
+            {CATEGORIES.filter((c) => c !== category).map((c) => (
+              <option key={c} value={c}>
+                Les jours de {CATEGORY_META[c].label}
+              </option>
+            ))}
+          </Select>
+          <p className="mt-1.5 text-xs font-semibold text-ink-soft/70">
+            La séance s'invite dans Aujourd'hui dès qu'une séance de cette catégorie est à faire — courses du
+            plan comprises.
+          </p>
         </Field>
 
         {category === 'hiit' && (
