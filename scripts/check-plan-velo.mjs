@@ -41,10 +41,18 @@ try {
   await page.waitForSelector('[role="dialog"] >> text=130–145')
   await page.click('[role="dialog"] >> text=Valider ma séance')
   await page.waitForSelector('text=Quel jour as-tu fait cette séance')
+  await page.fill('[role="dialog"] input[type="number"]', '138') // FC moyenne (optionnelle)
   await page.click('[role="dialog"] >> text=Valider ✓')
   await page.waitForSelector('[role="dialog"]', { state: 'detached' })
   await page.waitForSelector('h2:has-text("Terminées")')
   await page.waitForSelector('section:has(h2:has-text("Terminées")) >> text=Endurance 50 min')
+  // La FC saisie est bien journalisée avec la séance du plan
+  const bpm = await page.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('elan-data-v1'))
+    const log = d.logs.find((l) => l.planRef === 'elan-velo-2026-08-29')
+    return log?.metrics?.find((m) => m.key === 'bpm')?.value
+  })
+  if (bpm !== 138) throw new Error(`FC moyenne attendue 138, journalisée : ${bpm}`)
   await page.screenshot({ path: `${DIR}/61-plan-velo-validee.png` })
 
   // --- Navigation : semaine du semi (S6) allégée, puis reprise de la progression (S9)

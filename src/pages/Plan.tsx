@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, Bike, Check, ChevronDown, ChevronRight, Footprints, Zap } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { PageHeader, Seg, Sheet } from '../components/ui'
+import { Field, NumInput, PageHeader, Seg, Sheet } from '../components/ui'
 import WorkoutSheet from '../components/WorkoutSheet'
 import { DAY_NAMES, addDays, formatShortFr, mondayIndex, toDateStr, todayStr } from '../lib/dates'
 import {
@@ -411,6 +411,9 @@ function VeloSheet({ st, week, onClose }: { st: VeloSeanceState | null; week: Ve
   const { logs, addLog, removeLog } = useData()
   const [confirming, setConfirming] = useState(false)
   const [date, setDate] = useState('')
+  // FC moyenne de la séance (optionnelle) : c'est elle qui permettra de recalibrer le
+  // plan sur les vraies données, comme les allures du semi le sont sur Strava
+  const [bpm, setBpm] = useState<number | undefined>(undefined)
   if (!st) return null
   const se = st.seance
   const existing = logs.find((l) => l.planRef === st.planRef)
@@ -424,6 +427,7 @@ function VeloSheet({ st, week, onClose }: { st: VeloSeanceState | null; week: Ve
       metrics: [
         { key: 'power', label: 'Résistance', unit: '', value: se.resistance },
         { key: 'duration', label: 'Durée', unit: 'min', value: se.durationMin },
+        ...(bpm != null ? [{ key: 'bpm', label: 'BPM moyen', unit: 'bpm', value: bpm }] : []),
       ],
       note: '',
       createdAt: Date.now(),
@@ -477,6 +481,9 @@ function VeloSheet({ st, week, onClose }: { st: VeloSeanceState | null; week: Ve
               onChange={(e) => setDate(e.target.value || se.date)}
               className="w-full rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-bold text-ink outline-none focus:border-sage-400"
             />
+            <Field label="FC moyenne (optionnel)">
+              <NumInput value={bpm} onChange={setBpm} suffix="bpm" />
+            </Field>
             <button
               type="button"
               onClick={validate}
@@ -613,7 +620,8 @@ function PlanVelo() {
         </section>
       )}
 
-      <VeloSheet st={sheet} week={week} onClose={() => setSheet(null)} />
+      {/* key = la séance ouverte : la date/FC saisies ne fuient pas d'une séance à l'autre */}
+      <VeloSheet key={sheet?.planRef ?? 'aucune'} st={sheet} week={week} onClose={() => setSheet(null)} />
     </div>
   )
 }
