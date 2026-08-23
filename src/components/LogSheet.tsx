@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, type Log } from '../types'
 import { buildTimeline, timelineFromLog, collectSets, type SetStatus } from '../lib/timeline'
+import { DEFAULT_VELO_METRICS, effectiveMetrics } from '../lib/metrics'
 import { CategoryIcon, Field, NumInput, PrimaryButton, Sheet, TextArea } from './ui'
 import FeelingPicker from './FeelingPicker'
 import ResultTimeline from './ResultTimeline'
@@ -100,6 +101,19 @@ function Inner({ log, onClose }: { log: Log; onClose: () => void }) {
     )
   const flagRow = (gi: number) => setStatus((p) => p.map((s, i) => (i === gi ? (s === 'flag' ? 'ok' : 'flag') : s)))
 
+  // Champs de mesures affichés : celles du log FUSIONNÉES avec celles de la séance —
+  // une fiche peut avoir gagné une mesure (Calories, août 2026) après la journalisation,
+  // elle doit rester saisissable sur une séance déjà complétée. Log sans séance (plan
+  // vélo, séance supprimée) : repli sur les mesures vélo par défaut.
+  const metricDefs = useMemo(() => {
+    const sessionDefs = session ? effectiveMetrics(session) : log.category === 'velo' ? DEFAULT_VELO_METRICS : []
+    const defs = (log.metrics ?? []).map((m) => ({ key: m.key, label: m.label, unit: m.unit }))
+    for (const d of sessionDefs) {
+      if (!defs.some((m) => m.key === d.key)) defs.push({ key: d.key, label: d.label, unit: d.unit })
+    }
+    return defs
+  }, [session, log])
+
   // Mesures (vélo / champs perso) : valeurs du log, éditables en place
   const [mvals, setMvals] = useState<Record<string, number | undefined>>(() =>
     Object.fromEntries((log.metrics ?? []).map((m) => [m.key, m.value])),
@@ -112,9 +126,12 @@ function Inner({ log, onClose }: { log: Log; onClose: () => void }) {
   const save = async () => {
     const patch: Partial<Log> = { note: note.trim(), date: logDate }
     if (feeling != null) patch.feeling = feeling
-    if (log.metrics?.length) {
-      patch.metrics = log.metrics.map((m) => ({ ...m, value: mvals[m.key] ?? m.value }))
-    }
+    // Toutes les mesures renseignées, y compris celles ajoutées après coup (un champ vidé disparaît)
+    const mv = metricDefs.flatMap((m) => {
+      const v = mvals[m.key]
+      return v == null ? [] : [{ key: m.key, label: m.label, unit: m.unit, value: v }]
+    })
+    if (mv.length || log.metrics?.length) patch.metrics = mv
     if (hasTimeline && flatRows.length) {
       const seen = new Set<string>()
       patch.results = flatRows
@@ -169,9 +186,9 @@ function Inner({ log, onClose }: { log: Log; onClose: () => void }) {
         </>
       )}
 
-      {(log.metrics?.length ?? 0) > 0 && (
+      {metricDefs.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
-          {(log.metrics ?? []).map((m) => (
+          {metricDefs.map((m) => (
             <Field key={m.key} label={m.label}>
               <NumInput
                 value={mvals[m.key]}
