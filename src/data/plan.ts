@@ -93,8 +93,8 @@ export const PLAN_ZONES: PlanZone[] = [
   // et étagées du calme (vert/bleu) vers l'intense (ambre → orange → corail).
   { label: 'Endurance fondamentale', pace: '5:45–6:05', hr: '140–152', hex: '#86c48e' },
   { label: 'Endurance active', pace: '5:25–5:45', hr: '152–162', hex: '#7fb6dc' },
-  { label: 'Seuil', pace: '5:13–5:25', hr: '162–170', hex: '#f0c060' },
-  { label: 'Allure semi (cible)', pace: '5:08–5:13', hr: '170–173', hex: '#f4956a' },
+  { label: 'Seuil', pace: '5:12–5:20', hr: '162–170', hex: '#f0c060' },
+  { label: 'Allure semi (cible)', pace: '5:20–5:24', hr: '170–173', hex: '#f4956a' },
   { label: 'VMA', pace: '4:35–4:50', hr: '173–186', hex: '#ef7d86' },
 ]
 
@@ -219,10 +219,10 @@ export function workoutStats(w: Workout): { sec: number; distM: number } {
 // Jours : Lundi = 0, Mardi = 1, Mercredi = 2, Jeudi = 3, Vendredi = 4, Samedi = 5, Dimanche = 6
 // (le squelette habituel est mar/mer/ven/dim, les autres jours servent aux semaines refaites)
 export const PLAN_SEMI = {
-  name: 'Plan semi — sub 1h50',
+  name: 'Plan semi — objectif 1h53',
   race: 'Tout Rennes Court',
   raceDate: '2026-10-04',
-  goal: '1h50 · 5:13/km',
+  goal: '1h53 · 5:21/km',
   weeks: [
     { start: '2026-06-08', phase: 'Fondation', label: 'reprise', km: 8, seances: [
       mk(6, 'sl', 'Sortie longue 8 km', '8 km en EF · reprise en douceur', longRun(8, 'démarrage du plan, tout en aisance')),
@@ -316,50 +316,55 @@ export const PLAN_SEMI = {
       mk(4, 'seuil', 'Seuil 2×8 min', '2×8 min à 5:15, récup 2 min', seuilInt(2, 8, '5:15', 120)),
       mk(6, 'sl', 'Sortie longue 12 km', '12 km en EF', longRun(12)),
     ] },
-    { start: '2026-08-24', phase: 'Développement', km: 40, seances: [
+    // Recalibrage du 23/08 (analyse Strava) : le seuil réel tourne à 5:15–5:20 (2×8 min du 12/08
+    // passé à 5:17–5:20, FC 168–175 sous forte chaleur) — l'objectif 1h50 (5:13/km) supposait un
+    // seuil nettement plus rapide que l'actuel. Cible ramenée à 1h53 (5:21/km) : allure spécifique
+    // 5:20, seuil 5:12–5:15, VMA inchangée (8×300 du 20/08 à 4:33–4:43 avec FC ≤ 160, très à l'aise).
+    // Volume plafonné à ~41 km (max réalisé à ce jour : ~32) : dos fragile début août, on lisse la marche.
+    { start: '2026-08-24', phase: 'Développement', km: 37, seances: [
       mk(1, 'vma', 'VMA 6×600 m', '6×600 m à 4:40, récup 1:15', vma(6, 600, '4:40', 75)),
-      mk(2, 'ef', 'Footing 8 km', '8 km en EF', footing(8)),
-      mk(4, 'seuil', 'Seuil 2×10 min', '2×10 min à 5:12, récup 2 min', seuilInt(2, 10, '5:12', 120)),
+      mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
+      mk(4, 'seuil', 'Seuil 2×10 min', '2×10 min à 5:15, récup 2 min', seuilInt(2, 10, '5:15', 120)),
+      mk(6, 'sl', 'Sortie longue 13 km', '11 km EF + 2 km EA', longRunEA(11, 2)),
+    ] },
+    { start: '2026-08-31', phase: 'Développement', km: 40, seances: [
+      mk(1, 'vma', 'VMA 5×800 m', '5×800 m à 4:45, récup 1:30', vma(5, 800, '4:45', 90)),
+      mk(2, 'ef', 'Footing 7 km', '7 km en EF', footing(7)),
+      mk(4, 'seuil', 'Seuil 2×12 min', '2×12 min à 5:15, récup 2 min', seuilInt(2, 12, '5:15', 120)),
       mk(6, 'sl', 'Sortie longue 14 km', '12 km EF + 2 km EA', longRunEA(12, 2)),
     ] },
-    { start: '2026-08-31', phase: 'Développement', km: 43, seances: [
-      mk(1, 'vma', 'VMA 5×800 m', '5×800 m à 4:45, récup 1:30', vma(5, 800, '4:45', 90)),
-      mk(2, 'ef', 'Footing 8 km', '8 km en EF', footing(8)),
-      mk(4, 'seuil', 'Seuil 25 min', '25 min continu à 5:10', seuilContinu(25, '5:10')),
-      mk(6, 'sl', 'Sortie longue 15 km', '13 km EF + 2 km EA', longRunEA(13, 2)),
-    ] },
-    { start: '2026-09-07', phase: 'Spécifique', km: 44, seances: [
+    { start: '2026-09-07', phase: 'Spécifique', km: 42, seances: [
       mk(1, 'vma', 'VMA 5×1000 m', '5×1000 m à 4:48, récup 1:30', vma(5, 1000, '4:48', 90)),
-      mk(2, 'ef', 'Footing 7 km', '7 km en EF', footing(7)),
-      mk(4, 'as', 'Allure semi 3×2 km', '3×2 km à 5:10, récup 2 min', asInt(3, 2000, '5:10', 120)),
-      mk(6, 'sl', 'Sortie longue 16 km', '16 km dont 2×4 km à allure semi', {
+      mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
+      mk(4, 'as', 'Allure semi 3×2 km', '3×2 km à 5:20, récup 2 min', asInt(3, 2000, '5:20', 120)),
+      mk(6, 'sl', 'Sortie longue 15 km', '15 km dont 2×4 km à allure semi', {
         surface: 'route',
         parts: [
-          { kind: 'steady', label: 'EF', distanceM: 4000, pace: EF, hr: HR.ef },
-          { kind: 'work', label: 'Allure semi', distanceM: 4000, pace: p('5:10'), hr: HR.as },
+          { kind: 'steady', label: 'EF', distanceM: 3000, pace: EF, hr: HR.ef },
+          { kind: 'work', label: 'Allure semi', distanceM: 4000, pace: p('5:20'), hr: HR.as },
           { kind: 'recovery', label: 'EF', distanceM: 2000, pace: EF, hr: HR.ef },
-          { kind: 'work', label: 'Allure semi', distanceM: 4000, pace: p('5:10'), hr: HR.as },
+          { kind: 'work', label: 'Allure semi', distanceM: 4000, pace: p('5:20'), hr: HR.as },
           { kind: 'steady', label: 'EF', distanceM: 2000, pace: EF, hr: HR.ef },
         ],
       }),
     ] },
-    { start: '2026-09-14', phase: 'Spécifique', label: 'pic de volume', km: 45, seances: [
+    { start: '2026-09-14', phase: 'Spécifique', label: 'pic de volume', km: 41, seances: [
       mk(1, 'vma', 'VMA 4×1200 m', '4×1200 m à 4:48, récup 2 min', vma(4, 1200, '4:48', 120)),
-      mk(2, 'ef', 'Footing 8 km', '8 km en EF', footing(8)),
-      mk(4, 'seuil', 'Seuil 2×10 min', '2×10 min à 5:10, récup 2:30', seuilInt(2, 10, '5:10', 150)),
-      mk(6, 'sl', 'Répétition générale 17 km', '17 km dont 6 km à allure semi', {
+      mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
+      mk(4, 'seuil', 'Seuil 2×10 min', '2×10 min à 5:12, récup 2:30', seuilInt(2, 10, '5:12', 150)),
+      mk(6, 'sl', 'Répétition générale 16 km', '16 km dont 6 km à allure semi', {
         surface: 'route',
         parts: [
-          { kind: 'steady', label: 'EF', distanceM: 7000, pace: EF, hr: HR.ef },
-          { kind: 'work', label: 'Allure semi', distanceM: 6000, pace: p('5:10'), hr: HR.as, note: 'teste ravito, allure et tenue du jour J' },
+          { kind: 'steady', label: 'EF', distanceM: 6000, pace: EF, hr: HR.ef },
+          { kind: 'work', label: 'Allure semi', distanceM: 6000, pace: p('5:20'), hr: HR.as, note: 'teste ravito, allure et tenue du jour J' },
           { kind: 'steady', label: 'EF', distanceM: 4000, pace: EF, hr: HR.ef },
         ],
       }),
     ] },
-    { start: '2026-09-21', phase: 'Affûtage', km: 33, seances: [
+    { start: '2026-09-21', phase: 'Affûtage', km: 34, seances: [
       mk(1, 'vma', 'VMA 6×400 m', '6×400 m à 4:40, récup 1:00', vma(6, 400, '4:40', 60)),
       mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
-      mk(4, 'as', 'Allure semi 2×2 km', '2×2 km à 5:08, récup 2 min', asInt(2, 2000, '5:08', 120)),
+      mk(4, 'as', 'Allure semi 2×2 km', '2×2 km à 5:18, récup 2 min', asInt(2, 2000, '5:18', 120)),
       mk(6, 'sl', 'Sortie longue 11 km', '11 km en EF', longRun(11)),
     ] },
     { start: '2026-09-28', phase: 'Affûtage', label: 'semaine de course', km: 35, seances: [
@@ -372,13 +377,13 @@ export const PLAN_SEMI = {
         surface: 'route',
         parts: [
           { kind: 'steady', label: 'EF', durationSec: 15 * 60, pace: EF, hr: HR.ef },
-          rep(3, [{ kind: 'work', label: 'Allure semi', durationSec: 60, pace: p('5:08'), hr: HR.as }, { kind: 'recovery', label: 'Lent', durationSec: 60 }]),
+          rep(3, [{ kind: 'work', label: 'Allure semi', durationSec: 60, pace: p('5:20'), hr: HR.as }, { kind: 'recovery', label: 'Lent', durationSec: 60 }]),
           { kind: 'cooldown', label: 'Retour au calme', durationSec: 5 * 60, pace: EF },
         ],
       }),
-      mk(6, 'course', 'Semi-marathon — 21,1 km', 'Tout Rennes Court · objectif 1h50', {
+      mk(6, 'course', 'Semi-marathon — 21,1 km', 'Tout Rennes Court · objectif 1h53', {
         surface: 'route',
-        parts: [{ kind: 'work', label: 'Semi-marathon', distanceM: 21100, pace: p('5:10'), hr: '163–172', note: 'partir à 5:12–5:13, accélérer sur la fin (négatif split)' }],
+        parts: [{ kind: 'work', label: 'Semi-marathon', distanceM: 21100, pace: p('5:21'), hr: '163–172', note: 'partir à 5:25–5:27, accélérer sur la fin (négatif split)' }],
       }),
     ] },
   ] satisfies PlanWeek[],

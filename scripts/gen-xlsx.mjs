@@ -266,14 +266,15 @@ const allureRows = [ah.map((h) => ({ v: h, s: 1 }))]
 const allureSheet = { name: 'Allures & FC', cols: [28, 14, 16, 52], autoFilter: 'A1:D1', rows: allureRows }
 
 // ---------- feuille « Jour J » ----------
-const jh = ['Passage', 'Temps cible (5:10 /km)', 'Consigne']
+// Recalibré le 23/08 (analyse Strava) : seuil réel 5:15–5:20, cible ramenée de 1h50 à 1h53 (5:21/km).
+const jh = ['Passage', 'Temps cible (5:21 /km)', 'Consigne']
 const jourRows = [jh.map((h) => ({ v: h, s: 1 }))]
 ;[
-  ['5 km', '25:50', 'Se caler à 5:12–5:13. Surtout pas plus vite.'],
-  ['10 km', '51:40', 'Verrouiller le 5:10, rester relâché, boire au ravito.'],
-  ['15 km', '1:17:30', 'Tenir. Gel vers 45 min puis 1 h 20 (testés à la rép. générale).'],
-  ['20 km', '1:43:20', 'Si les jambes répondent, accélérer progressivement.'],
-  ['Arrivée — 21,1 km', '1:49:00', 'Objectif < 1h50 avec ~1 min de marge.'],
+  ['5 km', '27:00', 'Se caler à 5:25–5:27. Surtout pas plus vite.'],
+  ['10 km', '53:45', 'Revenir vers 5:21, rester relâché, boire au ravito.'],
+  ['15 km', '1:20:30', 'Tenir. Gel vers 45 min puis 1 h 20 (testés à la rép. générale).'],
+  ['20 km', '1:47:15', 'Si les jambes répondent, accélérer progressivement.'],
+  ['Arrivée — 21,1 km', '1:52:55', 'Objectif < 1h53 (négatif split).'],
 ].forEach((r) => jourRows.push(r.map((v, i) => ({ v, s: i === 0 ? 4 : 2 }))))
 const jourSheet = { name: 'Jour J', cols: [22, 22, 56], autoFilter: 'A1:C1', rows: jourRows }
 
