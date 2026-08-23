@@ -414,6 +414,8 @@ function VeloSheet({ st, week, onClose }: { st: VeloSeanceState | null; week: Ve
   // FC moyenne de la séance (optionnelle) : c'est elle qui permettra de recalibrer le
   // plan sur les vraies données, comme les allures du semi le sont sur Strava
   const [bpm, setBpm] = useState<number | undefined>(undefined)
+  // Calories affichées par le home trainer (optionnelles)
+  const [calories, setCalories] = useState<number | undefined>(undefined)
   if (!st) return null
   const se = st.seance
   const existing = logs.find((l) => l.planRef === st.planRef)
@@ -428,6 +430,7 @@ function VeloSheet({ st, week, onClose }: { st: VeloSeanceState | null; week: Ve
         { key: 'power', label: 'Résistance', unit: '', value: se.resistance },
         { key: 'duration', label: 'Durée', unit: 'min', value: se.durationMin },
         ...(bpm != null ? [{ key: 'bpm', label: 'BPM moyen', unit: 'bpm', value: bpm }] : []),
+        ...(calories != null ? [{ key: 'calories', label: 'Calories', unit: 'kcal', value: calories }] : []),
       ],
       note: '',
       createdAt: Date.now(),
@@ -481,9 +484,14 @@ function VeloSheet({ st, week, onClose }: { st: VeloSeanceState | null; week: Ve
               onChange={(e) => setDate(e.target.value || se.date)}
               className="w-full rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-bold text-ink outline-none focus:border-sage-400"
             />
-            <Field label="FC moyenne (optionnel)">
-              <NumInput value={bpm} onChange={setBpm} suffix="bpm" />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="FC moyenne (optionnel)">
+                <NumInput value={bpm} onChange={setBpm} suffix="bpm" />
+              </Field>
+              <Field label="Calories (optionnel)">
+                <NumInput value={calories} onChange={setCalories} suffix="kcal" />
+              </Field>
+            </div>
             <button
               type="button"
               onClick={validate}
