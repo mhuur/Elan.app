@@ -13,7 +13,7 @@ export function diffDays(fromStr: string, toStr: string): number {
  * semaine appartient à `days` — sert d'indice d'occurrence pour une rotation posée sur
  * des jours de semaine fixes (ex. lun/jeu/sam).
  */
-function countWeekdays(startStr: string, endStr: string, days: number[]): number {
+export function countWeekdays(startStr: string, endStr: string, days: number[]): number {
   const n = diffDays(startStr, endStr)
   if (n <= 0) return 0
   const startWd = mondayIndex(new Date(startStr + 'T12:00:00'))

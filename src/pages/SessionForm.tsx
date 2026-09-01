@@ -38,8 +38,8 @@ import {
   type Measure,
   type SessionItem,
 } from '../types'
-import { DAY_LETTER, DAY_NAMES, todayStr } from '../lib/dates'
-import { canonicalCycles, cycleStepsOf, ownerOf } from '../lib/schedule'
+import { DAY_LETTER, DAY_NAMES, mondayIndex, toDateStr, todayStr } from '../lib/dates'
+import { canonicalCycles, countWeekdays, cycleStepsOf, ownerOf } from '../lib/schedule'
 import { CategoryIcon, Chip, Combobox, Eyebrow, FormActions, PageHeader, Seg, Select, Sheet, Stepper, glassCard } from '../components/ui'
 import ExercisePicker from '../components/ExercisePicker'
 
@@ -162,6 +162,28 @@ const followCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform })
 /** Les trois façons de planifier, à plat (plus de segment dans un segment) */
 type PlanMode = 'weekly' | 'every' | 'weekdays'
 
+/** Prochaine date (aujourd'hui inclus) tombant sur un de ces jours de semaine */
+function nextOccurrenceStr(days: number[]): string {
+  const d = new Date()
+  for (let i = 0; i < 7; i++) {
+    if (days.includes(mondayIndex(d))) return toDateStr(d)
+    d.setDate(d.getDate() + 1)
+  }
+  return todayStr()
+}
+
+/** Date k occurrences (parmi ces jours) avant `fromStr` — l'ancre qui fait tomber l'étape k sur fromStr */
+function backOccurrences(fromStr: string, k: number, days: number[]): string {
+  if (!days.length) return fromStr
+  const d = new Date(fromStr + 'T12:00:00')
+  let left = k
+  while (left > 0) {
+    d.setDate(d.getDate() - 1)
+    if (days.includes(mondayIndex(d))) left--
+  }
+  return toDateStr(d)
+}
+
 export default function SessionForm() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -189,6 +211,13 @@ export default function SessionForm() {
   // Rotation en cours d'édition : un tableau de « jours », chacun regroupant
   // les séances faites ensemble ce jour-là (selfKey = cette séance).
   const [steps, setSteps] = useState<string[][]>(() => (ownerSteps.length ? ownerSteps : [[selfKey]]))
+  // « Commencer par » (alternance) : étape de la rotation qui tombera à la prochaine
+  // occurrence — dérivée de l'ancre stockée pour refléter la phase actuelle du cycle.
+  const [startStep, setStartStep] = useState(() => {
+    const r = cycleOwner?.repeat
+    if (!r?.onDays?.length || ownerSteps.length < 2) return 0
+    return countWeekdays(r.startDate, nextOccurrenceStr(r.onDays), r.onDays) % ownerSteps.length
+  })
   // `comment: ''` (un commentaire ajouté puis laissé vide — Firestore stocke les champs vidés
   // comme '') redevient « pas de commentaire » : le champ ne s'affiche que s'il y a du texte.
   const [items, setItems] = useState<DraftItem[]>(() =>
@@ -438,10 +467,20 @@ export default function SessionForm() {
       .filter((st) => st.length)
     const allIds = cleanSteps.flat()
     const ownerId = cleanSteps[0][0]
+    // « Commencer par » : ne réancre le cycle que si l'étape choisie diffère de la phase
+    // actuelle — sinon l'ancre stockée est conservée (l'historique affiché ne bouge pas).
+    let cycleStart = startDate
+    if (planMode === 'weekdays' && onDays.length && cleanSteps.length > 1) {
+      const d0 = nextOccurrenceStr(onDays)
+      const chosen = startStep % cleanSteps.length
+      if (countWeekdays(startDate, d0, onDays) % cleanSteps.length !== chosen) {
+        cycleStart = backOccurrences(d0, chosen, onDays)
+      }
+    }
     await updateSession(ownerId, {
       repeat: {
         everyDays,
-        startDate,
+        startDate: cycleStart,
         ...(planMode === 'weekdays' && onDays.length ? { onDays: [...onDays].sort((a, b) => a - b) } : {}),
         steps: cleanSteps.map((ids) => ({ ids })),
       },
@@ -532,7 +571,7 @@ export default function SessionForm() {
   // Garde-fou du retour : « Retour » sur une fiche modifiée demandait zéro confirmation et
   // perdait tout en silence. On compare un instantané du formulaire à celui du montage.
   const snapshot = JSON.stringify({
-    name, category, planMode, days, everyDays, startDate, onDays, steps,
+    name, category, planMode, days, everyDays, startDate, onDays, steps, startStep,
     items: items.map(({ uid: _uid, ...rest }) => rest),
     workSec, restSec, rounds, stretchRest, stretchRounds, muscuRounds, group, warmupFor,
   })
@@ -1101,19 +1140,21 @@ export default function SessionForm() {
                 </div>
               )}
 
+              {planMode === 'every' && (
+                <div className={row}>
+                  <span className={rowLabel}>À partir du</span>
+                  {/* Champ natif habillé : le sélecteur reste celui du système (color-scheme: dark) */}
+                  <input
+                    type="date"
+                    aria-label="Date de départ du cycle"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value || todayStr())}
+                    className={miniInput + ' ml-auto px-2.5 text-left [&::-webkit-calendar-picker-indicator]:opacity-60'}
+                  />
+                </div>
+              )}
               {planMode !== 'weekly' && (
                 <>
-                  <div className={row}>
-                    <span className={rowLabel}>À partir du</span>
-                    {/* Champ natif habillé : le sélecteur reste celui du système (color-scheme: dark) */}
-                    <input
-                      type="date"
-                      aria-label="Date de départ du cycle"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value || todayStr())}
-                      className={miniInput + ' ml-auto px-2.5 text-left [&::-webkit-calendar-picker-indicator]:opacity-60'}
-                    />
-                  </div>
                   <div className={row + ' min-h-11'}>
                     <span className={rowLabel}>Rotation</span>
                     <button
@@ -1200,6 +1241,19 @@ export default function SessionForm() {
                       )}
                     </div>
                   ))}
+                  {planMode === 'weekdays' && steps.length > 1 && onDays.length > 0 && (
+                    <div className={row}>
+                      <span className={rowLabel}>Commencer par</span>
+                      <div className="ml-auto">
+                        <Seg
+                          compact
+                          options={steps.map((_, i) => ({ value: String(i), label: `J${i + 1}` }))}
+                          value={String(startStep % steps.length)}
+                          onChange={(v) => setStartStep(Number(v))}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
