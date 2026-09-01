@@ -215,6 +215,10 @@ export default function Planning() {
     [monday, sessions, cycles],
   )
   const doneByDay = weekDates.map((ds) => new Set(logs.filter((l) => l.date === ds && !isPlanLog(l)).map((l) => l.sessionId)))
+  // Une séance non planifiée (ni jours fixes, ni rotation, ni membre d'un cycle)
+  // n'encombre pas la grille : elle n'apparaît que les semaines où elle a été faite.
+  const visibleInWeek = (s: Session) =>
+    s.days.length > 0 || !!s.repeat || !!ownerOf(s.id, sessions, cycles) || doneByDay.some((ids) => ids.has(s.id))
   // Compteur d'en-tête : séances utilisateur planifiées + séances de course du plan de la semaine
   const perWeek = plannedByDay.reduce((a, ids) => a + ids.size, 0) + planStates.length
 
@@ -338,7 +342,7 @@ export default function Planning() {
             <SortableContext items={sectionItems} strategy={verticalListSortingStrategy}>
               {sections.map((sec) => {
                 const g = sec.group
-                const list = sec.sessions
+                const list = sec.sessions.filter(visibleInWeek)
                 // La section « Running » porte les séances du plan (course à pied), typées
                 // par couleur, posées en tête — au-dessus des séances Running de l'utilisateur.
                 const isRun = sec.plan

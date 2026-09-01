@@ -21,10 +21,11 @@ try {
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
-  // Ouvre la fiche de la séance Vélo depuis le Planning
-  await page.getByRole('link', { name: 'Planning', exact: true }).click()
-  await page.waitForSelector('text=Cette semaine')
-  await page.click('button:has-text("appartement")')
+  // Ouvre la fiche de la séance Vélo depuis la Bibliothèque (depuis sept. 2026 la
+  // grille du Planning masque les séances non planifiées, le vélo du seed en est une)
+  await page.getByRole('link', { name: 'Séries' }).click()
+  await page.waitForSelector('text=Bibliothèque')
+  await page.click('text=appartement')
   await page.waitForSelector('text=Planification')
 
   // Un seul choix à trois positions depuis sept. 2026 : « Alternance » = sur des jours de semaine
@@ -36,8 +37,10 @@ try {
   await page.click('[title="Samedi"]')
   await page.screenshot({ path: `${DIR}/49-form-jours-semaine.png` })
 
-  // Enregistre → retour au Planning, le libellé reflète les jours choisis
+  // Enregistre, puis va au Planning : le libellé reflète les jours choisis
   await page.click('text=Enregistrer')
+  await page.waitForSelector('text=Bibliothèque')
+  await page.getByRole('link', { name: 'Planning', exact: true }).click()
   await page.waitForSelector('text=Cette semaine')
   await page.waitForSelector('text=Lun · Jeu · Sam')
   await page.screenshot({ path: `${DIR}/50-planning-jours-semaine.png`, fullPage: true })

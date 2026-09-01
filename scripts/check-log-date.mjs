@@ -23,6 +23,19 @@ try {
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
+  // Depuis sept. 2026, une séance non planifiée n'apparaît pas dans la grille du
+  // Planning : on planifie « Sortie courte » le samedi pour pouvoir taper son rond.
+  await page.evaluate(() => {
+    const raw = localStorage.getItem('elan-data-v1')
+    if (!raw) return
+    const data = JSON.parse(raw)
+    const s = data.sessions.find((x) => x.name === 'Sortie courte')
+    if (s) s.days = [5]
+    localStorage.setItem('elan-data-v1', JSON.stringify(data))
+  })
+  await page.reload()
+  await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
+
   // Valider « Sortie courte » aujourd'hui (samedi 13) via le rond du Planning
   await page.getByRole('link', { name: 'Planning', exact: true }).click()
   await page.waitForSelector('text=Cette semaine')

@@ -19,6 +19,9 @@ page.on('dialog', (d) => d.accept())
 const shot = (name) => page.screenshot({ path: `${DIR}/${name}.png` })
 
 try {
+  // Date figée (mer. 17/06/2026) → déterministe : le tap Planning vise « Lundi »,
+  // forcément passé et sans log quel que soit le jour d'exécution réel.
+  await page.clock.setFixedTime(new Date('2026-06-17T12:00:00'))
   // --- Aujourd'hui : le seed crée la routine matinale planifiée tous les jours
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
@@ -89,11 +92,15 @@ try {
   await page.click('[aria-label="Quitter"]') // confirm auto-accepté
   await page.waitForSelector('text=Séance libre')
 
-  // --- Planning : toucher un rond valide / dévalide la séance ce jour-là (lundi passé)
+  // --- Planning : toucher un rond valide / dévalide la séance ce jour-là (lundi passé).
+  // « Full body » est visible parce que validée plus haut (une séance non planifiée
+  // n'apparaît que les semaines où elle a un log) ; le HIIT, jamais validé, est absent.
   await page.click('text=Planning')
   await page.waitForSelector('text=Cette semaine')
-  await page.click('[aria-label="HIIT — Cardio express — Lundi"]')
-  await page.waitForSelector('[aria-label="HIIT — Cardio express — Lundi"][aria-pressed="true"]')
+  if ((await page.locator('[aria-label^="HIIT — Cardio express"]').count()) > 0)
+    throw new Error('Le HIIT (non planifié, jamais validé) ne devrait pas apparaître dans la grille')
+  await page.click('[aria-label="Muscu — Full body — Lundi"]')
+  await page.waitForSelector('[aria-label="Muscu — Full body — Lundi"][aria-pressed="true"]')
   await shot('08-planning')
 
   // --- Bibliothèque : séances, formulaire de séance épuré

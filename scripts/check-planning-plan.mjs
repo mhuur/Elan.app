@@ -110,6 +110,9 @@ try {
     for (const s of data.sessions) {
       s.group = groupFor(s)
       s.sortOrder = order++
+      // Depuis sept. 2026 la grille masque les séances non planifiées : on donne des
+      // jours fixes aux séances « Cardio » pour que leur section reste visible.
+      if (s.group === 'Cardio') s.days = [s.category === 'velo' ? 0 : 3]
     }
     localStorage.setItem('elan-data-v1', JSON.stringify(data))
   })
