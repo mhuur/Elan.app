@@ -1,4 +1,4 @@
-import type { Session } from '../types'
+import { CATEGORY_META, type Session } from '../types'
 import { DAY_SHORT, mondayIndex, toDateStr } from './dates'
 
 /** Nombre de jours entre deux dates YYYY-MM-DD (positif si to > from) */
@@ -146,5 +146,6 @@ export function describeSchedule(
   }
   if (s.days.length === 7) return 'Tous les jours'
   if (s.days.length) return s.days.map((d) => DAY_SHORT[d]).join(' · ')
+  if (s.warmupFor) return 'Avant chaque ' + CATEGORY_META[s.warmupFor].label
   return 'Non planifiée'
 }

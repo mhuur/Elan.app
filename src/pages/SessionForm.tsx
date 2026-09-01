@@ -160,7 +160,7 @@ const followCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform })
 }
 
 /** Les trois façons de planifier, à plat (plus de segment dans un segment) */
-type PlanMode = 'weekly' | 'every' | 'weekdays'
+type PlanMode = 'weekly' | 'every' | 'weekdays' | 'warmup'
 
 /** Prochaine date (aujourd'hui inclus) tombant sur un de ces jours de semaine */
 function nextOccurrenceStr(days: number[]): string {
@@ -200,10 +200,16 @@ export default function SessionForm() {
   const [name, setName] = useState(existing?.name ?? '')
   const [category, setCategory] = useState<Category>(existing?.category ?? 'muscu')
   const [days, setDays] = useState<number[]>(existing?.days ?? [])
-  // Jours fixes / tous les X jours / alternance sur des jours de semaine — un seul choix.
-  // Les deux derniers écrivent le même `repeat`, seule la cadence change (`onDays`).
+  // Jours fixes / tous les X jours / alternance / avant une autre (warmupFor) — un seul
+  // choix. Intervalle et alternance écrivent le même `repeat`, seule la cadence change.
   const [planMode, setPlanMode] = useState<PlanMode>(
-    cycleOwner ? (cycleOwner.repeat?.onDays?.length ? 'weekdays' : 'every') : 'weekly',
+    cycleOwner
+      ? cycleOwner.repeat?.onDays?.length
+        ? 'weekdays'
+        : 'every'
+      : existing?.warmupFor && !existing.days.length
+        ? 'warmup'
+        : 'weekly',
   )
   const [everyDays, setEveryDays] = useState(cycleOwner?.repeat?.everyDays ?? 2)
   const [startDate, setStartDate] = useState(cycleOwner?.repeat?.startDate ?? todayStr())
@@ -432,7 +438,7 @@ export default function SessionForm() {
   const applySchedule = async (selfId: string) => {
     const byId = (sid: string) => sessions.find((x) => x.id === sid)
 
-    if (planMode === 'weekly') {
+    if (planMode === 'weekly' || planMode === 'warmup') {
       // Je quitte le cycle éventuel ; il continue sans moi
       const rest = ownerSteps.map((st) => st.filter((x) => x !== selfId && !!byId(x))).filter((st) => st.length)
       const restIds = rest.flat()
@@ -528,7 +534,7 @@ export default function SessionForm() {
       notes: existing?.notes ?? '',
       group: group.trim(),
       // Firestore ne supprime pas les champs absents : null pour désactiver
-      warmupFor: warmupFor && warmupFor !== category ? warmupFor : null,
+      warmupFor: planMode === 'warmup' && warmupFor && warmupFor !== category ? warmupFor : null,
       sortOrder: existing?.sortOrder ?? maxOrder + 1,
       createdAt: existing?.createdAt ?? Date.now(),
       ...(category === 'hiit' ? { workSec, restSec, rounds } : {}),
@@ -587,10 +593,7 @@ export default function SessionForm() {
     else setPickerOpen(true)
   }
 
-  const optionsSummary = [
-    group.trim() || 'Aucune section',
-    'échauffement : ' + (warmupFor ? `les jours de ${CATEGORY_META[warmupFor].label}` : 'jamais'),
-  ].join(' · ')
+  const optionsSummary = group.trim() || 'Aucune section'
 
   return (
     // Avec des exercices à composer, l'écran passe en deux colonnes dès `lg` :
@@ -1101,12 +1104,17 @@ export default function SessionForm() {
                 <Seg
                   compact
                   options={[
-                    { value: 'weekly' as const, label: 'Jours fixes' },
+                    { value: 'weekly' as const, label: 'Jours fixes', short: 'Jours' },
                     { value: 'every' as const, label: 'Tous les X jours', short: 'Tous les X j.' },
                     { value: 'weekdays' as const, label: 'Alternance' },
+                    { value: 'warmup' as const, label: 'Avant une autre', short: 'Avant' },
                   ]}
                   value={planMode}
-                  onChange={setPlanMode}
+                  onChange={(v) => {
+                    setPlanMode(v)
+                    // « Avant une autre » sans cible n'a pas de sens : on présélectionne
+                    if (v === 'warmup' && !warmupFor) setWarmupFor(CATEGORIES.find((c) => c !== category) ?? '')
+                  }}
                 />
               </div>
 
@@ -1115,6 +1123,21 @@ export default function SessionForm() {
                   <div className="flex w-full items-center justify-between">
                     {DAY_LETTER.map((_, d) => (
                       <DayButton key={d} d={d} on={days.includes(d)} onClick={() => toggleDay(d)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Jumelée : s'invite dans Aujourd'hui les jours où une séance de la
+                  catégorie cible est due (courses du plan comprises) — pas de jour propre */}
+              {planMode === 'warmup' && (
+                <div className={row + ' min-h-14'}>
+                  <span className={rowLabel}>Avant chaque</span>
+                  <div className="ml-auto flex flex-wrap justify-end gap-1.5">
+                    {CATEGORIES.filter((c) => c !== category).map((c) => (
+                      <Chip key={c} active={warmupFor === c} onClick={() => setWarmupFor(c)}>
+                        {CATEGORY_META[c].label}
+                      </Chip>
                     ))}
                   </div>
                 </div>
@@ -1153,7 +1176,7 @@ export default function SessionForm() {
                   />
                 </div>
               )}
-              {planMode !== 'weekly' && (
+              {(planMode === 'every' || planMode === 'weekdays') && (
                 <>
                   <div className={row + ' min-h-11'}>
                     <span className={rowLabel}>Rotation</span>
@@ -1286,19 +1309,6 @@ export default function SessionForm() {
                       onSelect={setGroup}
                       placeholder="Optionnel…"
                     />
-                  </div>
-                </div>
-                <div className="space-y-2.5 border-t border-hairline px-4 py-3">
-                  <span className={rowLabel}>Échauffement automatique</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Chip active={!warmupFor} onClick={() => setWarmupFor('')}>
-                      Jamais
-                    </Chip>
-                    {CATEGORIES.filter((c) => c !== category).map((c) => (
-                      <Chip key={c} active={warmupFor === c} onClick={() => setWarmupFor(c)}>
-                        {CATEGORY_META[c].label}
-                      </Chip>
-                    ))}
                   </div>
                 </div>
               </>

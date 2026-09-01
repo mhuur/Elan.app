@@ -368,6 +368,7 @@ export function Chip({ active, onClick, children }: { active: boolean; onClick: 
   return (
     <button
       type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={
         'rounded-full border px-3 py-[5px] font-mono text-[10px] tracking-[0.12em] uppercase transition-colors ' +
