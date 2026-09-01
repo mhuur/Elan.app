@@ -36,7 +36,9 @@ Le `.env` (gitignoré) contient la config Firebase du projet `routine-sport-ca44
 
 ## Déploiement
 
-**Un commit git ne publie RIEN.** La mise en ligne est une étape à part, à faire à chaque fin d'étape puisque l'utilisateur juge sur l'app en ligne :
+**Depuis le 1er septembre 2026, un push sur `main` publie tout seul** : le workflow `.github/workflows/firebase-hosting.yml` (GitHub Actions) fait `npm ci` → reconstruit le `.env` depuis le secret `AVEL_DOTENV` (le `.env` local sans `VAPID_PRIVATE_KEY`) → `npm run build` → `FirebaseExtended/action-hosting-deploy` sur les deux sites, avec le compte de service `github-action-avel@routine-sport-ca440.iam.gserviceaccount.com` (secret `FIREBASE_SERVICE_ACCOUNT`, rôles Hosting Admin / Auth Admin / API Keys Viewer / Cloud Run Viewer — ceux de `firebase init hosting:github`, créés à la main via l'API IAM parce que l'assistant est interactif). Suivi : `gh run list -R mhuur/Sport` / `gh run watch`. ⚠ Une nouvelle variable `VITE_*` dans le `.env` local doit être **reportée dans le secret** (`gh secret set AVEL_DOTENV -R mhuur/Sport < fichier`), sinon la version en ligne ne l'a pas. Un commit **sans push** ne publie toujours rien.
+
+Publication manuelle (secours, ou pour tester sans committer) :
 
 ```
 npm run build

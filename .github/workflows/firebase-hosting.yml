@@ -1,0 +1,50 @@
+# Publication automatique d'Avel sur Firebase Hosting à chaque push sur `main`.
+#
+# Remplace le double-clic sur `publier-l-app.bat` : commit + push = en ligne.
+# Deux secrets GitHub (Settings → Secrets and variables → Actions) :
+#   - AVEL_DOTENV : le contenu du `.env` local SANS la ligne VAPID_PRIVATE_KEY
+#     (les variables VITE_* sont embarquées dans le bundle, comme en local) ;
+#   - FIREBASE_SERVICE_ACCOUNT : la clé JSON du compte de service
+#     github-action-avel@routine-sport-ca440.iam.gserviceaccount.com
+#     (rôles Firebase Hosting Admin, Firebase Auth Admin, API Keys Viewer, Cloud Run Viewer —
+#     ceux que `firebase init hosting:github` accorde).
+# `firebase deploy --only hosting` publie les DEUX sites de firebase.json (avel + routine-sport-ca440).
+name: Publier sur Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Un seul déploiement à la fois ; un push pendant un déploiement annule le précédent
+concurrency:
+  group: firebase-hosting
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Le `.env` est gitignoré : on le reconstruit depuis le secret avant le build
+      - name: Écrire le .env
+        run: printf '%s\n' "$AVEL_DOTENV" > .env
+        env:
+          AVEL_DOTENV: ${{ secrets.AVEL_DOTENV }}
+
+      - run: npm run build
+
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: routine-sport-ca440
+          channelId: live
