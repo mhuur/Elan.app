@@ -1073,8 +1073,7 @@ export default function SessionForm() {
 
               {planMode === 'weekly' && (
                 <div className={row + ' min-h-14'}>
-                  <span className={rowLabel}>Jours</span>
-                  <div className="ml-auto flex gap-1.5">
+                  <div className="flex w-full items-center justify-between">
                     {DAY_LETTER.map((_, d) => (
                       <DayButton key={d} d={d} on={days.includes(d)} onClick={() => toggleDay(d)} />
                     ))}
@@ -1094,8 +1093,7 @@ export default function SessionForm() {
 
               {planMode === 'weekdays' && (
                 <div className={row + ' min-h-14'}>
-                  <span className={rowLabel}>Sur ces jours</span>
-                  <div className="ml-auto flex gap-1.5">
+                  <div className="flex w-full items-center justify-between">
                     {DAY_LETTER.map((_, d) => (
                       <DayButton key={d} d={d} on={onDays.includes(d)} onClick={() => toggleOnDay(d)} />
                     ))}
