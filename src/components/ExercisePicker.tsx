@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Check, Plus } from 'lucide-react'
+import { useState, type RefObject } from 'react'
+import { Check, Plus, Search } from 'lucide-react'
 import { PRESET_SUBTYPES, subtypesOf, type Category, type Exercise, type Measure } from '../types'
 import { Seg } from './ui'
 
@@ -44,6 +44,7 @@ export default function ExercisePicker({
   counts,
   onAdd,
   onCreate,
+  searchRef,
 }: {
   /** Exercices de la catégorie de la séance uniquement */
   exercises: Exercise[]
@@ -52,6 +53,8 @@ export default function ExercisePicker({
   counts: Map<string, number>
   onAdd: (exId: string) => void
   onCreate: (draft: { name: string; subtype: string; measure: Measure }) => void
+  /** Le champ de recherche, pour lui donner le focus depuis le formulaire (volet desktop) */
+  searchRef?: RefObject<HTMLInputElement | null>
 }) {
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
@@ -86,16 +89,20 @@ export default function ExercisePicker({
 
   return (
     <div className="flex min-h-0 flex-col">
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={`Rechercher ou créer…`}
-        aria-label="Rechercher un exercice"
-        className="w-full shrink-0 rounded-sm border border-hairline bg-shoal px-4 py-3 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
-      />
+      <div className="relative shrink-0">
+        <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink/45" />
+        <input
+          ref={searchRef}
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={`Rechercher ou créer…`}
+          aria-label="Rechercher un exercice"
+          className="w-full rounded-sm border border-hairline bg-shoal py-2.5 pr-3 pl-9 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
+        />
+      </div>
 
-      <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto">
+      <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto [scrollbar-color:rgb(255_255_255/0.2)_transparent] [scrollbar-width:thin]">
         {subtypeGroups(visible).map(([subtype, exos]) => (
           <section key={subtype || '—'}>
             <p className="mb-1 px-1 font-mono text-[9px] tracking-[0.18em] uppercase text-sage-500">
@@ -110,13 +117,12 @@ export default function ExercisePicker({
                     type="button"
                     onClick={() => onAdd(e.id)}
                     className={
-                      'flex w-full items-center gap-2 px-1 py-2 text-left active:bg-glass ' +
+                      'flex min-h-10 w-full items-center gap-2 px-1 text-left active:bg-glass ' +
                       (i > 0 ? 'border-t border-hairline' : '')
                     }
                   >
-                    <span className="min-w-0 flex-1 truncate font-display text-lg leading-none font-bold uppercase">
-                      {e.name}
-                    </span>
+                    {/* Même police que la liste de la séance : un exercice a une seule tête, des deux côtés */}
+                    <span className="min-w-0 flex-1 truncate text-[15px] font-bold text-ink">{e.name}</span>
                     {e.measure === 'sec' && (
                       <span className="shrink-0 rounded-full border border-hairline px-2 py-[3px] font-mono text-[8px] tracking-[0.1em] uppercase text-ink/60">
                         sec

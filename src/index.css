@@ -132,6 +132,14 @@ body {
   color: var(--color-ink);
 }
 
+/* Popup natif des <select> : sous Windows, Chrome ignore `color-scheme` pour la liste
+   déroulante et y fait hériter le texte écume sur un fond clair — illisible. On fixe
+   les deux couleurs des options (fond `shoal`, comme les champs de saisie). */
+select option {
+  background-color: var(--color-shoal);
+  color: var(--color-ink);
+}
+
 /* Masque les flèches des champs numériques */
 input[type='number'] {
   -moz-appearance: textfield;

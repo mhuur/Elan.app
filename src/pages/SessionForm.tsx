@@ -14,27 +14,57 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS, getEventCoordinates } from '@dnd-kit/utilities'
-import { ChevronDown, ExternalLink, GripVertical, LayoutGrid, Link2, MessageSquare, MessageSquarePlus, Plus, Repeat, SlidersHorizontal, Timer, X } from 'lucide-react'
+import {
+  ChevronDown,
+  FileText,
+  GripVertical,
+  LayoutGrid,
+  Link2,
+  Merge,
+  MessageSquarePlus,
+  Play,
+  Plus,
+  SlidersHorizontal,
+  Star,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { useData } from '../data/DataContext'
 import {
   CATEGORIES,
   CATEGORY_META,
   setTargetsOf,
-  subtypesOf,
   type Category,
   type Measure,
   type SessionItem,
 } from '../types'
 import { DAY_LETTER, DAY_NAMES, todayStr } from '../lib/dates'
 import { canonicalCycles, cycleStepsOf, ownerOf } from '../lib/schedule'
-import { CategoryIcon, Combobox, Eyebrow, Fab, Field, FormActions, PageHeader, Seg, Select, Sheet, Stepper, TextInput, glassCard } from '../components/ui'
+import { CategoryIcon, Chip, Combobox, Eyebrow, FormActions, PageHeader, Seg, Select, Sheet, Stepper, glassCard } from '../components/ui'
 import ExercisePicker from '../components/ExercisePicker'
 
-const smallInput =
-  'rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
+/* ── Vocabulaire de l'écran (maquette « Fiche séance », direction B, sept. 2026) ─────
+ * Une carte de verre par section, des RANGÉES de 48 px « libellé mono à gauche, valeur
+ * à droite », un filet entre les rangées. Les rangées portent leur `border-t` elles-mêmes
+ * (pas de `divide-y`) parce que le drag & drop intercale des enveloppes entre la carte et
+ * ses lignes. Toutes les actions de ligne sont des ICÔNES dans un carré à filet.
+ */
+const card = glassCard
+const row = 'flex min-h-12 items-center gap-3 border-t border-hairline px-4'
+const rowLabel = 'shrink-0 font-mono text-[10px] tracking-[0.14em] uppercase text-ink-soft'
+const iconBtn =
+  'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-hairline-strong bg-glass-soft text-ink/70 active:bg-glass'
+const iconBtnOn = 'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-ink bg-ink text-onaccent'
+const iconBtnDanger =
+  'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-hiit/40 text-hiit active:bg-hiit/10'
+const miniInput =
+  'h-[30px] rounded-sm border border-hairline bg-glass-sunken text-center font-mono text-xs font-bold tabular-nums text-ink outline-none focus:border-sage-500'
+/** Bascule reps / secondes : une valeur, pas une action — d'où la pilule texte */
+const togglePill =
+  'h-[30px] rounded-sm border border-hairline-strong px-2 font-mono text-[10px] font-bold tracking-[0.12em] uppercase text-ink/70 active:bg-glass'
 
 /** Petit champ numérique à saisie directe (plus compact que le Stepper dans les listes) */
-function MiniNum({ value, onChange, min = 0, max = 990 }: { value: number; onChange: (v: number) => void; min?: number; max?: number }) {
+function MiniNum({ value, onChange, min = 0, max = 990, label }: { value: number; onChange: (v: number) => void; min?: number; max?: number; label?: string }) {
   const [text, setText] = useState(String(value))
   const editingRef = useRef(false)
   useEffect(() => {
@@ -48,6 +78,7 @@ function MiniNum({ value, onChange, min = 0, max = 990 }: { value: number; onCha
     <input
       type="text"
       inputMode="numeric"
+      aria-label={label}
       value={text}
       onFocus={(e) => {
         editingRef.current = true
@@ -61,8 +92,26 @@ function MiniNum({ value, onChange, min = 0, max = 990 }: { value: number; onCha
         editingRef.current = false
         setText(String(value))
       }}
-      className="w-11 rounded-lg border border-sand bg-sage-50/60 py-1 text-center text-sm font-extrabold tabular-nums outline-none focus:border-sage-400 focus:bg-shoal"
+      className={miniInput + ' w-9'}
     />
+  )
+}
+
+/** Case de jour de semaine (jours fixes ou jours de l'alternance) */
+function DayButton({ d, on, onClick }: { d: number; on: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      title={DAY_NAMES[d]}
+      aria-pressed={on}
+      onClick={onClick}
+      className={
+        'flex h-9 w-9 items-center justify-center rounded-sm border font-mono text-[11px] font-bold transition-colors ' +
+        (on ? 'border-ink bg-ink text-onaccent' : 'border-hairline-strong text-ink/60 active:bg-glass')
+      }
+    >
+      {DAY_LETTER[d]}
+    </button>
   )
 }
 
@@ -110,6 +159,9 @@ const followCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform })
   }
 }
 
+/** Les trois façons de planifier, à plat (plus de segment dans un segment) */
+type PlanMode = 'weekly' | 'every' | 'weekdays'
+
 export default function SessionForm() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -126,11 +178,13 @@ export default function SessionForm() {
   const [name, setName] = useState(existing?.name ?? '')
   const [category, setCategory] = useState<Category>(existing?.category ?? 'muscu')
   const [days, setDays] = useState<number[]>(existing?.days ?? [])
-  const [scheduleMode, setScheduleMode] = useState<'weekly' | 'interval'>(cycleOwner ? 'interval' : 'weekly')
+  // Jours fixes / tous les X jours / alternance sur des jours de semaine — un seul choix.
+  // Les deux derniers écrivent le même `repeat`, seule la cadence change (`onDays`).
+  const [planMode, setPlanMode] = useState<PlanMode>(
+    cycleOwner ? (cycleOwner.repeat?.onDays?.length ? 'weekdays' : 'every') : 'weekly',
+  )
   const [everyDays, setEveryDays] = useState(cycleOwner?.repeat?.everyDays ?? 2)
   const [startDate, setStartDate] = useState(cycleOwner?.repeat?.startDate ?? todayStr())
-  // Cadence du cycle d'alternance : « tous les X jours » ou sur des jours de semaine fixes
-  const [intervalKind, setIntervalKind] = useState<'every' | 'weekdays'>(cycleOwner?.repeat?.onDays?.length ? 'weekdays' : 'every')
   const [onDays, setOnDays] = useState<number[]>(cycleOwner?.repeat?.onDays ?? [])
   // Rotation en cours d'édition : un tableau de « jours », chacun regroupant
   // les séances faites ensemble ce jour-là (selfKey = cette séance).
@@ -151,6 +205,10 @@ export default function SessionForm() {
   const [warmupFor, setWarmupFor] = useState<Category | ''>(existing?.warmupFor ?? '')
   // Sheet mobile du sélecteur d'exercices (sur desktop le volet est permanent)
   const [pickerOpen, setPickerOpen] = useState(false)
+  // Section du planning + échauffement : options de niche, repliées derrière leur résumé
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  // Sur desktop, « + Ajouter un exercice » envoie le focus dans la recherche du volet
+  const searchRef = useRef<HTMLInputElement | null>(null)
 
   // Sections déjà utilisées dans le planning, proposées dans la combobox
   const groupSuggestions = [...new Set(sessions.map((s) => (s.group ?? '').trim()).filter(Boolean))].sort((a, b) =>
@@ -179,6 +237,7 @@ export default function SessionForm() {
   const canBlocks = category === 'muscu' || category === 'etirements'
   const hasBreaks = canBlocks && items.some((it, i) => i > 0 && it.blockBreak)
   const catMeta = CATEGORY_META[category]
+  const itemWord = category === 'etirements' ? 'posture' : 'exercice'
   // Groupes de blocs pour l'affichage et le drag & drop (un seul bloc si pas de découpage)
   const blocksArr: DraftItem[][] = []
   items.forEach((it, i) => {
@@ -279,10 +338,10 @@ export default function SessionForm() {
   // hauteurs uniformes → les échanges deviennent progressifs au lieu de sauter de la hauteur
   // d'une carte pleine, et la liste entière reste visible pour viser.
   const [dragId, setDragId] = useState<string | null>(null)
-  // Cartes repliées par défaut, une seule dépliée à la fois, au CLIC partout — le survol
+  // Lignes repliées par défaut, une seule dépliée à la fois, au CLIC partout — le survol
   // ouvrait les cartes au passage de la souris et faisait danser le layout (abandonné
-  // août 2026). Le dépli se justifie par ce que la ligne repliée ne montre pas :
-  // consignes de l'exercice, lien démo, accès à sa fiche.
+  // août 2026). La ligne repliée = poignée + nom (+ commentaire) + résumé ; tout le reste
+  // (réglages, actions, infos de l'exercice) n'apparaît qu'une fois dépliée.
   const [openUid, setOpenUid] = useState<string | null>(null)
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -344,7 +403,7 @@ export default function SessionForm() {
   const applySchedule = async (selfId: string) => {
     const byId = (sid: string) => sessions.find((x) => x.id === sid)
 
-    if (scheduleMode === 'weekly') {
+    if (planMode === 'weekly') {
       // Je quitte le cycle éventuel ; il continue sans moi
       const rest = ownerSteps.map((st) => st.filter((x) => x !== selfId && !!byId(x))).filter((st) => st.length)
       const restIds = rest.flat()
@@ -383,7 +442,7 @@ export default function SessionForm() {
       repeat: {
         everyDays,
         startDate,
-        ...(intervalKind === 'weekdays' && onDays.length ? { onDays: [...onDays].sort((a, b) => a - b) } : {}),
+        ...(planMode === 'weekdays' && onDays.length ? { onDays: [...onDays].sort((a, b) => a - b) } : {}),
         steps: cleanSteps.map((ids) => ({ ids })),
       },
     })
@@ -420,7 +479,7 @@ export default function SessionForm() {
     const data = {
       name: name.trim() || 'Séance',
       category,
-      days: scheduleMode === 'weekly' ? days : [],
+      days: planMode === 'weekly' ? days : [],
       // La planification par cycle est réécrite par applySchedule ci-dessous
       repeat: null,
       items: hasItems ? items.map(({ uid: _uid, ...rest }) => rest) : [],
@@ -470,6 +529,30 @@ export default function SessionForm() {
     navigate('/library', { replace: true })
   }
 
+  // Garde-fou du retour : « Retour » sur une fiche modifiée demandait zéro confirmation et
+  // perdait tout en silence. On compare un instantané du formulaire à celui du montage.
+  const snapshot = JSON.stringify({
+    name, category, planMode, days, everyDays, startDate, onDays, steps,
+    items: items.map(({ uid: _uid, ...rest }) => rest),
+    workSec, restSec, rounds, stretchRest, stretchRounds, muscuRounds, group, warmupFor,
+  })
+  const initialRef = useRef<string | null>(null)
+  if (initialRef.current === null) initialRef.current = snapshot
+  const back = () => {
+    if (snapshot === initialRef.current || window.confirm('Abandonner les modifications ?')) navigate(-1)
+  }
+
+  const addFromList = () => {
+    // Desktop (≥ lg) : le volet est déjà là, on y envoie le focus ; mobile : la Sheet
+    if (window.matchMedia('(min-width: 64rem)').matches && searchRef.current) searchRef.current.focus()
+    else setPickerOpen(true)
+  }
+
+  const optionsSummary = [
+    group.trim() || 'Aucune section',
+    'échauffement : ' + (warmupFor ? `les jours de ${CATEGORY_META[warmupFor].label}` : 'jamais'),
+  ].join(' · ')
+
   return (
     // Avec des exercices à composer, l'écran passe en deux colonnes dès `lg` :
     // formulaire à gauche, banque d'exercices en volet permanent à droite —
@@ -484,135 +567,577 @@ export default function SessionForm() {
       }
     >
       <div className="min-w-0">
-        <PageHeader title={existing ? 'Modifier la séance' : 'Nouvelle séance'} onBack={() => navigate(-1)} />
+        <PageHeader title={existing ? 'Modifier la séance' : 'Nouvelle séance'} onBack={back} />
 
-        <div className="space-y-4 px-5 pb-2">
-        <Field label="Nom">
-          <TextInput value={name} onChange={setName} placeholder="Ex. HIIT du mardi" />
-        </Field>
-
-        <div className="grid grid-cols-2 gap-2.5">
-          <Field label="Catégorie">
-            <Select value={category} onChange={(v) => switchCategory(v as Category)}>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {CATEGORY_META[c].label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Section du planning">
-            <Combobox
-              small
-              value={group}
-              onChange={setGroup}
-              options={groupSuggestions.map((g) => ({ id: g, label: g }))}
-              onSelect={setGroup}
-              placeholder="Optionnel…"
-            />
-          </Field>
-        </div>
-
-        <Field label="Planification">
-          <Seg
-            options={[
-              { value: 'weekly' as const, label: 'Jours fixes' },
-              { value: 'interval' as const, label: 'Tous les X jours' },
-            ]}
-            value={scheduleMode}
-            onChange={setScheduleMode}
-          />
-          {scheduleMode === 'weekly' ? (
-            <div className="mt-2 flex gap-1.5">
-              {DAY_LETTER.map((letter, d) => (
-                <button
-                  key={d}
-                  type="button"
-                  title={DAY_NAMES[d]}
-                  onClick={() => toggleDay(d)}
-                  className={
-                    'h-10 flex-1 rounded-xl text-sm font-extrabold transition-colors ' +
-                    (days.includes(d) ? 'bg-sage-500 text-onaccent shadow-sm' : 'bg-sage-100 text-sage-700')
-                  }
-                >
-                  {letter}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-3 space-y-3">
-              <Seg
-                options={[
-                  { value: 'every' as const, label: 'Tous les X jours' },
-                  { value: 'weekdays' as const, label: 'Jours de semaine' },
-                ]}
-                value={intervalKind}
-                onChange={setIntervalKind}
+        <div className="space-y-5 px-5 pb-2">
+          {/* ── Nom + catégorie ── */}
+          <div className={card}>
+            <div className={row + ' border-t-0'}>
+              <label htmlFor="session-name" className={rowLabel}>
+                Nom
+              </label>
+              <input
+                id="session-name"
+                type="text"
+                value={name}
+                placeholder="Ex. HIIT du mardi"
+                onChange={(e) => setName(e.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-right text-[15px] font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink/40"
               />
-              {intervalKind === 'every' ? (
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm font-semibold text-ink-soft">
-                  <span>Tous les</span>
-                  <MiniNum value={everyDays} onChange={setEveryDays} min={1} max={30} />
-                  <span>jour{everyDays > 1 ? 's' : ''}</span>
-                </div>
-              ) : (
-                <div>
-                  <div className="flex gap-1.5">
-                    {DAY_LETTER.map((letter, d) => (
-                      <button
-                        key={d}
-                        type="button"
-                        title={DAY_NAMES[d]}
-                        onClick={() => toggleOnDay(d)}
-                        className={
-                          'h-10 flex-1 rounded-xl text-sm font-extrabold transition-colors ' +
-                          (onDays.includes(d) ? 'bg-sage-500 text-onaccent shadow-sm' : 'bg-sage-100 text-sage-700')
-                        }
-                      >
-                        {letter}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-1.5 text-xs font-semibold text-ink-soft/70">
-                    L'alternance se pose sur ces jours — pratique pour éviter les jours de course.
-                  </p>
-                </div>
-              )}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm font-semibold text-ink-soft">
-                <span>À partir du</span>
-                <input
-                  type="date"
-                  aria-label="Date de départ du cycle"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value || todayStr())}
-                  className="rounded-lg border border-sand bg-shoal px-2 py-1.5 text-xs font-bold text-ink outline-none focus:border-sage-400"
-                />
+            </div>
+            <div className={row}>
+              <span className={rowLabel}>Catégorie</span>
+              {/* Tuiles de catégorie (les codes de CodeTile) — remplace le <select> natif dont le
+                  popup restait illisible sous Windows */}
+              <div className="ml-auto flex gap-1">
+                {CATEGORIES.map((c) => {
+                  const m = CATEGORY_META[c]
+                  const on = c === category
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      title={m.label}
+                      aria-label={m.label}
+                      aria-pressed={on}
+                      onClick={() => switchCategory(c)}
+                      className={
+                        'flex h-8 w-8 items-center justify-center rounded-xs border font-mono text-[8px] font-bold tracking-[0.06em] uppercase ' +
+                        (on ? '' : 'border-hairline-strong text-ink/50 active:bg-glass')
+                      }
+                      style={on ? { backgroundColor: m.hex + '29', borderColor: m.hex + '66', color: m.hex } : undefined}
+                    >
+                      {m.code}
+                    </button>
+                  )
+                })}
               </div>
-              <div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-ink-soft">
-                    Rotation <span className="text-ink-soft/50">— on recommence après le dernier jour</span>
-                  </p>
+            </div>
+          </div>
+
+          {/* ── Exercices ── */}
+          {hasItems && (
+            <div className="space-y-2">
+              <Eyebrow className="ml-1 text-ink/60">
+                {category === 'etirements' ? 'Postures de la routine' : 'Exercices de la séance'}
+              </Eyebrow>
+              <div className={card}>
+                {/* En-tête : compte + réglages de la séance (tours, effort/repos, transition) */}
+                <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-1.5">
+                  <span className={rowLabel + ' text-ink/45'}>
+                    {items.length} {itemWord}
+                    {items.length > 1 ? 's' : ''}
+                    {hasBreaks ? ` · ${blocksArr.length} blocs` : ''}
+                  </span>
+                  <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    {category === 'muscu' && !hasBreaks && (
+                      <span className="flex items-center gap-2" title="Tours du circuit">
+                        <span className={rowLabel}>Tours</span>
+                        <Stepper value={muscuRounds} onChange={setMuscuRounds} min={1} max={10} small />
+                      </span>
+                    )}
+                    {category === 'hiit' && (
+                      <>
+                        <span className="flex items-center gap-1.5">
+                          <span className={rowLabel}>Effort</span>
+                          <MiniNum value={workSec} onChange={setWorkSec} min={5} max={600} label="Secondes d'effort" />
+                          <span className={rowLabel}>s</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className={rowLabel}>Repos</span>
+                          <MiniNum value={restSec} onChange={setRestSec} min={0} max={600} label="Secondes de repos" />
+                          <span className={rowLabel}>s</span>
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <span className={rowLabel}>Tours</span>
+                          <Stepper value={rounds} onChange={setRounds} min={1} small />
+                        </span>
+                      </>
+                    )}
+                    {category === 'etirements' && (
+                      <>
+                        {!hasBreaks && (
+                          <span className="flex items-center gap-2" title="Tours de la routine">
+                            <span className={rowLabel}>Tours</span>
+                            <Stepper value={stretchRounds} onChange={setStretchRounds} min={1} max={10} small />
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1.5" title="Transition entre postures">
+                          <span className={rowLabel}>Transition</span>
+                          <MiniNum value={stretchRest} onChange={setStretchRest} min={0} max={120} label="Transition entre postures" />
+                          <span className={rowLabel}>s</span>
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <DndContext
+                  sensors={dndSensors}
+                  collisionDetection={closestCenter}
+                  modifiers={[followCursor]}
+                  // La ligne dépliée se referme au dragStart (les rangées du dessous remontent) :
+                  // re-mesurer les cibles en continu, sinon dnd-kit garde les rects d'avant fermeture
+                  measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+                  onDragStart={(e) => {
+                    setOpenUid(null)
+                    setDragId(String(e.active.id))
+                  }}
+                  onDragCancel={() => setDragId(null)}
+                  onDragEnd={(e) => {
+                    setDragId(null)
+                    onDragEnd(e)
+                  }}
+                >
+                  {/* UN SEUL SortableContext plat (en-têtes de bloc + lignes) : les contexts imbriqués
+                      appliquaient un transform au bloc entier EN PLUS de celui des lignes — d'où les
+                      trous géants et les chevauchements pendant le drag (retour utilisateur août 2026). */}
+                  <SortableContext
+                    items={
+                      hasBreaks
+                        ? blocksArr.flatMap((b) => ['blk-' + b[0].uid, ...b.map((x) => x.uid)])
+                        : items.map((x) => x.uid)
+                    }
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {blocksArr.map((blk, bi) => (
+                      <div key={'blk-' + blk[0].uid}>
+                        {hasBreaks && (
+                          <SortableItem uid={'blk-' + blk[0].uid}>
+                            {(blockDrag) => (
+                              <div className={`flex min-h-10 items-center gap-2.5 border-t border-hairline px-4 ${catMeta.soft}`}>
+                                <button
+                                  type="button"
+                                  aria-label={`Déplacer le bloc ${bi + 1}`}
+                                  {...blockDrag.attributes}
+                                  {...blockDrag.listeners}
+                                  className="-ml-1.5 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
+                                >
+                                  <GripVertical className="h-4 w-4" />
+                                </button>
+                                <span className={`font-mono text-[10px] font-bold tracking-[0.16em] uppercase ${catMeta.text}`}>
+                                  Bloc {bi + 1}
+                                </span>
+                                <div className="ml-auto flex items-center gap-2">
+                                  <span className={rowLabel}>Tours</span>
+                                  <Stepper
+                                    small
+                                    value={items[blockStarts[bi]]?.blockRounds ?? 1}
+                                    onChange={(v) => setItem(blockStarts[bi], { blockRounds: v })}
+                                    min={1}
+                                    max={10}
+                                  />
+                                  {bi > 0 && (
+                                    <button
+                                      type="button"
+                                      aria-label="Fusionner avec le bloc précédent"
+                                      title="Fusionner avec le bloc précédent"
+                                      onClick={() => setItem(blockStarts[bi], { blockBreak: false })}
+                                      className={iconBtn + ' ml-1 h-[26px] w-[26px]'}
+                                    >
+                                      <Merge className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </SortableItem>
+                        )}
+                        {blk.map((it, ii) => {
+                          const idx = blockStarts[bi] + ii
+                          const ex = exOf(it.exerciseId)
+                          const isSec = ex?.measure === 'sec'
+                          const isOpen = openUid === it.uid && !dragId
+                          const summary =
+                            category === 'muscu'
+                              ? `${it.sets ?? 3} × ${it.targets ? setTargetsOf(it).join('/') : (it.target ?? 10)}${isSec ? ' s' : ''} · ${it.restSec ?? 60} s`
+                              : category === 'etirements'
+                                ? `${it.sets ?? 1} × ${!ex || isSec ? `${it.durationSec ?? 30} s` : `${it.target ?? 10} reps`}`
+                                : ''
+                          return (
+                            <SortableItem key={it.uid} uid={it.uid}>
+                              {(drag) => (
+                                <div>
+                                  {/* Ligne repliée : poignée · nom (+ commentaire) · résumé · chevron.
+                                      Le clic n'importe où (hors contrôles) déplie SOUS la ligne. */}
+                                  <div
+                                    className={row + ' cursor-pointer'}
+                                    onClick={(e) => {
+                                      const t = e.target as Element
+                                      if (t.closest('button,input,select,a')) return
+                                      setOpenUid((u) => (u === it.uid ? null : it.uid))
+                                    }}
+                                  >
+                                    <button
+                                      type="button"
+                                      aria-label={`Réordonner ${ex?.name ?? 'cet exercice'}`}
+                                      {...drag.attributes}
+                                      {...drag.listeners}
+                                      className="-ml-1.5 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
+                                    >
+                                      <GripVertical className="h-4 w-4" />
+                                    </button>
+                                    <div className="min-w-0 flex-1 py-2">
+                                      <p className="truncate text-[15px] font-bold text-ink">{ex?.name ?? '—'}</p>
+                                      {it.comment && !isOpen && (
+                                        <p className="truncate text-xs font-semibold text-ink-soft">{it.comment}</p>
+                                      )}
+                                    </div>
+                                    {summary && (
+                                      <span className="shrink-0 font-mono text-[11px] tracking-[0.06em] uppercase tabular-nums text-ink-soft">
+                                        {summary}
+                                      </span>
+                                    )}
+                                    <ChevronDown
+                                      className={
+                                        'h-4 w-4 shrink-0 text-ink-soft/40 transition-transform duration-150 ' +
+                                        (isOpen ? 'rotate-180 text-ink-soft/70' : '')
+                                      }
+                                    />
+                                  </div>
+
+                                  {/* Vrai dépliage : les lignes suivantes descendent (transition 150 ms) */}
+                                  <div
+                                    className={
+                                      'overflow-hidden transition-all duration-150 ' +
+                                      (isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0')
+                                    }
+                                  >
+                                    <div className="space-y-2.5 border-t border-hairline py-3 pr-4 pl-11">
+                                      {category === 'muscu' && (
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span className={rowLabel}>Séries</span>
+                                          <MiniNum
+                                            value={it.sets ?? 3}
+                                            onChange={(v) => {
+                                              const patch: Partial<SessionItem> = { sets: v }
+                                              if (it.targets) patch.targets = setTargetsOf({ ...it, sets: v })
+                                              setItem(idx, patch)
+                                            }}
+                                            min={1}
+                                            max={12}
+                                            label="Séries"
+                                          />
+                                          <span className={rowLabel}>×</span>
+                                          {it.targets ? (
+                                            setTargetsOf(it).map((t, s) => (
+                                              <MiniNum
+                                                key={s}
+                                                value={t}
+                                                onChange={(v) =>
+                                                  setItem(idx, { targets: setTargetsOf(it).map((x, j) => (j === s ? v : x)) })
+                                                }
+                                                min={1}
+                                                label={`Objectif série ${s + 1}`}
+                                              />
+                                            ))
+                                          ) : (
+                                            <MiniNum value={it.target ?? 10} onChange={(v) => setItem(idx, { target: v })} min={1} label="Objectif par série" />
+                                          )}
+                                          <button
+                                            type="button"
+                                            title="Basculer répétitions / secondes"
+                                            onClick={() => ex && void updateExercise(ex.id, { measure: isSec ? 'reps' : 'sec' })}
+                                            className={togglePill}
+                                          >
+                                            {isSec ? 'sec' : 'reps'}
+                                          </button>
+                                          <span className="ml-auto flex items-center gap-1.5" title="Repos entre séries">
+                                            <span className={rowLabel}>Repos</span>
+                                            <MiniNum value={it.restSec ?? 60} onChange={(v) => setItem(idx, { restSec: v })} max={600} label="Repos entre séries" />
+                                            <span className={rowLabel}>s</span>
+                                          </span>
+                                        </div>
+                                      )}
+
+                                      {category === 'etirements' && (
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          {/* Séries de la posture : 2 × 30 s pour un étirement fait des deux côtés */}
+                                          <span className={rowLabel}>Séries</span>
+                                          <MiniNum value={it.sets ?? 1} onChange={(v) => setItem(idx, { sets: v })} min={1} max={6} label="Séries" />
+                                          <span className={rowLabel}>×</span>
+                                          {!ex || isSec ? (
+                                            <>
+                                              <MiniNum value={it.durationSec ?? 30} onChange={(v) => setItem(idx, { durationSec: v })} min={5} label="Durée de la posture" />
+                                              <span className={rowLabel}>s</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <MiniNum value={it.target ?? 10} onChange={(v) => setItem(idx, { target: v })} min={1} label="Répétitions" />
+                                              <span className={rowLabel}>reps</span>
+                                            </>
+                                          )}
+                                          <button
+                                            type="button"
+                                            title="Basculer secondes / répétitions (modifie l'exercice)"
+                                            onClick={() => ex && void updateExercise(ex.id, { measure: isSec ? 'reps' : 'sec' })}
+                                            className={togglePill + ' ml-auto'}
+                                          >
+                                            {isSec ? 'sec' : 'reps'}
+                                          </button>
+                                        </div>
+                                      )}
+
+                                      {it.comment !== undefined && (
+                                        <input
+                                          type="text"
+                                          value={it.comment}
+                                          onChange={(e) => setItem(idx, { comment: e.target.value })}
+                                          onBlur={() => {
+                                            // Laissé vide → le champ disparaît (retour à l'icône), rien n'est persisté
+                                            if (!it.comment?.trim()) setItem(idx, { comment: undefined })
+                                          }}
+                                          autoFocus={it.comment === ''}
+                                          placeholder="Commentaire (tempo, consigne…)"
+                                          className="h-[34px] w-full rounded-sm border border-hairline bg-glass-sunken px-3 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
+                                        />
+                                      )}
+
+                                      {ex?.description && <p className="text-xs font-medium text-ink-soft/80">{ex.description}</p>}
+
+                                      {/* Actions de la ligne, en icônes : varier · commenter · démo · fiche · retirer */}
+                                      <div className="flex items-center gap-1.5">
+                                        {category === 'muscu' && (
+                                          <button
+                                            type="button"
+                                            aria-label="Varier les séries"
+                                            aria-pressed={!!it.targets}
+                                            title={it.targets ? 'Revenir à des séries identiques' : 'Varier l’objectif de chaque série (ex. 30 / 20 / 15)'}
+                                            onClick={() =>
+                                              setItem(
+                                                idx,
+                                                it.targets
+                                                  ? { targets: undefined, target: setTargetsOf(it)[0] }
+                                                  : { targets: setTargetsOf(it) },
+                                              )
+                                            }
+                                            className={it.targets ? iconBtnOn : iconBtn}
+                                          >
+                                            <SlidersHorizontal className="h-[15px] w-[15px]" />
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          aria-label="Commentaire"
+                                          aria-pressed={it.comment !== undefined}
+                                          title="Ajouter un commentaire"
+                                          onClick={() => {
+                                            if (it.comment === undefined) setItem(idx, { comment: '' })
+                                          }}
+                                          className={it.comment !== undefined ? iconBtnOn : iconBtn}
+                                        >
+                                          <MessageSquarePlus className="h-[15px] w-[15px]" />
+                                        </button>
+                                        {ex?.videoUrl && (
+                                          <a
+                                            href={ex.videoUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            aria-label="Démo"
+                                            title="Vidéo de démonstration"
+                                            className={iconBtn}
+                                          >
+                                            <Play className="h-[15px] w-[15px]" />
+                                          </a>
+                                        )}
+                                        {ex && (
+                                          <button
+                                            type="button"
+                                            aria-label="Fiche exercice"
+                                            title="Fiche exercice"
+                                            onClick={() => navigate(`/exercise/${ex.id}`)}
+                                            className={iconBtn}
+                                          >
+                                            <FileText className="h-[15px] w-[15px]" />
+                                          </button>
+                                        )}
+                                        <button
+                                          type="button"
+                                          aria-label="Retirer"
+                                          title="Retirer de la séance"
+                                          onClick={() => removeItem(idx)}
+                                          className={iconBtnDanger + ' ml-auto'}
+                                        >
+                                          <Trash2 className="h-[15px] w-[15px]" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Superset : une pastille posée sur le filet entre deux lignes */}
+                                  {category === 'muscu' && idx < items.length - 1 && !items[idx + 1].blockBreak && (
+                                    <div className="relative z-10 flex h-0 justify-center">
+                                      <button
+                                        type="button"
+                                        aria-pressed={!!it.linkNext}
+                                        title={it.linkNext ? 'Superset — enchaîné sans repos' : 'Enchaîner avec le suivant sans repos (superset)'}
+                                        onClick={() => setItem(idx, { linkNext: !it.linkNext })}
+                                        className={
+                                          'flex h-6 -translate-y-1/2 items-center gap-1 rounded-full px-3 font-mono text-[9px] font-bold tracking-[0.12em] uppercase transition-colors ' +
+                                          (it.linkNext ? 'bg-muscu text-onaccent shadow-sm' : 'border border-hairline-strong bg-shoal text-ink-soft')
+                                        }
+                                      >
+                                        <Link2 className="h-3 w-3" />
+                                        superset
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </SortableItem>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </SortableContext>
+                  {/* La vignette qui suit le doigt : compacte et opaque, elle ne cache plus la liste */}
+                  <DragOverlay>
+                    {dragId &&
+                      (() => {
+                        if (dragId.startsWith('blk-')) {
+                          const bi = blocksArr.findIndex((b) => 'blk-' + b[0].uid === dragId)
+                          if (bi === -1) return null
+                          return (
+                            <div className={`flex items-center gap-2.5 rounded-sm px-4 py-2 shadow-xl backdrop-blur-lg ${catMeta.soft}`}>
+                              <GripVertical className="h-4 w-4 text-ink-soft/40" />
+                              <span className={`font-mono text-[10px] font-bold tracking-[0.16em] uppercase ${catMeta.text}`}>
+                                Bloc {bi + 1} · {blocksArr[bi].length} exo{blocksArr[bi].length > 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          )
+                        }
+                        const it = items.find((x) => x.uid === dragId)
+                        const ex = it && exOf(it.exerciseId)
+                        return (
+                          <div className="flex items-center gap-3 rounded-sm border border-hairline bg-shoal px-4 py-2 shadow-xl">
+                            <GripVertical className="h-4 w-4 shrink-0 text-ink-soft/40" />
+                            <p className="min-w-0 flex-1 truncate text-[15px] font-bold text-ink">{ex?.name ?? '—'}</p>
+                          </div>
+                        )
+                      })()}
+                  </DragOverlay>
+                </DndContext>
+
+                {/* Pied de liste : ajouter (Sheet mobile / focus du volet desktop) · nouveau bloc */}
+                <div className={row + ' min-h-11'}>
                   <button
                     type="button"
-                    onClick={addStep}
-                    className="flex items-center gap-0.5 text-xs font-extrabold text-sage-600 active:text-sage-700"
+                    onClick={addFromList}
+                    className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-sage-600 active:text-sage-700"
                   >
-                    <Plus className="h-3.5 w-3.5" /> jour
+                    <Plus className="h-3.5 w-3.5" /> Ajouter {category === 'etirements' ? 'une posture' : 'un exercice'}
                   </button>
+                  {/* Un seul point de découpe, en bas : le dernier exercice démarre le nouveau bloc,
+                      le drag & drop fait le reste (remplace les pilules entre chaque paire d'exercices) */}
+                  {canBlocks && items.length >= 2 && !items[items.length - 1].blockBreak && (
+                    <button
+                      type="button"
+                      title="Le dernier exercice démarre un nouveau bloc — glisses-y les autres"
+                      onClick={() => {
+                        const last = items.length - 1
+                        setItem(last, { blockBreak: true, blockRounds: items[last].blockRounds ?? 1 })
+                        setItem(last - 1, { linkNext: false })
+                      }}
+                      className="ml-auto flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-ink/60 active:text-ink"
+                    >
+                      <LayoutGrid className="h-3.5 w-3.5" /> nouveau bloc
+                    </button>
+                  )}
                 </div>
-                <div className="mt-1.5 space-y-1.5">
+                {category === 'hiit' && items.length > 0 && (
+                  <p className="border-t border-hairline bg-glass-sunken px-4 py-2.5 text-center font-mono text-[10px] tracking-[0.12em] uppercase text-ink/45">
+                    {items.length} exercice{items.length > 1 ? 's' : ''} × {rounds} tour{rounds > 1 ? 's' : ''} · {workSec} s
+                    d'effort / {restSec} s de repos
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Planification ── */}
+          <div className="space-y-2">
+            <Eyebrow className="ml-1 text-ink/60">Planification</Eyebrow>
+            <div className={card}>
+              <div className="px-3 py-2.5">
+                <Seg
+                  compact
+                  options={[
+                    { value: 'weekly' as const, label: 'Jours fixes' },
+                    { value: 'every' as const, label: 'Tous les X jours', short: 'Tous les X j.' },
+                    { value: 'weekdays' as const, label: 'Alternance' },
+                  ]}
+                  value={planMode}
+                  onChange={setPlanMode}
+                />
+              </div>
+
+              {planMode === 'weekly' && (
+                <div className={row + ' min-h-14'}>
+                  <span className={rowLabel}>Jours</span>
+                  <div className="ml-auto flex gap-1.5">
+                    {DAY_LETTER.map((_, d) => (
+                      <DayButton key={d} d={d} on={days.includes(d)} onClick={() => toggleDay(d)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {planMode === 'every' && (
+                <div className={row}>
+                  <span className={rowLabel}>Tous les</span>
+                  <div className="ml-auto flex items-center gap-2">
+                    <MiniNum value={everyDays} onChange={setEveryDays} min={1} max={30} label="Intervalle en jours" />
+                    <span className={rowLabel}>jour{everyDays > 1 ? 's' : ''}</span>
+                  </div>
+                </div>
+              )}
+
+              {planMode === 'weekdays' && (
+                <div className={row + ' min-h-14'}>
+                  <span className={rowLabel}>Sur ces jours</span>
+                  <div className="ml-auto flex gap-1.5">
+                    {DAY_LETTER.map((_, d) => (
+                      <DayButton key={d} d={d} on={onDays.includes(d)} onClick={() => toggleOnDay(d)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {planMode !== 'weekly' && (
+                <>
+                  <div className={row}>
+                    <span className={rowLabel}>À partir du</span>
+                    {/* Champ natif habillé : le sélecteur reste celui du système (color-scheme: dark) */}
+                    <input
+                      type="date"
+                      aria-label="Date de départ du cycle"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value || todayStr())}
+                      className={miniInput + ' ml-auto px-2.5 text-left [&::-webkit-calendar-picker-indicator]:opacity-60'}
+                    />
+                  </div>
+                  <div className={row + ' min-h-11'}>
+                    <span className={rowLabel}>Rotation</span>
+                    <button
+                      type="button"
+                      onClick={addStep}
+                      className="ml-auto flex items-center gap-1 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-sage-600 active:text-sage-700"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> jour
+                    </button>
+                  </div>
                   {steps.map((st, si) => (
-                    <div key={si} className="rounded-xl bg-surface px-3 py-2 shadow-sm">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="w-6 shrink-0 text-[11px] font-extrabold uppercase text-ink-soft/60">
-                          J{si + 1}
-                        </span>
+                    <div key={si} className="px-4 pb-2.5">
+                      <div className="flex min-h-[30px] flex-wrap items-center gap-2">
+                        <span className="w-6 shrink-0 font-mono text-[10px] font-bold uppercase text-ink/45">J{si + 1}</span>
                         {st.map((sid) => {
                           if (sid === selfKey) {
                             return (
-                              <span key={sid} className="rounded-full bg-sage-500 px-2.5 py-1 text-xs font-extrabold text-onaccent">
-                                ★ {name.trim() || 'Cette séance'}
+                              <span
+                                key={sid}
+                                className="flex h-[26px] items-center gap-1.5 rounded-full bg-sage-500 px-2.5 font-mono text-[10px] font-bold tracking-[0.08em] uppercase text-onaccent"
+                              >
+                                <Star className="h-2.5 w-2.5 fill-current" /> {name.trim() || 'Cette séance'}
                               </span>
                             )
                           }
@@ -625,10 +1150,11 @@ export default function SessionForm() {
                               type="button"
                               title="Retirer de ce jour"
                               onClick={() => removeFromStep(si, sid)}
-                              className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-extrabold ${meta.soft} ${meta.text}`}
+                              className={`flex h-[26px] items-center gap-1.5 rounded-full border px-2.5 font-mono text-[10px] font-bold tracking-[0.08em] uppercase ${meta.soft} ${meta.text}`}
+                              style={{ borderColor: meta.hex + '59' }}
                             >
                               <CategoryIcon category={x.category} className="h-3 w-3" /> {x.name}
-                              <X className="h-3 w-3 opacity-50" />
+                              <X className="h-3 w-3 opacity-60" />
                             </button>
                           )
                         })}
@@ -636,16 +1162,17 @@ export default function SessionForm() {
                           type="button"
                           aria-label={`Ajouter une séance au jour ${si + 1}`}
                           onClick={() => setAddingDay(addingDay === si ? null : si)}
-                          className="flex h-6 w-6 items-center justify-center rounded-full bg-sage-100 text-sage-700 active:bg-sage-200"
+                          className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-hairline-strong bg-glass-soft text-ink active:bg-glass"
                         >
-                          <Plus className="h-3.5 w-3.5" />
+                          <Plus className="h-3 w-3" />
                         </button>
                         {!st.includes(selfKey) && steps.length > 1 && (
                           <button
                             type="button"
                             aria-label={`Retirer le jour ${si + 1}`}
+                            title="Retirer ce jour de la rotation"
                             onClick={() => removeStep(si)}
-                            className="ml-auto px-0.5 text-ink-soft/40"
+                            className="ml-auto px-0.5 text-ink-soft/40 active:text-ink-soft"
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -675,464 +1202,56 @@ export default function SessionForm() {
                       )}
                     </div>
                   ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </Field>
-
-        <Field label="Échauffement automatique">
-          <Select value={warmupFor} onChange={(v) => setWarmupFor(v as Category | '')}>
-            <option value="">Jamais</option>
-            {CATEGORIES.filter((c) => c !== category).map((c) => (
-              <option key={c} value={c}>
-                Les jours de {CATEGORY_META[c].label}
-              </option>
-            ))}
-          </Select>
-          <p className="mt-1.5 text-xs font-semibold text-ink-soft/70">
-            La séance s'invite dans Aujourd'hui dès qu'une séance de cette catégorie est à faire — courses du
-            plan comprises.
-          </p>
-        </Field>
-
-        {category === 'hiit' && (
-          <div className="rounded-md border border-hairline bg-glass p-3.5 backdrop-blur-lg">
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p className="mb-1 text-xs font-bold text-ink-soft">Effort</p>
-                <Stepper value={workSec} onChange={setWorkSec} min={5} step={5} suffix="s" small />
-              </div>
-              <div>
-                <p className="mb-1 text-xs font-bold text-ink-soft">Repos</p>
-                <Stepper value={restSec} onChange={setRestSec} min={0} step={5} suffix="s" small />
-              </div>
-              <div>
-                <p className="mb-1 text-xs font-bold text-ink-soft">Tours</p>
-                <Stepper value={rounds} onChange={setRounds} min={1} small />
-              </div>
+                </>
+              )}
             </div>
           </div>
-        )}
 
-        {category === 'etirements' && (
-          <div className="space-y-3 rounded-md border border-hairline bg-glass p-3.5 backdrop-blur-lg">
-            {!hasBreaks && (
-              <div className="flex items-center justify-between gap-2">
-                <p className="flex items-center gap-2 text-sm font-extrabold" title="Refaire toute la routine à la suite">
-                  <Repeat className="h-4 w-4 text-etirements" /> Tours de la routine
-                </p>
-                <Stepper value={stretchRounds} onChange={setStretchRounds} min={1} max={10} small />
-              </div>
+          {/* ── Options avancées (repliées derrière leur résumé) ── */}
+          <div className={card}>
+            <button
+              type="button"
+              aria-expanded={optionsOpen}
+              onClick={() => setOptionsOpen((o) => !o)}
+              className="flex min-h-12 w-full items-center gap-3 px-4 text-left"
+            >
+              <span className={rowLabel}>Options avancées</span>
+              {!optionsOpen && <p className="truncate text-[13px] font-semibold text-ink-soft">{optionsSummary}</p>}
+              <ChevronDown
+                className={'ml-auto h-4 w-4 shrink-0 text-ink-soft/60 transition-transform duration-150 ' + (optionsOpen ? 'rotate-180' : '')}
+              />
+            </button>
+            {optionsOpen && (
+              <>
+                <div className={row}>
+                  <span className={rowLabel}>Section du planning</span>
+                  <div className="ml-auto w-full max-w-60">
+                    <Combobox
+                      small
+                      value={group}
+                      onChange={setGroup}
+                      options={groupSuggestions.map((g) => ({ id: g, label: g }))}
+                      onSelect={setGroup}
+                      placeholder="Optionnel…"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2.5 border-t border-hairline px-4 py-3">
+                  <span className={rowLabel}>Échauffement automatique</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Chip active={!warmupFor} onClick={() => setWarmupFor('')}>
+                      Jamais
+                    </Chip>
+                    {CATEGORIES.filter((c) => c !== category).map((c) => (
+                      <Chip key={c} active={warmupFor === c} onClick={() => setWarmupFor(c)}>
+                        {CATEGORY_META[c].label}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
-            <div className="flex items-center justify-between gap-2">
-              <p className="flex items-center gap-2 text-sm font-extrabold">
-                <Timer className="h-4 w-4 text-etirements" /> Transition entre postures
-              </p>
-              <Stepper value={stretchRest} onChange={setStretchRest} min={0} step={5} suffix="s" small />
-            </div>
           </div>
-        )}
-
-        {category === 'muscu' && !hasBreaks && (
-          <div className="flex items-center justify-between gap-2 rounded-md border border-hairline bg-glass p-3.5 backdrop-blur-lg">
-            <p
-              className="flex items-center gap-2 text-sm font-extrabold"
-              title="Refaire toute la liste d'exercices à la suite"
-            >
-              <Repeat className="h-4 w-4 text-muscu" /> Tours du circuit
-            </p>
-            <Stepper value={muscuRounds} onChange={setMuscuRounds} min={1} max={10} small />
-          </div>
-        )}
-
-        {hasItems && (
-          <Field label={category === 'etirements' ? 'Postures de la routine' : 'Exercices de la séance'}>
-            <DndContext
-              sensors={dndSensors}
-              collisionDetection={closestCenter}
-              modifiers={[followCursor]}
-              // La carte dépliée se referme au dragStart (les rangées du dessous remontent) :
-              // re-mesurer les cibles en continu, sinon dnd-kit garde les rects d'avant fermeture
-              measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-              onDragStart={(e) => {
-                setOpenUid(null)
-                setDragId(String(e.active.id))
-              }}
-              onDragCancel={() => setDragId(null)}
-              onDragEnd={(e) => {
-                setDragId(null)
-                onDragEnd(e)
-              }}
-            >
-              {/* UN SEUL SortableContext plat (en-têtes de bloc + cartes) : les contexts imbriqués
-                  appliquaient un transform au bloc entier EN PLUS de celui des cartes — d'où les
-                  trous géants et les chevauchements pendant le drag (retour utilisateur août 2026). */}
-              <SortableContext
-                items={
-                  hasBreaks
-                    ? blocksArr.flatMap((b) => ['blk-' + b[0].uid, ...b.map((x) => x.uid)])
-                    : items.map((x) => x.uid)
-                }
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="space-y-1.5">
-                  {blocksArr.map((blk, bi) => (
-                    <div key={'blk-' + blk[0].uid} className="space-y-1.5">
-                      {hasBreaks && (
-                        <SortableItem uid={'blk-' + blk[0].uid}>
-                          {(blockDrag) => (
-                            <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-1 ${catMeta.soft}`}>
-                              <p className={`flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase ${catMeta.text}`}>
-                                <button
-                                  type="button"
-                                  aria-label={`Déplacer le bloc ${bi + 1}`}
-                                  {...blockDrag.attributes}
-                                  {...blockDrag.listeners}
-                                  className="-ml-1 cursor-grab touch-none active:cursor-grabbing"
-                                >
-                                  <GripVertical className="h-3.5 w-3.5" />
-                                </button>
-                                <LayoutGrid className="h-3.5 w-3.5" /> Bloc {bi + 1} — tours
-                              </p>
-                              <div className="flex items-center gap-1.5">
-                                <Stepper
-                                  small
-                                  value={items[blockStarts[bi]]?.blockRounds ?? 1}
-                                  onChange={(v) => setItem(blockStarts[bi], { blockRounds: v })}
-                                  min={1}
-                                  max={10}
-                                />
-                                {bi > 0 && (
-                                  <button
-                                    type="button"
-                                    aria-label="Fusionner avec le bloc précédent"
-                                    title="Fusionner avec le bloc précédent"
-                                    onClick={() => setItem(blockStarts[bi], { blockBreak: false })}
-                                    className="px-1 text-ink-soft/50"
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </SortableItem>
-                      )}
-                      {blk.map((it, ii) => {
-                        const idx = blockStarts[bi] + ii
-                        const ex = exOf(it.exerciseId)
-                        const isSec = ex?.measure === 'sec'
-                        const isOpen = openUid === it.uid && !dragId
-                        return (
-                          <SortableItem key={it.uid} uid={it.uid}>
-                            {(drag) => (
-                              <div>
-                    {/* Carte repliée : la rangée de titre porte le résumé complet des réglages.
-                        Le clic déplie SOUS la ligne de titre (vrai dépli dans le flux, les cartes
-                        suivantes descendent) l'édition + les infos de l'exercice. */}
-                    <div
-                      className="cursor-pointer rounded-md border border-hairline bg-glass px-3 py-1.5 backdrop-blur-lg"
-                      onClick={(e) => {
-                        const t = e.target as Element
-                        if (t.closest('button,input,select,a') || t.closest('[data-edit-zone]')) return
-                        setOpenUid((u) => (u === it.uid ? null : it.uid))
-                      }}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          aria-label={`Réordonner ${ex?.name ?? 'cet exercice'}`}
-                          {...drag.attributes}
-                          {...drag.listeners}
-                          className="-ml-1.5 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
-                        >
-                          <GripVertical className="h-4 w-4" />
-                        </button>
-                        <p className="min-w-0 flex-1 truncate py-0.5 text-[15px] font-extrabold text-ink">{ex?.name ?? '—'}</p>
-                        {/* Résumé des réglages, lisible sans déplier */}
-                        {category === 'muscu' && (
-                          <span className="shrink-0 text-[11px] font-bold tabular-nums text-ink-soft">
-                            {it.sets ?? 3} × {it.targets ? setTargetsOf(it).join('/') : (it.target ?? 10)}
-                            {isSec ? ' s' : ''}
-                          </span>
-                        )}
-                        {category === 'etirements' && (
-                          <span className="shrink-0 text-[11px] font-bold tabular-nums text-ink-soft">
-                            {it.sets ?? 1} × {!ex || isSec ? `${it.durationSec ?? 30} s` : `${it.target ?? 10} reps`}
-                          </span>
-                        )}
-                        {it.comment ? <MessageSquare className="h-3.5 w-3.5 shrink-0 text-ink-soft/50" /> : null}
-                        {ex && subtypesOf(ex)[0] && (
-                          <span className="max-w-24 shrink-0 truncate text-[11px] font-bold text-ink-soft/60">
-                            {subtypesOf(ex)[0]}
-                          </span>
-                        )}
-                        {it.comment === undefined && (
-                          <button
-                            type="button"
-                            aria-label="Ajouter un commentaire"
-                            onClick={() => {
-                              setItem(idx, { comment: '' })
-                              setOpenUid(it.uid)
-                            }}
-                            className="px-0.5 text-ink-soft/40"
-                          >
-                            <MessageSquarePlus className="h-4 w-4" />
-                          </button>
-                        )}
-                        <button type="button" aria-label="Retirer" onClick={() => removeItem(idx)} className="px-0.5 text-ink-soft/40">
-                          <X className="h-4 w-4" />
-                        </button>
-                        <ChevronDown
-                          className={
-                            'h-4 w-4 shrink-0 text-ink-soft/40 transition-transform duration-150 ' +
-                            (isOpen ? 'rotate-180' : '')
-                          }
-                        />
-                      </div>
-
-                      {/* Vrai dépliage : les cartes suivantes descendent (transition 150 ms) */}
-                      <div
-                        data-edit-zone
-                        className={
-                          'overflow-hidden transition-all duration-150 ' +
-                          (isOpen ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0')
-                        }
-                      >
-                      {category === 'muscu' && (
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
-                          <MiniNum
-                            value={it.sets ?? 3}
-                            onChange={(v) => {
-                              const patch: Partial<SessionItem> = { sets: v }
-                              if (it.targets) patch.targets = setTargetsOf({ ...it, sets: v })
-                              setItem(idx, patch)
-                            }}
-                            min={1}
-                            max={12}
-                          />
-                          <span className="text-ink-soft/60">×</span>
-                          {it.targets ? (
-                            setTargetsOf(it).map((t, s) => (
-                              <MiniNum
-                                key={s}
-                                value={t}
-                                onChange={(v) =>
-                                  setItem(idx, { targets: setTargetsOf(it).map((x, j) => (j === s ? v : x)) })
-                                }
-                                min={1}
-                              />
-                            ))
-                          ) : (
-                            <MiniNum value={it.target ?? 10} onChange={(v) => setItem(idx, { target: v })} min={1} />
-                          )}
-                          <button
-                            type="button"
-                            title="Basculer répétitions / secondes"
-                            onClick={() => ex && void updateExercise(ex.id, { measure: isSec ? 'reps' : 'sec' })}
-                            className="rounded-md bg-sage-100 px-2 py-1 text-[11px] font-extrabold text-sage-700 active:bg-sage-200"
-                          >
-                            {isSec ? 'sec' : 'reps'}
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="Varier les séries"
-                            title={
-                              it.targets
-                                ? 'Revenir à des séries identiques'
-                                : 'Varier l’objectif de chaque série (ex. 30 / 20 / 15)'
-                            }
-                            onClick={() =>
-                              setItem(
-                                idx,
-                                it.targets
-                                  ? { targets: undefined, target: setTargetsOf(it)[0] }
-                                  : { targets: setTargetsOf(it) },
-                              )
-                            }
-                            className={
-                              'rounded-md px-1.5 py-1 ' +
-                              (it.targets ? 'bg-sage-500 text-onaccent' : 'bg-sage-100 text-sage-700 active:bg-sage-200')
-                            }
-                          >
-                            <SlidersHorizontal className="h-3.5 w-3.5" />
-                          </button>
-                          <span className="ml-auto flex items-center gap-1.5" title="Repos entre séries">
-                            <Timer className="h-3.5 w-3.5 text-ink-soft/60" />
-                            <MiniNum value={it.restSec ?? 60} onChange={(v) => setItem(idx, { restSec: v })} max={600} />
-                            <span>s</span>
-                          </span>
-                        </div>
-                      )}
-
-                      {category === 'etirements' && (
-                        <div className="mt-1.5 flex items-center gap-1.5 pl-1 text-xs font-bold text-ink-soft">
-                          {/* Séries de la posture : 2 × 30 s pour un étirement fait des deux côtés */}
-                          <MiniNum
-                            value={it.sets ?? 1}
-                            onChange={(v) => setItem(idx, { sets: v })}
-                            min={1}
-                            max={6}
-                          />
-                          <span>×</span>
-                          {!ex || isSec ? (
-                            <>
-                              <MiniNum
-                                value={it.durationSec ?? 30}
-                                onChange={(v) => setItem(idx, { durationSec: v })}
-                                min={5}
-                              />
-                              <span>s</span>
-                            </>
-                          ) : (
-                            <>
-                              <MiniNum value={it.target ?? 10} onChange={(v) => setItem(idx, { target: v })} min={1} />
-                              <span>répétitions</span>
-                            </>
-                          )}
-                          <button
-                            type="button"
-                            title="Basculer secondes / répétitions (modifie l'exercice)"
-                            onClick={() => ex && void updateExercise(ex.id, { measure: isSec ? 'reps' : 'sec' })}
-                            className="ml-auto rounded-md bg-sage-100 px-2 py-1 text-[11px] font-extrabold text-sage-700 active:bg-sage-200"
-                          >
-                            {isSec ? 'sec' : 'reps'}
-                          </button>
-                        </div>
-                      )}
-
-                      {it.comment !== undefined && (
-                        <input
-                          type="text"
-                          value={it.comment}
-                          onChange={(e) => setItem(idx, { comment: e.target.value })}
-                          onBlur={() => {
-                            // Laissé vide → le champ disparaît (retour au bouton [+]), rien n'est persisté
-                            if (!it.comment?.trim()) setItem(idx, { comment: undefined })
-                          }}
-                          autoFocus={it.comment === ''}
-                          placeholder="Commentaire (tempo, consigne…)"
-                          className={smallInput + ' mt-1.5 w-full py-1.5'}
-                        />
-                      )}
-
-                      {/* Infos de l'exercice : ce que la ligne repliée ne montre pas */}
-                      {ex && (
-                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-hairline pt-1.5 pb-0.5 pl-1">
-                          {ex.description && (
-                            <p className="w-full text-xs font-medium text-ink-soft/80">{ex.description}</p>
-                          )}
-                          {ex.videoUrl && (
-                            <a
-                              href={ex.videoUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex items-center gap-1 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-sage-600"
-                            >
-                              <ExternalLink className="h-3 w-3" /> Démo
-                            </a>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/exercise/${ex.id}`)}
-                            className="font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-ink-soft/60"
-                          >
-                            Fiche exercice ›
-                          </button>
-                        </div>
-                      )}
-                      </div>
-                    </div>
-
-                    {category === 'muscu' && idx < items.length - 1 && !items[idx + 1].blockBreak && (
-                      <div className="-my-1 flex justify-center">
-                        <button
-                          type="button"
-                          onClick={() => setItem(idx, { linkNext: !it.linkNext })}
-                          className={
-                            'relative z-10 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-extrabold transition-colors ' +
-                            (it.linkNext ? 'bg-muscu text-onaccent shadow-sm' : 'bg-sage-100 text-ink-soft')
-                          }
-                        >
-                          <Link2 className="h-3 w-3" />
-                          {it.linkNext ? 'Superset — enchaîné sans repos' : 'superset'}
-                        </button>
-                      </div>
-                    )}
-                              </div>
-                            )}
-                          </SortableItem>
-                        )
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </SortableContext>
-              {/* La vignette qui suit le doigt : compacte et opaque, elle ne cache plus la liste */}
-              <DragOverlay>
-                {dragId &&
-                  (() => {
-                    if (dragId.startsWith('blk-')) {
-                      const bi = blocksArr.findIndex((b) => 'blk-' + b[0].uid === dragId)
-                      if (bi === -1) return null
-                      return (
-                        <div className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 shadow-xl backdrop-blur-lg ${catMeta.soft}`}>
-                          <p className={`flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase ${catMeta.text}`}>
-                            <GripVertical className="h-3.5 w-3.5" />
-                            <LayoutGrid className="h-3.5 w-3.5" /> Bloc {bi + 1} · {blocksArr[bi].length} exo
-                            {blocksArr[bi].length > 1 ? 's' : ''}
-                          </p>
-                        </div>
-                      )
-                    }
-                    const it = items.find((x) => x.uid === dragId)
-                    const ex = it && exOf(it.exerciseId)
-                    return (
-                      <div className="flex items-center gap-1.5 rounded-md border border-hairline bg-shoal px-3 py-1 shadow-xl">
-                        <GripVertical className="h-4 w-4 shrink-0 text-ink-soft/40" />
-                        <p className="min-w-0 flex-1 truncate py-1 text-[15px] font-extrabold text-ink">{ex?.name ?? '—'}</p>
-                      </div>
-                    )
-                  })()}
-              </DragOverlay>
-            </DndContext>
-            <div className="mt-2 space-y-2">
-              {/* Un seul point de découpe, en bas : le dernier exercice démarre le nouveau bloc,
-                  le drag & drop fait le reste (remplace les pilules entre chaque paire d'exercices) */}
-              {canBlocks && items.length >= 2 && !items[items.length - 1].blockBreak && (
-                <div className="flex justify-center">
-                  <button
-                    type="button"
-                    title="Le dernier exercice démarre un nouveau bloc — glisses-y les autres"
-                    onClick={() => {
-                      const last = items.length - 1
-                      setItem(last, { blockBreak: true, blockRounds: items[last].blockRounds ?? 1 })
-                      setItem(last - 1, { linkNext: false })
-                    }}
-                    className="flex items-center gap-1 rounded-full bg-sage-100 px-3 py-1 text-[11px] font-extrabold text-ink-soft"
-                  >
-                    <LayoutGrid className="h-3 w-3" /> nouveau bloc
-                  </button>
-                </div>
-              )}
-              {/* Sur mobile, le sélecteur s'ouvre en Sheet ; sur desktop il est déjà là, en volet */}
-              <button
-                type="button"
-                onClick={() => setPickerOpen(true)}
-                className="w-full rounded-sm border border-hairline bg-glass-sunken px-4 py-3 text-left text-sm text-ink/50 backdrop-blur-lg active:bg-glass lg:hidden"
-              >
-                {category === 'etirements' ? '+ Ajouter ou créer une posture…' : '+ Ajouter ou créer un exercice…'}
-              </button>
-              {category === 'hiit' && items.length > 0 && (
-                <p className="text-center text-xs font-semibold text-ink-soft">
-                  {items.length} exercice{items.length > 1 ? 's' : ''} × {rounds} tour{rounds > 1 ? 's' : ''} ·{' '}
-                  {workSec}s d'effort / {restSec}s de repos
-                </p>
-              )}
-            </div>
-          </Field>
-        )}
         </div>
       </div>
 
@@ -1147,6 +1266,7 @@ export default function SessionForm() {
               counts={itemCounts}
               onAdd={appendItem}
               onCreate={(d) => void quickCreate(d)}
+              searchRef={searchRef}
             />
           </div>
         </aside>
@@ -1175,16 +1295,6 @@ export default function SessionForm() {
           Terminé
         </button>
       </Sheet>
-
-      {/* Ajout accessible sans défiler jusqu'au bas de la liste (le volet remplit ce rôle sur desktop) */}
-      {hasItems && !pickerOpen && !removed && (
-        <div className="lg:hidden">
-          <Fab
-            onClick={() => setPickerOpen(true)}
-            label={category === 'etirements' ? '+ Posture' : '+ Exercice'}
-          />
-        </div>
-      )}
 
       {removed && (
         <div className="fixed inset-x-0 bottom-20 z-50 flex justify-center px-5">

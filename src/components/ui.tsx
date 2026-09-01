@@ -324,11 +324,12 @@ export function Stepper({ value, onChange, min = 0, max = 990, step = 1, suffix,
     const n = Number(t.replace(',', '.'))
     if (t.trim() !== '' && !Number.isNaN(n)) onChange(clamp(n))
   }
+  // Carrés à filet (le moule d'`iconSquare`), plus les ronds pleins de la charte de juin
   const btn = small
-    ? 'h-8 w-8 shrink-0 rounded-full bg-sage-100 text-base font-extrabold text-sage-700 active:bg-sage-200'
-    : 'h-11 w-11 shrink-0 rounded-full bg-sage-100 text-xl font-extrabold text-sage-700 active:bg-sage-200'
+    ? 'h-7 w-7 shrink-0 rounded-sm border border-hairline-strong bg-glass-soft text-sm font-extrabold text-ink active:bg-glass'
+    : 'h-9 w-9 shrink-0 rounded-sm border border-hairline-strong bg-glass-soft text-lg font-extrabold text-ink active:bg-glass'
   return (
-    <div className="inline-flex items-center gap-1">
+    <div className="inline-flex items-center gap-1.5">
       <button type="button" aria-label="Diminuer" className={btn} onClick={() => onChange(clamp(value - step))}>
         −
       </button>
@@ -350,8 +351,8 @@ export function Stepper({ value, onChange, min = 0, max = 990, step = 1, suffix,
             setText(String(value))
           }}
           className={
-            (small ? 'w-9 text-sm' : 'w-12 text-lg') +
-            ' rounded-lg border border-transparent bg-transparent text-center font-extrabold tabular-nums outline-none focus:border-sage-300 focus:bg-sage-50'
+            (small ? 'w-7 font-mono text-[13px]' : 'w-12 text-lg') +
+            ' rounded-sm border border-transparent bg-transparent text-center font-bold tabular-nums outline-none focus:border-sage-500 focus:bg-glass-sunken'
           }
         />
         {suffix && <span className="text-xs font-bold text-ink-soft">{suffix}</span>}
@@ -378,22 +379,47 @@ export function Chip({ active, onClick, children }: { active: boolean; onClick: 
   )
 }
 
-export function Seg<T extends string>({ options, value, onChange }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+/** `compact` : rail de 34 px (fiche séance) au lieu de 44 — les segments pleine hauteur
+ *  « prenaient toute la place » sur un formulaire dense (audit sept. 2026). En compact,
+ *  trois options doivent tenir sur 322 px : texte 9 px sous `sm`, et `short` (libellé
+ *  abrégé pour mobile) quand le plein ne rentre pas — `aria-label` garde le nom complet. */
+export function Seg<T extends string>({
+  options,
+  value,
+  onChange,
+  compact,
+}: {
+  options: { value: T; label: string; short?: string }[]
+  value: T
+  onChange: (v: T) => void
+  compact?: boolean
+}) {
   return (
     <div className="flex rounded-sm border border-hairline bg-glass-soft p-[3px] backdrop-blur-lg">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
+          aria-label={o.short ? o.label : undefined}
           onClick={() => onChange(o.value)}
           className={
             // Actif = aplat écume : sur fond sombre, une pastille « plus claire que son
             // rail » est la seule façon de lire la sélection (l'ombre, elle, ne se voit plus).
-            'flex-1 rounded-xs px-3 py-2.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase transition-colors ' +
+            'flex-1 rounded-xs font-mono font-bold uppercase transition-colors ' +
+            (compact
+              ? 'px-2 py-[7px] text-[9px] tracking-[0.1em] whitespace-nowrap sm:px-3 sm:text-[10px] sm:tracking-[0.14em] '
+              : 'px-3 py-2.5 text-[10px] tracking-[0.14em] ') +
             (o.value === value ? 'bg-ink text-onaccent' : 'text-ink/60')
           }
         >
-          {o.label}
+          {o.short ? (
+            <>
+              <span className="sm:hidden">{o.short}</span>
+              <span className="hidden sm:inline">{o.label}</span>
+            </>
+          ) : (
+            o.label
+          )}
         </button>
       ))}
     </div>
@@ -461,8 +487,15 @@ export function FormActions({
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-cream/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg">
       <div className="mx-auto flex max-w-lg items-center gap-2 px-5 py-2.5">
         {onDelete && (
-          <button type="button" aria-label="Supprimer" title="Supprimer" onClick={onDelete} className={iconBtn}>
-            <Trash2 className="h-5 w-5 text-ink-soft" />
+          // Teinte danger : la destruction ne doit pas ressembler à « Dupliquer »
+          <button
+            type="button"
+            aria-label="Supprimer"
+            title="Supprimer"
+            onClick={onDelete}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm border border-hiit/40 text-hiit active:bg-hiit/10"
+          >
+            <Trash2 className="h-5 w-5" />
           </button>
         )}
         {onDuplicate && (

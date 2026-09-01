@@ -27,11 +27,8 @@ try {
   await page.click('button:has-text("appartement")')
   await page.waitForSelector('text=Planification')
 
-  // Passe en mode intervalle si besoin, puis cadence « Jours de semaine »
-  if ((await page.locator('text=Jours de semaine').count()) === 0) {
-    await page.click('text=Tous les X jours')
-  }
-  await page.click('text=Jours de semaine')
+  // Un seul choix à trois positions depuis sept. 2026 : « Alternance » = sur des jours de semaine
+  await page.click('text=Alternance')
 
   // Choisit lun / jeu / sam
   await page.click('[title="Lundi"]')

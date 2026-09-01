@@ -28,7 +28,7 @@ try {
   await page.screenshot({ path: 'screenshots/31-form-seance-exos.png' })
 
   // --- Sélecteur d'exercices (Sheet mobile) : filtre puis création à la volée
-  const addBtn = page.getByRole('button', { name: /Ajouter ou créer un exercice/ })
+  const addBtn = page.getByRole('button', { name: /Ajouter un exercice/ })
   await addBtn.scrollIntoViewIfNeeded()
   await addBtn.click()
   // Deux pickers dans le DOM (volet desktop masqué en CSS + Sheet) : viser le dialog
@@ -52,13 +52,14 @@ try {
   // Les cartes sont repliées par défaut et se déplient au CLIC (plus de survol, août 2026) :
   // la carte ouverte montre l'édition + les infos de l'exercice (lien démo, fiche)
   await page.locator('div.rounded-md p.truncate').first().click()
-  await page.waitForSelector('a:has-text("Démo")')
+  await page.waitForSelector('a[aria-label="Démo"]') // lien démo en icône (sept. 2026)
   await page.locator('[aria-label="Varier les séries"]').first().click()
   await page.screenshot({ path: 'screenshots/38-series-variees.png' })
   const firstCard = page.locator('div.rounded-md').filter({ hasText: 'reps' }).first()
   await firstCard.locator('input[inputmode="numeric"]').nth(1).fill('30')
 
   // --- Section du planning : suggestions filtrées dans la combobox
+  await page.click('text=Options avancées') // section repliée derrière son résumé (sept. 2026)
   const groupBox = page.getByPlaceholder('Optionnel…')
   await groupBox.scrollIntoViewIfNeeded()
   await groupBox.click()
@@ -87,9 +88,9 @@ try {
   // --- Étirements : blocs disponibles aussi (découpage + tours par bloc)
   await page.click('text=Routine matinale')
   await page.waitForSelector('text=Planification')
-  await page.waitForSelector('text=Tours de la routine')
+  await page.waitForSelector('[title="Tours de la routine"]')
   await page.locator('button:has-text("nouveau bloc")').click()
-  await page.waitForSelector('text=Bloc 2 — tours')
+  await page.waitForSelector('text=Bloc 2')
   await page.click('text=Enregistrer')
   await page.waitForSelector('text=Bibliothèque')
   const d2 = await page.evaluate(() => JSON.parse(localStorage.getItem('elan-data-v1')))

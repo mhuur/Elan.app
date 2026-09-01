@@ -43,9 +43,9 @@ try {
   // segment « Mes séances » (le Seg moitié-moitié a disparu).
   await page.click('[aria-label="Retour"]')
   await page.click('text=Full body')
-  await page.waitForSelector('text=Tours du circuit')
+  await page.waitForSelector('[title="Tours du circuit"]')
   await page.locator('button:has-text("superset")').first().click()
-  await page.waitForSelector('text=Superset — enchaîné sans repos')
+  await page.waitForSelector('button[aria-pressed="true"]:has-text("superset")') // pastille sur le filet (sept. 2026)
   await page.click('text=Enregistrer')
 
   // --- Onglet Objectifs : objectif Pompes à 2 paliers avec récompenses
