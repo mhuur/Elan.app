@@ -18,7 +18,7 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // --- Pompes : 2e sous-type (Bras) → visible dans les deux groupes
-  await page.getByRole('link', { name: 'Séries' }).click()
+  await page.getByRole('link', { name: 'Exercices', exact: true }).click()
   await page.getByRole('button', { name: "Banque d'exercices", exact: true }).click()
   await page.click('button:has-text("Pompes")')
   await page.waitForSelector("text=Modifier l'exercice")
@@ -43,6 +43,7 @@ try {
   // segment « Mes séances » (le Seg moitié-moitié a disparu).
   await page.click('[aria-label="Retour"]')
   await page.click('text=Full body')
+  await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('[title="Tours du circuit"]')
   await page.locator('button:has-text("superset")').first().click()
   await page.waitForSelector('button[aria-pressed="true"]:has-text("superset")') // pastille sur le filet (sept. 2026)

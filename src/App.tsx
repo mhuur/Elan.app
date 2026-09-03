@@ -34,8 +34,9 @@ function Shell() {
   const fullScreen = location.pathname.startsWith('/player')
   // Écrans d'édition : pas de barre d'onglets, une barre d'action fixe les remplace
   const formScreen = location.pathname.startsWith('/session/') || location.pathname.startsWith('/exercise/')
-  // La fiche séance s'élargit sur desktop : volet banque d'exercices à droite du formulaire
-  const sessionScreen = location.pathname.startsWith('/session/')
+  // Écrans élargis sur desktop : la fiche séance (volet banque d'exercices à droite du
+  // formulaire) et la liste des programmes (cartes sur deux colonnes)
+  const wideScreen = location.pathname.startsWith('/session/') || location.pathname === '/library'
 
   return (
     <>
@@ -45,7 +46,7 @@ function Shell() {
       <main
         className={
           'mx-auto w-full ' +
-          (sessionScreen ? 'max-w-lg lg:max-w-[62rem] ' : 'max-w-lg ') +
+          (wideScreen ? 'max-w-lg lg:max-w-[62rem] ' : 'max-w-lg ') +
           (fullScreen ? '' : formScreen ? 'min-h-dvh pb-24' : 'min-h-dvh pb-28')
         }
       >

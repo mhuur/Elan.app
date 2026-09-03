@@ -23,9 +23,10 @@ try {
 
   // Ouvre la fiche de la séance Vélo depuis la Bibliothèque (depuis sept. 2026 la
   // grille du Planning masque les séances non planifiées, le vélo du seed en est une)
-  await page.getByRole('link', { name: 'Séries' }).click()
-  await page.waitForSelector('text=Bibliothèque')
+  await page.getByRole('link', { name: 'Exercices', exact: true }).click()
+  await page.waitForSelector('text=Mes programmes')
   await page.click('text=appartement')
+  await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
 
   // Un seul choix à trois positions depuis sept. 2026 : « Alternance » = sur des jours de semaine
@@ -39,7 +40,7 @@ try {
 
   // Enregistre, puis va au Planning : le libellé reflète les jours choisis
   await page.click('text=Enregistrer')
-  await page.waitForSelector('text=Bibliothèque')
+  await page.waitForSelector('text=Mes programmes')
   await page.getByRole('link', { name: 'Planning', exact: true }).click()
   await page.waitForSelector('text=Cette semaine')
   await page.waitForSelector('text=Lun · Jeu · Sam')

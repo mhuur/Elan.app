@@ -18,9 +18,10 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // --- Découper Full body : le bouton unique du bas isole le dernier exercice en bloc 2 × 2 tours
-  await page.getByRole('link', { name: 'Séries' }).click()
-  await page.waitForSelector('text=Bibliothèque')
+  await page.getByRole('link', { name: 'Exercices', exact: true }).click()
+  await page.waitForSelector('text=Mes programmes')
   await page.click('p:has-text("Muscu — Full body")')
+  await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
   await page.locator('button:has-text("nouveau bloc")').click()
   await page.waitForSelector('text=Bloc 2')
@@ -29,7 +30,7 @@ try {
   await page.locator('div[class*="bg-muscu"] input').nth(1).fill('2')
   await page.screenshot({ path: 'screenshots/27-blocs-form.png' })
   await page.click('text=Enregistrer')
-  await page.waitForSelector('text=Bibliothèque')
+  await page.waitForSelector('text=Mes programmes')
 
   // --- Données : flags posés sur le dernier exercice (Pont fessier, 5e du seed)
   const d = await page.evaluate(() => JSON.parse(localStorage.getItem('elan-data-v1')))

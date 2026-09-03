@@ -110,6 +110,72 @@ export default function CompleteSheet({
 }
 
 /** Cible du programme d'un exercice, valeur et unité séparées : « 3 × 20 | reps » ou « 30 / 20 / 15 | reps » */
+/** Programme en lecture seule — HIIT : les intervalles et la ligne « × tours · repos » ;
+ *  muscu / étirements : les blocs, leurs tours et le détail d'UN tour. Partagé avec la liste
+ *  des programmes (`pages/Library`), qui le déplie sous chaque carte. */
+export function ProgramView({ session, exOf }: { session: Session; exOf: (id: string) => Exercise | undefined }) {
+  if (session.category === 'hiit') {
+    return (
+      <div>
+        <div className="divide-y divide-hairline">
+          {session.items.map((it, i) => {
+            const ex = exOf(it.exerciseId)
+            return (
+              <ProgramRow
+                key={i}
+                name={ex?.name ?? 'Exercice'}
+                comment={it.comment}
+                videoUrl={ex?.videoUrl}
+                value={String(it.durationSec ?? session.workSec ?? 45)}
+                unit="s"
+              />
+            )
+          })}
+        </div>
+        <p className="border-t border-hairline pt-2 font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
+          × {session.rounds ?? 1} tour{(session.rounds ?? 1) > 1 ? 's' : ''} · {session.restSec ?? 15} s de repos
+        </p>
+      </div>
+    )
+  }
+  const isStretch = session.category === 'etirements'
+  const blocks = muscuBlocks(session)
+  return (
+    <div>
+      {blocks.map((b, bi) => (
+        <div key={bi}>
+          {(blocks.length > 1 || b.rounds > 1) && (
+            <p
+              className={`flex items-center gap-1.5 pt-2.5 font-mono text-[10px] tracking-[0.2em] uppercase ${CATEGORY_META[session.category].text}`}
+            >
+              <Repeat className="h-3 w-3" />
+              {blocks.length > 1 ? `Bloc ${bi + 1}` : 'Circuit'}
+              {b.rounds > 1 ? ` · × ${b.rounds} tours` : ''}
+            </p>
+          )}
+          <div className="divide-y divide-hairline">
+            {b.items.map((it, i) => {
+              const ex = exOf(it.exerciseId)
+              const t = itemTarget(it, ex, isStretch)
+              return (
+                <ProgramRow
+                  key={i}
+                  name={ex?.name ?? 'Exercice'}
+                  comment={it.comment}
+                  linkNext={it.linkNext}
+                  videoUrl={ex?.videoUrl}
+                  value={t.value}
+                  unit={t.unit}
+                />
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function itemTarget(it: SessionItem, ex: Exercise | undefined, isStretch: boolean): { value: string; unit: string } {
   if (isStretch) {
     // Étirements : « 2 × 30 s » quand la posture se fait des deux côtés
@@ -253,7 +319,6 @@ function Inner({
 
   // Muscu/étirements : structure blocs → tours → exercices (→ séries pour la muscu)
   const exOf = (id: string) => exercises.find((e) => e.id === id)
-  const blocks = useMemo(() => (isMuscu || isStretch ? muscuBlocks(session) : []), [session, isMuscu, isStretch])
 
   // Timeline de saisie (muscu et HIIT) : toutes les séries dans l'ordre réel, groupées par bloc/tour
   const timeline = useMemo(() => buildTimeline(session, exercises), [session, exercises])
@@ -423,24 +488,7 @@ function Inner({
       {session.category === 'hiit' && session.items.length > 0 && (
         <div>
           <Eyebrow>{programLabel}</Eyebrow>
-          <div className="divide-y divide-hairline">
-            {session.items.map((it, i) => {
-              const ex = exOf(it.exerciseId)
-              return (
-                <ProgramRow
-                  key={i}
-                  name={ex?.name ?? 'Exercice'}
-                  comment={it.comment}
-                  videoUrl={ex?.videoUrl}
-                  value={String(it.durationSec ?? session.workSec ?? 45)}
-                  unit="s"
-                />
-              )
-            })}
-          </div>
-          <p className="border-t border-hairline pt-2 font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
-            × {session.rounds ?? 1} tour{(session.rounds ?? 1) > 1 ? 's' : ''} · {session.restSec ?? 15} s de repos
-          </p>
+          <ProgramView session={session} exOf={exOf} />
         </div>
       )}
 
@@ -448,36 +496,7 @@ function Inner({
       {!entering && (isMuscu || isStretch) && session.items.length > 0 && (
         <div>
           <Eyebrow>{programLabel}</Eyebrow>
-          {blocks.map((b, bi) => (
-            <div key={bi}>
-              {(blocks.length > 1 || b.rounds > 1) && (
-                <p
-                  className={`flex items-center gap-1.5 pt-2.5 font-mono text-[10px] tracking-[0.2em] uppercase ${CATEGORY_META[session.category].text}`}
-                >
-                  <Repeat className="h-3 w-3" />
-                  {blocks.length > 1 ? `Bloc ${bi + 1}` : 'Circuit'}
-                  {b.rounds > 1 ? ` · × ${b.rounds} tours` : ''}
-                </p>
-              )}
-              <div className="divide-y divide-hairline">
-                {b.items.map((it, i) => {
-                  const ex = exOf(it.exerciseId)
-                  const t = itemTarget(it, ex, isStretch)
-                  return (
-                    <ProgramRow
-                      key={i}
-                      name={ex?.name ?? 'Exercice'}
-                      comment={it.comment}
-                      linkNext={it.linkNext}
-                      videoUrl={ex?.videoUrl}
-                      value={t.value}
-                      unit={t.unit}
-                    />
-                  )
-                })}
-              </div>
-            </div>
-          ))}
+          <ProgramView session={session} exOf={exOf} />
         </div>
       )}
 

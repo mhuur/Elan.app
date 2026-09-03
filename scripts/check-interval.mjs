@@ -19,9 +19,10 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // Passer « Vélo d'appartement » en intervalle (tous les 2 jours) + alternance avec HIIT
-  await page.getByRole('link', { name: 'Séries' }).click()
-  await page.waitForSelector('text=Bibliothèque')
+  await page.getByRole('link', { name: 'Exercices', exact: true }).click()
+  await page.waitForSelector('text=Mes programmes')
   await page.click('text=appartement')
+  await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
   await page.getByRole('button', { name: 'Tous les X jours', exact: true }).click()
   await page.waitForSelector('text=à partir du')
@@ -36,6 +37,7 @@ try {
 
   // Bidirectionnel : la fiche du HIIT montre la même planification (chip Vélo)
   await page.click('p:has-text("HIIT — Cardio express")') // titre de la carte HIIT (pas le badge du vélo)
+  await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
   await page.waitForSelector('button:has-text("Vélo d’appartement")')
   await page.screenshot({ path: 'screenshots/20-alternance-bidirectionnelle.png' })

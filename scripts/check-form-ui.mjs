@@ -19,9 +19,10 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // --- Fiche séance muscu : liste d'exercices compacte
-  await page.getByRole('link', { name: 'Séries' }).click()
-  await page.waitForSelector('text=Bibliothèque')
+  await page.getByRole('link', { name: 'Exercices', exact: true }).click()
+  await page.waitForSelector('text=Mes programmes')
   await page.click('p:has-text("Muscu — Full body")')
+  await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
   await page.screenshot({ path: 'screenshots/30-form-seance-haut.png' })
   await page.locator('text=Exercices de la séance').scrollIntoViewIfNeeded()
@@ -68,7 +69,7 @@ try {
 
   // --- Enregistrer via la barre d'action fixe
   await page.click('text=Enregistrer')
-  await page.waitForSelector('text=Bibliothèque')
+  await page.waitForSelector('text=Mes programmes')
   const d = await page.evaluate(() => JSON.parse(localStorage.getItem('elan-data-v1')))
   const full = d.sessions.find((s) => s.name.includes('Full body'))
   if (!full.items.some((it) => d.exercises.find((e) => e.id === it.exerciseId)?.name === 'Dips sur chaise'))
@@ -87,12 +88,13 @@ try {
 
   // --- Étirements : blocs disponibles aussi (découpage + tours par bloc)
   await page.click('text=Routine matinale')
+  await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
   await page.waitForSelector('[title="Tours de la routine"]')
   await page.locator('button:has-text("nouveau bloc")').click()
   await page.waitForSelector('text=Bloc 2')
   await page.click('text=Enregistrer')
-  await page.waitForSelector('text=Bibliothèque')
+  await page.waitForSelector('text=Mes programmes')
   const d2 = await page.evaluate(() => JSON.parse(localStorage.getItem('elan-data-v1')))
   const rout = d2.sessions.find((s) => s.name === 'Routine matinale')
   if (!rout.items[rout.items.length - 1].blockBreak)
@@ -103,11 +105,11 @@ try {
   await page.waitForSelector('text=Bloc 2')
   await page.screenshot({ path: 'screenshots/39-etirements-blocs.png' })
   await page.click('[aria-label="Fermer"]') // la croix ✕ remplace « Fermer sans valider »
-  await page.getByRole('link', { name: 'Séries' }).click()
-  await page.waitForSelector('text=Bibliothèque')
+  await page.getByRole('link', { name: 'Exercices', exact: true }).click()
+  await page.waitForSelector('text=Mes programmes')
 
   // --- Nouvelle séance : écran épuré
-  await page.click('text=+ Séance')
+  await page.click('text=+ Programme')
   await page.waitForSelector('text=Nouvelle séance')
   await page.screenshot({ path: 'screenshots/35-form-nouvelle-seance.png' })
   await page.click('[aria-label="Retour"]')
@@ -130,8 +132,9 @@ try {
   })
   await desk.goto(BASE)
   await desk.waitForSelector('text=Routine matinale', { timeout: 20000 })
-  await desk.getByRole('link', { name: 'Séries' }).click()
+  await desk.getByRole('link', { name: 'Exercices', exact: true }).click()
   await desk.click('p:has-text("Muscu — Full body")')
+  await desk.getByRole('button', { name: 'Modifier', exact: true }).click()
   await desk.waitForSelector('text=Planification')
   await desk.waitForSelector("aside >> text=Banque d'exercices")
   // Compter les poignées : une par carte d'exercice, toujours dans le DOM

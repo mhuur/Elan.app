@@ -104,10 +104,11 @@ try {
   await shot('08-planning')
 
   // --- Bibliothèque : séances, formulaire de séance épuré
-  await page.getByRole('link', { name: 'Séries' }).click()
-  await page.waitForSelector('text=Bibliothèque')
+  await page.getByRole('link', { name: 'Exercices', exact: true }).click()
+  await page.waitForSelector('text=Mes programmes')
   await shot('09-bibliotheque-seances')
   await page.click('text=appartement')
+  await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
   await shot('10-seance-form')
   await page.click('[aria-label="Retour"]')

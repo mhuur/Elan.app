@@ -5,7 +5,7 @@ const items = [
   { to: '/', label: "Aujourd'hui", icon: Sun },
   { to: '/planning', label: 'Planning', icon: CalendarDays },
   { to: '/plan', label: '21K', icon: Route },
-  { to: '/library', label: 'Séries', icon: Dumbbell },
+  { to: '/library', label: 'Exercices', icon: Dumbbell },
   // Onglet « Objectifs » masqué pour l'instant (route /goals conservée) — non utilisé
   // Onglet « Progrès » supprimé (août 2026, demande utilisateur) — page retirée avec lui
 ]

@@ -26,9 +26,10 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // Fiche de « Sortie courte » (running) depuis la Bibliothèque
-  await page.getByRole('link', { name: 'Séries' }).click()
-  await page.waitForSelector('text=Bibliothèque')
+  await page.getByRole('link', { name: 'Exercices', exact: true }).click()
+  await page.waitForSelector('text=Mes programmes')
   await page.click('p:has-text("Sortie courte")')
+  await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
 
   // Mode « Avant une autre » : la cible se présélectionne (1re catégorie ≠ running)
@@ -45,7 +46,7 @@ try {
   }
   await page.screenshot({ path: `${DIR}/54-form-avant-une-autre.png` })
   await page.click('text=Enregistrer')
-  await page.waitForSelector('text=Bibliothèque')
+  await page.waitForSelector('text=Mes programmes')
 
   const wf = await warmupForOf()
   if (wf !== 'hiit') throw new Error(`warmupFor devrait valoir « hiit », trouvé : ${JSON.stringify(wf)}`)
@@ -54,6 +55,7 @@ try {
 
   // Rouvrir : mode et cible re-sélectionnés
   await page.click('p:has-text("Sortie courte")')
+  await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
   await chipRow.locator('button[aria-pressed="true"]:has-text("HIIT")').waitFor()
 
@@ -61,7 +63,7 @@ try {
   await page.getByRole('button', { name: 'Jours fixes', exact: true }).click()
   await page.waitForSelector('button[title="Lundi"]')
   await page.click('text=Enregistrer')
-  await page.waitForSelector('text=Bibliothèque')
+  await page.waitForSelector('text=Mes programmes')
   const wf2 = await warmupForOf()
   if (wf2 != null) throw new Error(`warmupFor devrait être nettoyé, trouvé : ${JSON.stringify(wf2)}`)
 

@@ -147,5 +147,5 @@ export function describeSchedule(
   if (s.days.length === 7) return 'Tous les jours'
   if (s.days.length) return s.days.map((d) => DAY_SHORT[d]).join(' · ')
   if (s.warmupFor) return 'Avant chaque ' + CATEGORY_META[s.warmupFor].label
-  return 'Non planifiée'
+  return 'Non planifié'
 }
