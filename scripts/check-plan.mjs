@@ -39,11 +39,11 @@ try {
   await page.waitForSelector('text=Endurance fondamentale')
   await page.screenshot({ path: `${DIR}/40-plan.png` })
 
-  // --- Navigation par flèches jusqu'au pic de volume (7 sept.) = Semaine 10 depuis la reprise
-  for (let i = 0; i < 13; i++) {
+  // --- Navigation par flèches jusqu'au pic de volume (14 sept.) = Semaine 11 depuis la reprise
+  for (let i = 0; i < 14; i++) {
     await page.click('[aria-label="Semaine suivante"]')
   }
-  await page.waitForSelector('text=Semaine 10')
+  await page.waitForSelector('text=Semaine 11')
   await page.waitForSelector('text=pic de volume')
   await page.waitForSelector('text=VMA 4×1200 m')
 
@@ -68,7 +68,7 @@ try {
   await page.screenshot({ path: `${DIR}/43-plan-validee.png` })
 
   // --- Dernière semaine : le semi est bien là
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     await page.click('[aria-label="Semaine suivante"]')
   }
   await page.waitForSelector('text=Semaine 13')
