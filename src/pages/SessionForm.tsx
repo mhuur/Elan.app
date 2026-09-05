@@ -27,7 +27,6 @@ import {
   Play,
   Plus,
   SlidersHorizontal,
-  Star,
   Trash2,
   X,
 } from 'lucide-react'
@@ -46,7 +45,7 @@ import { canonicalCycles, countWeekdays, cycleStepsOf, describeSchedule, diffDay
 import { isPlanLog, planToDoOn, warmupsDueOn } from '../lib/planDay'
 import { usePlanningWeek } from '../lib/usePlanningWeek'
 import { TYPE_META } from '../data/plan'
-import { CategoryIcon, Chip, Combobox, Eyebrow, FormActions, PageHeader, Seg, Select, Sheet, Stepper, glassCard } from '../components/ui'
+import { CategoryIcon, Chip, Combobox, Eyebrow, FormActions, PageHeader, Seg, Sheet, Stepper, glassCard } from '../components/ui'
 import { DayDot, dayCell } from '../components/DayDot'
 import ExercisePicker from '../components/ExercisePicker'
 
@@ -215,7 +214,7 @@ const followCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform })
 
 /** Les trois « quand » d'une séance : jours fixes, tous les X jours, avant une autre.
  *  L'alternance n'en fait plus partie (sept. 2026) : c'est une section à part, cumulable
- *  avec les deux premiers — Jours fixes + alternance = `repeat.onDays` + `steps`. */
+ *  avec les deux premiers — Jours choisis + alternance = `repeat.onDays` + `steps`. */
 type PlanMode = 'weekly' | 'every' | 'warmup'
 
 /** Prochaine occurrence (aujourd'hui inclus) d'une cadence « tous les X jours » et son rang */
@@ -268,7 +267,7 @@ export default function SessionForm() {
   const [days, setDays] = useState<number[]>(
     cycleOwner?.repeat?.onDays?.length ? cycleOwner.repeat.onDays : (existing?.days ?? []),
   )
-  // Jours fixes / tous les X jours / avant une autre (warmupFor) — un seul « quand »
+  // Jours choisis / tous les X jours / avant une autre (warmupFor) — un seul « quand »
   const [planMode, setPlanMode] = useState<PlanMode>(
     cycleOwner
       ? cycleOwner.repeat?.onDays?.length
@@ -318,20 +317,34 @@ export default function SessionForm() {
     a.localeCompare(b, 'fr'),
   )
 
-  // --- Édition de la rotation (le sélecteur d'ajout n'apparaît qu'au tap sur +)
-  const usedIds = new Set(steps.flat())
-  const [addingDay, setAddingDay] = useState<number | null>(null)
-  const addToStep = (si: number, id: string) => setSteps((p) => p.map((st, i) => (i === si ? [...st, id] : st)))
-  const removeFromStep = (si: number, id: string) =>
-    setSteps((p) => p.map((st, i) => (i === si ? st.filter((x) => x !== id) : st)).filter((st, i) => st.length > 0 || i !== si))
-  const addStep = () => {
-    setAddingDay(steps.length)
-    setSteps((p) => [...p, []])
-  }
-  const removeStep = (si: number) => {
-    setAddingDay(null)
-    setSteps((p) => p.filter((_, i) => i !== si))
-  }
+  // --- Édition de l'alternance (simplifiée le 05/09/2026, retour utilisateur) : UNE séance
+  // partenaire, choisie dans un sélecteur. `steps` garde sa forme générale (crans, plusieurs
+  // séances par cran) pour lire les cycles existants, mais la fiche n'en crée plus : un cycle
+  // complexe s'affiche en texte, avec une croix pour repartir de zéro.
+  const simpleSteps = steps.length <= 2 && steps.every((st) => st.length === 1)
+  const partnerId = simpleSteps ? steps.flat().find((id) => id !== selfKey) : undefined
+  const partner = partnerId ? sessions.find((s) => s.id === partnerId) : undefined
+  const setPartner = (id: string) =>
+    setSteps((p) => {
+      if (!id) return [[selfKey]]
+      // Remplace le partenaire à sa place : l'ordre des crans porte la phase du cycle
+      if (p.length === 2 && p.every((st) => st.length === 1)) return p.map((st) => (st[0] === selfKey ? st : [id]))
+      return [[selfKey], [id]]
+    })
+  const nameOf = (id: string) => (id === selfKey ? name.trim() || 'Cette séance' : (sessions.find((s) => s.id === id)?.name ?? '?'))
+  // « Commencer par » : les noms remplacent les lettres A/B. Sur mobile le rail ne tient
+  // qu'une quarantaine de signes en tout : au-delà, chaque libellé est abrégé (`short`, le
+  // nom complet reste en aria-label et sur desktop).
+  const startOptions = (() => {
+    const labels = steps.map((st) => st.map(nameOf).join(' + '))
+    const total = labels.reduce((a, l) => a + l.length, 0)
+    const cap = total > 40 ? Math.max(8, Math.floor(40 / labels.length)) : Infinity
+    return labels.map((label, i) => ({
+      value: String(i),
+      label,
+      short: label.length > cap ? label.slice(0, cap - 1).trimEnd() + '…' : undefined,
+    }))
+  })()
 
   const catExercises = exercises.filter((e) => e.category === category)
   const exOf = (exId: string) => exercises.find((e) => e.id === exId)
@@ -524,7 +537,7 @@ export default function SessionForm() {
       .filter((st) => st.length)
     const alternating = cleanSteps.length > 1 || (cleanSteps[0]?.length ?? 0) > 1
     // Un cycle n'a de sens qu'avec une cadence : tous les X jours, ou des jours de semaine
-    // en alternance. Jours fixes sans alternance, avant une autre, ou alternance sans aucun
+    // en alternance. Jours choisis sans alternance, avant une autre, ou alternance sans aucun
     // jour coché → pas de cycle — et surtout pas la cadence « tous les X jours » héritée
     // d'un autre onglet, invisible à l'écran (bug relevé le 05/09/2026).
     const cycle = planMode === 'every' || (planMode === 'weekly' && alternating && days.length > 0)
@@ -614,9 +627,6 @@ export default function SessionForm() {
     for (const w of scheduleWrites(selfId)) await updateSession(w.id, w.patch)
   }
 
-  // Alternance affichée dès qu'un cran existe au-delà de « cette séance seule »
-  const alternating = steps.length > 1 || (steps[0]?.length ?? 0) > 1
-  const cranLetter = (i: number) => String.fromCharCode(65 + i)
   const noDays = planMode === 'weekly' && days.length === 0
 
   // --- Aperçu : la grille du Planning (une ligne par séance, un rond par jour, semaine
@@ -1266,7 +1276,7 @@ export default function SessionForm() {
                 <Seg
                   compact
                   options={[
-                    { value: 'weekly' as const, label: 'Jours fixes' },
+                    { value: 'weekly' as const, label: 'Jours choisis' },
                     { value: 'every' as const, label: 'Tous les X jours' },
                     { value: 'warmup' as const, label: 'Avant une autre' },
                   ]}
@@ -1329,109 +1339,76 @@ export default function SessionForm() {
                 </div>
               )}
 
-              {/* ── En alternance avec : vide par défaut ; « + Ajouter » crée un cran (A, B, C…)
-                  et ouvre le sélecteur. Cumulable avec Jours fixes et Tous les X jours. ── */}
+              {/* ── En alternance avec : UNE séance partenaire (sélecteur « Aucune » → pastille avec sa
+                  croix). Cumulable avec Jours choisis et Tous les X jours. Un cycle existant plus
+                  complexe (trois crans, plusieurs séances le même jour) se lit en texte. ── */}
               {planMode !== 'warmup' && (
                 <>
-                  <div className={row + ' min-h-11'}>
-                    <span className={rowLabel}>En alternance avec</span>
-                    <button
-                      type="button"
-                      onClick={addStep}
-                      className="ml-auto flex items-center gap-1 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-sage-600 active:text-sage-700"
-                    >
-                      <Plus className="h-3.5 w-3.5" /> Ajouter
-                    </button>
-                  </div>
-                  {alternating &&
-                    steps.map((st, si) => (
-                      <div key={si} className="px-4 pb-2.5">
-                        <div className="flex min-h-[30px] flex-wrap items-center gap-2">
-                          <span className="w-6 shrink-0 font-mono text-[10px] font-bold uppercase text-ink/45">{cranLetter(si)}</span>
-                          {st.map((sid) => {
-                            if (sid === selfKey) {
-                              return (
-                                <span
-                                  key={sid}
-                                  className="flex h-[26px] items-center gap-1.5 rounded-full bg-sage-500 px-2.5 font-mono text-[10px] font-bold tracking-[0.08em] uppercase text-onaccent"
-                                >
-                                  <Star className="h-2.5 w-2.5 fill-current" /> {name.trim() || 'Cette séance'}
-                                </span>
-                              )
-                            }
-                            const x = sessions.find((q) => q.id === sid)
-                            if (!x) return null
-                            const meta = CATEGORY_META[x.category]
-                            return (
-                              <button
-                                key={sid}
-                                type="button"
-                                title="Retirer de ce cran"
-                                onClick={() => removeFromStep(si, sid)}
-                                className={`flex h-[26px] items-center gap-1.5 rounded-full border px-2.5 font-mono text-[10px] font-bold tracking-[0.08em] uppercase ${meta.soft} ${meta.text}`}
-                                style={{ borderColor: meta.hex + '59' }}
-                              >
-                                <CategoryIcon category={x.category} className="h-3 w-3" /> {x.name}
-                                <X className="h-3 w-3 opacity-60" />
-                              </button>
-                            )
-                          })}
-                          <button
-                            type="button"
-                            aria-label={`Ajouter une séance au cran ${cranLetter(si)}`}
-                            title="Le même jour, aussi…"
-                            onClick={() => setAddingDay(addingDay === si ? null : si)}
-                            className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-hairline-strong bg-glass-soft text-ink active:bg-glass"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                          {!st.includes(selfKey) && steps.length > 1 && (
-                            <button
-                              type="button"
-                              aria-label={`Retirer le cran ${cranLetter(si)}`}
-                              title="Retirer ce cran de l'alternance"
-                              onClick={() => removeStep(si)}
-                              className="ml-auto px-0.5 text-ink-soft/40 active:text-ink-soft"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                        {addingDay === si && (
-                          <div className="mt-2">
-                            <Select
-                              value=""
-                              onChange={(v) => {
-                                if (v) {
-                                  addToStep(si, v)
-                                  setAddingDay(null)
-                                }
-                              }}
-                            >
-                              <option value="">Choisir une séance…</option>
-                              {sessions
-                                .filter((s) => s.id !== existing?.id && !usedIds.has(s.id))
-                                .map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {s.name}
-                                  </option>
-                                ))}
-                            </Select>
-                          </div>
-                        )}
+                  {partner ? (
+                    <div className={row + ' flex-col items-stretch gap-2 py-3'}>
+                      <span className={rowLabel}>En alternance avec</span>
+                      <div
+                        className={`flex h-[30px] items-center justify-between rounded-full border pl-3 pr-1 ${CATEGORY_META[partner.category].soft} ${CATEGORY_META[partner.category].text}`}
+                        style={{ borderColor: CATEGORY_META[partner.category].hex + '73' }}
+                      >
+                        <span className="flex min-w-0 items-center gap-2 font-mono text-[10px] font-bold tracking-[0.08em] uppercase">
+                          <CategoryIcon category={partner.category} className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{partner.name}</span>
+                        </span>
+                        <button
+                          type="button"
+                          aria-label="Retirer l'alternance"
+                          onClick={() => setPartner('')}
+                          className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full opacity-75 active:opacity-100"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       </div>
-                    ))}
-                  {alternating && steps.length > 1 && (planMode === 'every' || days.length > 0) && (
+                    </div>
+                  ) : !simpleSteps ? (
+                    <div className={row + ' flex-col items-stretch gap-2 py-3'}>
+                      <span className={rowLabel}>En alternance avec</span>
+                      <div className="flex items-center gap-2">
+                        <span className="min-w-0 flex-1 font-mono text-[10px] leading-relaxed font-bold tracking-[0.08em] uppercase text-ink/85">
+                          {steps.map((st) => st.map(nameOf).join(' + ')).join(' → ')}
+                        </span>
+                        <button type="button" aria-label="Retirer l'alternance" onClick={() => setPartner('')} className={iconBtn}>
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
                     <div className={row}>
-                      <span className={rowLabel}>Commencer par</span>
-                      <div className="ml-auto">
-                        <Seg
-                          compact
-                          options={steps.map((_, i) => ({ value: String(i), label: cranLetter(i) }))}
-                          value={String(startStep % steps.length)}
-                          onChange={(v) => setStartStep(Number(v))}
-                        />
+                      <span className={rowLabel}>En alternance avec</span>
+                      <div className="relative ml-auto">
+                        <select
+                          aria-label="En alternance avec"
+                          value=""
+                          onChange={(e) => setPartner(e.target.value)}
+                          className="h-[30px] appearance-none rounded-sm border border-hairline bg-glass-sunken pl-3 pr-7 font-mono text-[10px] tracking-[0.14em] uppercase text-ink/70 outline-none focus:border-sage-500"
+                        >
+                          <option value="">Aucune</option>
+                          {sessions
+                            .filter((s) => s.id !== existing?.id)
+                            .map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}
+                              </option>
+                            ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-ink/60" />
                       </div>
+                    </div>
+                  )}
+                  {steps.length > 1 && (planMode === 'every' || days.length > 0) && (
+                    <div className={row + ' flex-col items-stretch gap-2 py-3'}>
+                      <span className={rowLabel}>Commencer par</span>
+                      <Seg
+                        compact
+                        options={startOptions}
+                        value={String(startStep % steps.length)}
+                        onChange={(v) => setStartStep(Number(v))}
+                      />
                     </div>
                   )}
                 </>

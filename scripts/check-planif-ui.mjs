@@ -1,12 +1,12 @@
 // Vérifie la section « Planification » de la fiche séance (refonte sept. 2026) : le « quand »
-// à trois positions, la section « En alternance avec » (crans A, B…), « Commencer par », et
+// à trois positions, la ligne « En alternance avec » (sélecteur « Aucune » → pastille), « Commencer par », et
 // surtout l'APERÇU — la grille du Planning (une ligne par séance, un rond par jour, semaine
 // navigable ‹ ›), avec TOUT ce qui est déjà posé, calculée par la même fonction que le Planning :
 //  - la fiche en cours est la première ligne (teintée), les autres séances planifiées suivent
 //    (« Routine matinale » = 7 anneaux), puis les courses du plan semi ;
-//  - Jours fixes L/J/S → 3 anneaux sur la ligne de la fiche (et « Prochaine fois » s'affiche) ;
-//  - + Ajouter → HIIT en cran B → une ligne HIIT apparaît, les anneaux se partagent ;
-//  - Commencer par B → la prochaine occurrence passe au HIIT AVANT d'enregistrer ;
+//  - Jours choisis L/J/S → 3 anneaux sur la ligne de la fiche (et « Prochaine fois » s'affiche) ;
+//  - En alternance avec → HIIT (sélecteur « Aucune ») → pastille, une ligne HIIT apparaît, les anneaux se partagent ;
+//  - Commencer par HIIT (les noms, plus de lettres) → la prochaine occurrence passe au HIIT AVANT d'enregistrer ;
 //  - aucun jour coché → avertissement, et l'enregistrement ne crée PAS de cadence cachée
 //    (bug du 05/09/2026 : « Alternance » sans jour enregistrait « Tous les 2 jours »).
 // Prérequis : `npm run dev:demo` lancé.
@@ -74,7 +74,7 @@ try {
   await page.waitForSelector('text=Planification')
 
   // Trois positions, plus d'« Alternance » ni de « Rotation »
-  for (const lbl of ['Jours fixes', 'Tous les X jours', 'Avant une autre']) await page.getByRole('button', { name: lbl, exact: true }).waitFor()
+  for (const lbl of ['Jours choisis', 'Tous les X jours', 'Avant une autre']) await page.getByRole('button', { name: lbl, exact: true }).waitFor()
   if ((await page.getByRole('button', { name: 'Alternance', exact: true }).count()) > 0) throw new Error('« Alternance » ne doit plus être une position du sélecteur')
   if ((await page.locator('text=Rotation').count()) > 0) throw new Error('Le mot « Rotation » ne doit plus apparaître')
 
@@ -95,13 +95,12 @@ try {
   for (const t of ['Lundi', 'Jeudi', 'Samedi']) await page.click(`button[title="${t}"]`)
   await page.waitForSelector('text=Prochaine fois')
   const n1 = await rings(selfRow())
-  if (n1 !== 3) throw new Error(`Jours fixes L/J/S : ${n1} anneau(x) sur la ligne de la fiche, 3 attendus`)
+  if (n1 !== 3) throw new Error(`Jours choisis L/J/S : ${n1} anneau(x) sur la ligne de la fiche, 3 attendus`)
   await page.screenshot({ path: 'screenshots/planif-01-jours-fixes.png' })
 
-  // + Ajouter → HIIT en cran B : une ligne HIIT dans l'aperçu, anneaux partagés + « Commencer par »
-  await page.getByRole('button', { name: 'Ajouter', exact: true }).click()
-  await page.locator('select:has-text("Choisir une séance")').selectOption({ label: 'HIIT — Cardio express' })
-  await page.waitForSelector('button:has-text("HIIT — Cardio express")')
+  // « En alternance avec » → HIIT : pastille avec sa croix, ligne HIIT dans l'aperçu, anneaux partagés + « Commencer par »
+  await page.locator('select[aria-label="En alternance avec"]').selectOption({ label: 'HIIT — Cardio express' })
+  await page.waitForSelector("[aria-label=\"Retirer l'alternance\"]")
   await page.waitForSelector('text=Commencer par')
   await rowOf('HIIT — Cardio express').waitFor()
   const me2 = await ringsTwoWeeks(selfRow())
@@ -109,7 +108,7 @@ try {
   if (me2 + other2 !== expectedLJS || other2 === 0) throw new Error(`Alternance A/B : ${me2} + ${other2} anneaux pour ${expectedLJS} jours L/J/S à venir sur deux semaines`)
   await page.screenshot({ path: 'screenshots/planif-02-alternance.png', fullPage: true })
 
-  // Commencer par B : la première occurrence à venir passe au HIIT, avant tout enregistrement
+  // Commencer par HIIT (les noms, plus de lettres) : la première occurrence à venir passe au HIIT, avant tout enregistrement
   let idx = await firstRing(selfRow())
   let onNext = false
   if (idx < 0) {
@@ -118,7 +117,7 @@ try {
     idx = await firstRing(selfRow())
   }
   if (idx < 0) throw new Error('Aucune occurrence à venir de la fiche sur deux semaines')
-  await page.getByRole('button', { name: 'B', exact: true }).click()
+  await page.getByRole('button', { name: 'HIIT — Cardio express', exact: true }).click()
   await page.waitForFunction(
     (i) => {
       const rows = [...document.querySelectorAll('[data-preview] [data-session]')]
@@ -139,8 +138,8 @@ try {
   const other3 = await ringsTwoWeeks(rowOf('HIIT — Cardio express'))
   if (me3 + other3 < 3) throw new Error(`Tous les 2 jours : seulement ${me3 + other3} anneau(x) sur deux semaines`)
 
-  // Retour Jours fixes, tout décoché : avertissement, et l'enregistrement ne cache aucune cadence
-  await page.getByRole('button', { name: 'Jours fixes', exact: true }).click()
+  // Retour Jours choisis, tout décoché : avertissement, et l'enregistrement ne cache aucune cadence
+  await page.getByRole('button', { name: 'Jours choisis', exact: true }).click()
   for (const t of ['Lundi', 'Jeudi', 'Samedi']) await page.click(`button[title="${t}"]`)
   await page.waitForSelector('text=Aucun jour choisi')
   await page.click('text=Enregistrer')
@@ -148,7 +147,7 @@ try {
   const when = await page.locator('button:has(p:text-is("Muscu — Full body")) span.truncate').innerText()
   if (!/non planifié/i.test(when)) throw new Error(`Sans jour coché, la carte devrait dire « Non planifié », trouvé : ${JSON.stringify(when)}`)
 
-  console.log('PLANIF-UI OK — trois positions, aperçu = grille du Planning avec tout le reste, alternance A/B, Commencer par, aucune cadence cachée')
+  console.log('PLANIF-UI OK — trois positions, aperçu = grille du Planning avec tout le reste, alternance à partenaire unique, Commencer par avec les noms, aucune cadence cachée')
   if (errors.length) {
     console.error('ERREURS DÉTECTÉES :')
     for (const e of errors) console.error(' -', e)

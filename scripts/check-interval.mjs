@@ -26,20 +26,19 @@ try {
   await page.waitForSelector('text=Planification')
   await page.getByRole('button', { name: 'Tous les X jours', exact: true }).click()
   await page.waitForSelector('text=à partir du')
-  // Le HIIT sur un nouveau cran de l'alternance (B) : « + Ajouter » ouvre le sélecteur
-  await page.getByRole('button', { name: 'Ajouter', exact: true }).click()
-  await page.locator('select:has-text("Choisir une séance")').selectOption({ label: 'HIIT — Cardio express' })
-  await page.waitForSelector('button:has-text("HIIT — Cardio express")') // chip ajoutée au jour 2
+  // « En alternance avec » → HIIT (sélecteur « Aucune » → pastille avec sa croix)
+  await page.locator('select[aria-label="En alternance avec"]').selectOption({ label: 'HIIT — Cardio express' })
+  await page.waitForSelector("[aria-label=\"Retirer l'alternance\"]")
   await page.click('text=Enregistrer')
 
   // La carte de la séance décrit l'alternance
   await page.waitForSelector('text=en alternance avec HIIT')
 
-  // Bidirectionnel : la fiche du HIIT montre la même planification (chip Vélo)
+  // Bidirectionnel : la fiche du HIIT montre la même planification (pastille Vélo)
   await page.click('p:has-text("HIIT — Cardio express")') // titre de la carte HIIT (pas le badge du vélo)
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
-  await page.waitForSelector('button:has-text("Vélo d’appartement")')
+  await page.waitForSelector('div:has(> span:text-is("En alternance avec")):has-text("Vélo d’appartement")')
   await page.screenshot({ path: 'screenshots/20-alternance-bidirectionnelle.png' })
   await page.click('[aria-label="Retour"]')
 

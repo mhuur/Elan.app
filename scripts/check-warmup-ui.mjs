@@ -1,7 +1,7 @@
 // Vérifie le mode de planification « Avant une autre » (jumelage / warmupFor, sept. 2026) :
 // depuis la fiche d'une séance, choisir « Avant une autre », prendre une catégorie cible,
 // enregistrer → `warmupFor` écrit, badge « Avant chaque X » dans la Bibliothèque, et la
-// fiche rouverte re-sélectionne le mode et la cible. Repasser en « Jours fixes » nettoie.
+// fiche rouverte re-sélectionne le mode et la cible. Repasser en « Jours choisis » nettoie.
 // Prérequis : `npm run dev:demo` lancé, puis `node scripts/check-warmup-ui.mjs`
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
@@ -59,8 +59,8 @@ try {
   await page.waitForSelector('text=Planification')
   await chipRow.locator('button[aria-pressed="true"]:has-text("HIIT")').waitFor()
 
-  // Repasser en « Jours fixes » nettoie le jumelage à l'enregistrement
-  await page.getByRole('button', { name: 'Jours fixes', exact: true }).click()
+  // Repasser en « Jours choisis » nettoie le jumelage à l'enregistrement
+  await page.getByRole('button', { name: 'Jours choisis', exact: true }).click()
   await page.waitForSelector('button[title="Lundi"]')
   await page.click('text=Enregistrer')
   await page.waitForSelector('text=Mes programmes')

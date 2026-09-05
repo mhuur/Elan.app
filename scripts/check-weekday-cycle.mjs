@@ -29,16 +29,15 @@ try {
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
 
-  // Jours fixes (défaut) + « En alternance avec » = cycle sur jours de semaine (repeat.onDays)
+  // Jours choisis (défaut) + « En alternance avec » = cycle sur jours de semaine (repeat.onDays)
 
   // Choisit lun / jeu / sam
   await page.click('[title="Lundi"]')
   await page.click('[title="Jeudi"]')
   await page.click('[title="Samedi"]')
-  // En alternance avec le HIIT : « + Ajouter » crée le cran B et ouvre le sélecteur
-  await page.getByRole('button', { name: 'Ajouter', exact: true }).click()
-  await page.locator('select:has-text("Choisir une séance")').selectOption({ label: 'HIIT — Cardio express' })
-  await page.waitForSelector('button:has-text("HIIT — Cardio express")')
+  // En alternance avec le HIIT : sélecteur « Aucune » → pastille avec sa croix
+  await page.locator('select[aria-label="En alternance avec"]').selectOption({ label: 'HIIT — Cardio express' })
+  await page.waitForSelector("[aria-label=\"Retirer l'alternance\"]")
   // L'aperçu dit quand tombe la prochaine fois
   await page.waitForSelector('text=Prochaine fois')
   await page.screenshot({ path: `${DIR}/49-form-jours-semaine.png` })
