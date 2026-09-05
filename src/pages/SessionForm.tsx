@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   DndContext,
@@ -36,10 +36,12 @@ import {
   setTargetsOf,
   type Category,
   type Measure,
+  type Session,
   type SessionItem,
 } from '../types'
-import { DAY_LETTER, DAY_NAMES, mondayIndex, toDateStr, todayStr } from '../lib/dates'
-import { canonicalCycles, countWeekdays, cycleStepsOf, ownerOf } from '../lib/schedule'
+import { DAY_LETTER, DAY_NAMES, addDays, mondayIndex, startOfWeek, toDateStr, todayStr } from '../lib/dates'
+import { canonicalCycles, countWeekdays, cycleStepsOf, diffDays, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
+import { planToDoOn, warmupsDueOn } from '../lib/planDay'
 import { CategoryIcon, Chip, Combobox, Eyebrow, FormActions, PageHeader, Seg, Select, Sheet, Stepper, glassCard } from '../components/ui'
 import ExercisePicker from '../components/ExercisePicker'
 
@@ -159,8 +161,18 @@ const followCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform })
   }
 }
 
-/** Les trois façons de planifier, à plat (plus de segment dans un segment) */
-type PlanMode = 'weekly' | 'every' | 'weekdays' | 'warmup'
+/** Les trois « quand » d'une séance : jours fixes, tous les X jours, avant une autre.
+ *  L'alternance n'en fait plus partie (sept. 2026) : c'est une section à part, cumulable
+ *  avec les deux premiers — Jours fixes + alternance = `repeat.onDays` + `steps`. */
+type PlanMode = 'weekly' | 'every' | 'warmup'
+
+/** Prochaine occurrence (aujourd'hui inclus) d'une cadence « tous les X jours » et son rang */
+function nextEveryOccurrence(startDate: string, everyDays: number): { dateStr: string; index: number } {
+  const diff = diffDays(startDate, todayStr())
+  if (diff <= 0) return { dateStr: startDate, index: 0 }
+  const index = Math.ceil(diff / everyDays)
+  return { dateStr: toDateStr(addDays(new Date(startDate + 'T12:00:00'), index * everyDays)), index }
+}
 
 /** Prochaine date (aujourd'hui inclus) tombant sur un de ces jours de semaine */
 function nextOccurrenceStr(days: number[]): string {
@@ -187,7 +199,7 @@ function backOccurrences(fromStr: string, k: number, days: number[]): string {
 export default function SessionForm() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { sessions, exercises, addSession, updateSession, removeSession, updateExercise, addExercise } = useData()
+  const { sessions, exercises, logs, addSession, updateSession, removeSession, updateExercise, addExercise } = useData()
   const existing = sessions.find((s) => s.id === id)
 
   // Cycle d'alternance : la séance « propriétaire » porte la planification, les
@@ -199,13 +211,16 @@ export default function SessionForm() {
 
   const [name, setName] = useState(existing?.name ?? '')
   const [category, setCategory] = useState<Category>(existing?.category ?? 'muscu')
-  const [days, setDays] = useState<number[]>(existing?.days ?? [])
-  // Jours fixes / tous les X jours / alternance / avant une autre (warmupFor) — un seul
-  // choix. Intervalle et alternance écrivent le même `repeat`, seule la cadence change.
+  // Jours de la séance : jours fixes (`days`) OU, en alternance, jours de semaine du cycle
+  // (`repeat.onDays`) — mêmes cases, même état, seule l'écriture change
+  const [days, setDays] = useState<number[]>(
+    cycleOwner?.repeat?.onDays?.length ? cycleOwner.repeat.onDays : (existing?.days ?? []),
+  )
+  // Jours fixes / tous les X jours / avant une autre (warmupFor) — un seul « quand »
   const [planMode, setPlanMode] = useState<PlanMode>(
     cycleOwner
       ? cycleOwner.repeat?.onDays?.length
-        ? 'weekdays'
+        ? 'weekly'
         : 'every'
       : existing?.warmupFor && !existing.days.length
         ? 'warmup'
@@ -213,16 +228,17 @@ export default function SessionForm() {
   )
   const [everyDays, setEveryDays] = useState(cycleOwner?.repeat?.everyDays ?? 2)
   const [startDate, setStartDate] = useState(cycleOwner?.repeat?.startDate ?? todayStr())
-  const [onDays, setOnDays] = useState<number[]>(cycleOwner?.repeat?.onDays ?? [])
-  // Rotation en cours d'édition : un tableau de « jours », chacun regroupant
-  // les séances faites ensemble ce jour-là (selfKey = cette séance).
+  // Alternance en cours d'édition : un tableau de « crans » (A, B, C…), chacun regroupant
+  // les séances faites ensemble ce jour-là (selfKey = cette séance). [[selfKey]] = pas
+  // d'alternance.
   const [steps, setSteps] = useState<string[][]>(() => (ownerSteps.length ? ownerSteps : [[selfKey]]))
-  // « Commencer par » (alternance) : étape de la rotation qui tombera à la prochaine
-  // occurrence — dérivée de l'ancre stockée pour refléter la phase actuelle du cycle.
+  // « Commencer par » : cran qui tombera à la prochaine occurrence — dérivé de l'ancre
+  // stockée pour refléter la phase actuelle du cycle, dans les deux cadences.
   const [startStep, setStartStep] = useState(() => {
     const r = cycleOwner?.repeat
-    if (!r?.onDays?.length || ownerSteps.length < 2) return 0
-    return countWeekdays(r.startDate, nextOccurrenceStr(r.onDays), r.onDays) % ownerSteps.length
+    if (!r || ownerSteps.length < 2) return 0
+    if (r.onDays?.length) return countWeekdays(r.startDate, nextOccurrenceStr(r.onDays), r.onDays) % ownerSteps.length
+    return nextEveryOccurrence(r.startDate, r.everyDays).index % ownerSteps.length
   })
   // `comment: ''` (un commentaire ajouté puis laissé vide — Firestore stocke les champs vidés
   // comme '') redevient « pas de commentaire » : le champ ne s'affiche que s'il y a du texte.
@@ -297,8 +313,6 @@ export default function SessionForm() {
 
   const toggleDay = (d: number) =>
     setDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d].sort((a, b) => a - b)))
-  const toggleOnDay = (d: number) =>
-    setOnDays((p) => (p.includes(d) ? p.filter((x) => x !== d) : [...p, d].sort((a, b) => a - b)))
 
   /**
    * Ajoute un exercice existant à la séance avec les réglages par défaut de la
@@ -429,36 +443,21 @@ export default function SessionForm() {
   }
 
   /**
-   * Applique la planification du cycle : la première séance du premier jour
-   * devient propriétaire du `repeat` (rotation par jours, plusieurs séances
-   * possibles le même jour) ; les autres membres sont nettoyés (plus de
-   * `repeat` propre ni de jours fixes résiduels), et les anciens cycles qui
-   * revendiquent une séance du nôtre sont réparés.
+   * Écritures de planification que l'enregistrement applique aux AUTRES séances — et que
+   * l'aperçu applique en mémoire, pour montrer exactement ce qui sera enregistré.
+   *
+   * En cycle (tous les X jours, ou jours fixes en alternance), la première séance du
+   * premier cran devient propriétaire du `repeat` (alternance par crans, plusieurs séances
+   * possibles le même jour) ; les autres membres sont nettoyés (plus de `repeat` propre ni
+   * de jours fixes résiduels), et les anciens cycles qui revendiquent une séance du nôtre
+   * sont réparés. Sans cycle (jours fixes seuls, avant une autre, ou alternance sans aucun
+   * jour coché) : je quitte le cycle éventuel, qui continue sans moi.
    */
-  const applySchedule = async (selfId: string) => {
-    const byId = (sid: string) => sessions.find((x) => x.id === sid)
+  const scheduleWrites = (selfId: string, pool: Session[] = sessions): { id: string; patch: Partial<Session> }[] => {
+    const writes: { id: string; patch: Partial<Session> }[] = []
+    const byId = (sid: string) => pool.find((x) => x.id === sid)
 
-    if (planMode === 'weekly' || planMode === 'warmup') {
-      // Je quitte le cycle éventuel ; il continue sans moi
-      const rest = ownerSteps.map((st) => st.filter((x) => x !== selfId && !!byId(x))).filter((st) => st.length)
-      const restIds = rest.flat()
-      if (cycleOwner?.repeat && restIds.length) {
-        await updateSession(rest[0][0], {
-          repeat: {
-            everyDays: cycleOwner.repeat.everyDays,
-            startDate: cycleOwner.repeat.startDate,
-            ...(cycleOwner.repeat.onDays?.length ? { onDays: cycleOwner.repeat.onDays } : {}),
-            steps: rest.map((ids) => ({ ids })),
-          },
-        })
-        for (const mid of restIds.slice(1)) {
-          if (byId(mid)?.repeat) await updateSession(mid, { repeat: null })
-        }
-      }
-      return
-    }
-
-    // Mode intervalle : nettoyer la rotation saisie (doublons, séances disparues)
+    // Nettoyer l'alternance saisie (doublons, séances disparues, crans vides)
     const seen = new Set<string>()
     const cleanSteps = steps
       .map((st) =>
@@ -471,53 +470,151 @@ export default function SessionForm() {
           }),
       )
       .filter((st) => st.length)
+    const alternating = cleanSteps.length > 1 || (cleanSteps[0]?.length ?? 0) > 1
+    // Un cycle n'a de sens qu'avec une cadence : tous les X jours, ou des jours de semaine
+    // en alternance. Jours fixes sans alternance, avant une autre, ou alternance sans aucun
+    // jour coché → pas de cycle — et surtout pas la cadence « tous les X jours » héritée
+    // d'un autre onglet, invisible à l'écran (bug relevé le 05/09/2026).
+    const cycle = planMode === 'every' || (planMode === 'weekly' && alternating && days.length > 0)
+
+    if (!cycle) {
+      const rest = ownerSteps.map((st) => st.filter((x) => x !== selfId && !!byId(x))).filter((st) => st.length)
+      const restIds = rest.flat()
+      if (cycleOwner?.repeat && restIds.length) {
+        writes.push({
+          id: rest[0][0],
+          patch: {
+            repeat: {
+              everyDays: cycleOwner.repeat.everyDays,
+              startDate: cycleOwner.repeat.startDate,
+              ...(cycleOwner.repeat.onDays?.length ? { onDays: cycleOwner.repeat.onDays } : {}),
+              steps: rest.map((ids) => ({ ids })),
+            },
+          },
+        })
+        for (const mid of restIds.slice(1)) {
+          if (byId(mid)?.repeat) writes.push({ id: mid, patch: { repeat: null } })
+        }
+      }
+      return writes
+    }
+
     const allIds = cleanSteps.flat()
     const ownerId = cleanSteps[0][0]
-    // « Commencer par » : ne réancre le cycle que si l'étape choisie diffère de la phase
+    // « Commencer par » : ne réancre le cycle que si le cran choisi diffère de la phase
     // actuelle — sinon l'ancre stockée est conservée (l'historique affiché ne bouge pas).
     let cycleStart = startDate
-    if (planMode === 'weekdays' && onDays.length && cleanSteps.length > 1) {
-      const d0 = nextOccurrenceStr(onDays)
-      const chosen = startStep % cleanSteps.length
-      if (countWeekdays(startDate, d0, onDays) % cleanSteps.length !== chosen) {
-        cycleStart = backOccurrences(d0, chosen, onDays)
+    if (cleanSteps.length > 1) {
+      const n = cleanSteps.length
+      const chosen = startStep % n
+      if (planMode === 'weekly') {
+        const d0 = nextOccurrenceStr(days)
+        if (countWeekdays(startDate, d0, days) % n !== chosen) cycleStart = backOccurrences(d0, chosen, days)
+      } else {
+        const next = nextEveryOccurrence(startDate, everyDays)
+        const back = (((chosen - next.index) % n) + n) % n
+        if (back) cycleStart = toDateStr(addDays(new Date(startDate + 'T12:00:00'), -back * everyDays))
       }
     }
-    await updateSession(ownerId, {
-      repeat: {
-        everyDays,
-        startDate: cycleStart,
-        ...(planMode === 'weekdays' && onDays.length ? { onDays: [...onDays].sort((a, b) => a - b) } : {}),
-        steps: cleanSteps.map((ids) => ({ ids })),
+    writes.push({
+      id: ownerId,
+      patch: {
+        repeat: {
+          everyDays,
+          startDate: cycleStart,
+          ...(planMode === 'weekly' ? { onDays: [...days].sort((a, b) => a - b) } : {}),
+          steps: cleanSteps.map((ids) => ({ ids })),
+        },
       },
     })
-    // Les membres sont pilotés par la rotation : ni repeat propre, ni jours fixes
+    // Les membres sont pilotés par l'alternance : ni repeat propre, ni jours fixes
     for (const mid of allIds) {
       if (mid === ownerId || mid === selfId) continue // la sauvegarde du formulaire nettoie déjà selfId
       const m = byId(mid)
       if (!m) continue
-      const patch: { repeat?: null; days?: number[] } = {}
+      const patch: Partial<Session> = {}
       if (m.repeat) patch.repeat = null
       if (m.days.length) patch.days = []
-      if (Object.keys(patch).length) await updateSession(mid, patch)
+      if (Object.keys(patch).length) writes.push({ id: mid, patch })
     }
     // Répare les autres cycles qui revendiquent encore une séance du nôtre
-    for (const s of sessions) {
+    for (const s of pool) {
       if (!s.repeat || s.id === ownerId || allIds.includes(s.id)) continue
       const oSteps = cycleStepsOf(s)
       const kept = oSteps.map((st) => st.filter((x) => !allIds.includes(x))).filter((st) => st.length)
       if (kept.flat().length !== oSteps.flat().length) {
-        await updateSession(s.id, {
-          repeat: {
-            everyDays: s.repeat.everyDays,
-            startDate: s.repeat.startDate,
-            ...(s.repeat.onDays?.length ? { onDays: s.repeat.onDays } : {}),
-            steps: kept.map((ids) => ({ ids })),
+        writes.push({
+          id: s.id,
+          patch: {
+            repeat: {
+              everyDays: s.repeat.everyDays,
+              startDate: s.repeat.startDate,
+              ...(s.repeat.onDays?.length ? { onDays: s.repeat.onDays } : {}),
+              steps: kept.map((ids) => ({ ids })),
+            },
           },
         })
       }
     }
+    return writes
   }
+  const applySchedule = async (selfId: string) => {
+    for (const w of scheduleWrites(selfId)) await updateSession(w.id, w.patch)
+  }
+
+  // Alternance affichée dès qu'un cran existe au-delà de « cette séance seule »
+  const alternating = steps.length > 1 || (steps[0]?.length ?? 0) > 1
+  const cranLetter = (i: number) => String.fromCharCode(65 + i)
+  const noDays = planMode === 'weekly' && days.length === 0
+
+  // --- Aperçu : ce que le Planning montrera, calculé par SA fonction (plannedSessionIdsOn)
+  // sur une copie des séances où cette fiche et ses écritures d'alternance sont appliquées.
+  // Une seule source de vérité : l'aperçu ne peut pas mentir sur l'enregistrement.
+  const preview = useMemo(() => {
+    const draft: Session = {
+      ...(existing ?? { items: [], createdAt: 0 }),
+      id: selfKey,
+      name: name.trim() || 'Séance',
+      category,
+      days: planMode === 'weekly' ? days : [],
+      repeat: null,
+      warmupFor: planMode === 'warmup' && warmupFor && warmupFor !== category ? warmupFor : null,
+    }
+    let pool = [...sessions.filter((s) => s.id !== selfKey), draft]
+    for (const w of scheduleWrites(selfKey, pool)) pool = pool.map((s) => (s.id === w.id ? { ...s, ...w.patch } : s))
+    const cycles = canonicalCycles(pool)
+    // Les partenaires d'alternance n'existent qu'en cycle : en « Avant une autre » les crans
+    // saisis restent en mémoire mais ne s'enregistrent pas, l'aperçu ne doit pas les montrer
+    const partnerIds = new Set(planMode === 'warmup' ? [] : steps.flat().filter((id) => id !== selfKey && id !== '__self__'))
+    const dueOn = (d: Date) => {
+      const ids = plannedSessionIdsOn(d, pool, cycles)
+      const me =
+        planMode === 'warmup'
+          ? warmupsDueOn(pool, planToDoOn(d, logs), ids, new Set()).some((s) => s.id === selfKey)
+          : ids.has(selfKey)
+      return { ids, me }
+    }
+    const today = todayStr()
+    const monday = startOfWeek()
+    const cells = Array.from({ length: 14 }, (_, i) => {
+      const d = addDays(monday, i)
+      const dStr = toDateStr(d)
+      const { ids, me } = dueOn(d)
+      const other = pool.find((s) => partnerIds.has(s.id) && ids.has(s.id))
+      return { d, dStr, me, other, past: dStr < today, today: dStr === today }
+    })
+    let nextLabel = '—'
+    for (let i = 0; i < 60; i++) {
+      const d = addDays(new Date(), i)
+      if (dueOn(d).me) {
+        nextLabel = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) + (i === 0 ? " (aujourd'hui)" : '')
+        break
+      }
+    }
+    const partners = [...partnerIds].map((id) => pool.find((s) => s.id === id)).filter((s): s is Session => !!s)
+    return { cells, nextLabel, partners }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions, logs, existing, selfKey, name, category, planMode, days, everyDays, startDate, steps, startStep, warmupFor])
 
   const save = async () => {
     const maxOrder = sessions.reduce((a, s) => Math.max(a, s.sortOrder ?? -1), -1)
@@ -577,7 +674,7 @@ export default function SessionForm() {
   // Garde-fou du retour : « Retour » sur une fiche modifiée demandait zéro confirmation et
   // perdait tout en silence. On compare un instantané du formulaire à celui du montage.
   const snapshot = JSON.stringify({
-    name, category, planMode, days, everyDays, startDate, onDays, steps, startStep,
+    name, category, planMode, days, everyDays, startDate, steps, startStep,
     items: items.map(({ uid: _uid, ...rest }) => rest),
     workSec, restSec, rounds, stretchRest, stretchRounds, muscuRounds, group, warmupFor,
   })
@@ -1100,14 +1197,14 @@ export default function SessionForm() {
           <div className="space-y-2">
             <Eyebrow className="ml-1 text-ink/60">Planification</Eyebrow>
             <div className={card}>
+              {/* Le « quand » : trois positions. L'alternance est une section à part, plus bas. */}
               <div className="px-3 py-2.5">
                 <Seg
                   compact
                   options={[
-                    { value: 'weekly' as const, label: 'Jours fixes', short: 'Jours' },
-                    { value: 'every' as const, label: 'Tous les X jours', short: 'Tous les X j.' },
-                    { value: 'weekdays' as const, label: 'Alternance' },
-                    { value: 'warmup' as const, label: 'Avant une autre', short: 'Avant' },
+                    { value: 'weekly' as const, label: 'Jours fixes' },
+                    { value: 'every' as const, label: 'Tous les X jours' },
+                    { value: 'warmup' as const, label: 'Avant une autre' },
                   ]}
                   value={planMode}
                   onChange={(v) => {
@@ -1129,11 +1226,13 @@ export default function SessionForm() {
               )}
 
               {/* Jumelée : s'invite dans Aujourd'hui les jours où une séance de la
-                  catégorie cible est due (courses du plan comprises) — pas de jour propre */}
+                  catégorie cible est due (courses du plan comprises) — pas de jour propre.
+                  Libellé au-dessus, chips en dessous : côte à côte, elles passaient sur deux
+                  lignes et chevauchaient le libellé. */}
               {planMode === 'warmup' && (
-                <div className={row + ' min-h-14'}>
-                  <span className={rowLabel}>Avant chaque</span>
-                  <div className="ml-auto flex flex-wrap justify-end gap-1.5">
+                <div className={row + ' flex-col items-start gap-2.5 py-3'}>
+                  <span className={rowLabel}>Avant chaque séance de</span>
+                  <div className="flex flex-wrap gap-2">
                     {CATEGORIES.filter((c) => c !== category).map((c) => (
                       <Chip key={c} active={warmupFor === c} onClick={() => setWarmupFor(c)}>
                         {CATEGORY_META[c].label}
@@ -1152,17 +1251,6 @@ export default function SessionForm() {
                   </div>
                 </div>
               )}
-
-              {planMode === 'weekdays' && (
-                <div className={row + ' min-h-14'}>
-                  <div className="flex w-full items-center justify-between">
-                    {DAY_LETTER.map((_, d) => (
-                      <DayButton key={d} d={d} on={onDays.includes(d)} onClick={() => toggleOnDay(d)} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {planMode === 'every' && (
                 <div className={row}>
                   <span className={rowLabel}>À partir du</span>
@@ -1176,101 +1264,106 @@ export default function SessionForm() {
                   />
                 </div>
               )}
-              {(planMode === 'every' || planMode === 'weekdays') && (
+
+              {/* ── En alternance avec : vide par défaut ; « + Ajouter » crée un cran (A, B, C…)
+                  et ouvre le sélecteur. Cumulable avec Jours fixes et Tous les X jours. ── */}
+              {planMode !== 'warmup' && (
                 <>
                   <div className={row + ' min-h-11'}>
-                    <span className={rowLabel}>Rotation</span>
+                    <span className={rowLabel}>En alternance avec</span>
                     <button
                       type="button"
                       onClick={addStep}
                       className="ml-auto flex items-center gap-1 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-sage-600 active:text-sage-700"
                     >
-                      <Plus className="h-3.5 w-3.5" /> jour
+                      <Plus className="h-3.5 w-3.5" /> Ajouter
                     </button>
                   </div>
-                  {steps.map((st, si) => (
-                    <div key={si} className="px-4 pb-2.5">
-                      <div className="flex min-h-[30px] flex-wrap items-center gap-2">
-                        <span className="w-6 shrink-0 font-mono text-[10px] font-bold uppercase text-ink/45">J{si + 1}</span>
-                        {st.map((sid) => {
-                          if (sid === selfKey) {
+                  {alternating &&
+                    steps.map((st, si) => (
+                      <div key={si} className="px-4 pb-2.5">
+                        <div className="flex min-h-[30px] flex-wrap items-center gap-2">
+                          <span className="w-6 shrink-0 font-mono text-[10px] font-bold uppercase text-ink/45">{cranLetter(si)}</span>
+                          {st.map((sid) => {
+                            if (sid === selfKey) {
+                              return (
+                                <span
+                                  key={sid}
+                                  className="flex h-[26px] items-center gap-1.5 rounded-full bg-sage-500 px-2.5 font-mono text-[10px] font-bold tracking-[0.08em] uppercase text-onaccent"
+                                >
+                                  <Star className="h-2.5 w-2.5 fill-current" /> {name.trim() || 'Cette séance'}
+                                </span>
+                              )
+                            }
+                            const x = sessions.find((q) => q.id === sid)
+                            if (!x) return null
+                            const meta = CATEGORY_META[x.category]
                             return (
-                              <span
+                              <button
                                 key={sid}
-                                className="flex h-[26px] items-center gap-1.5 rounded-full bg-sage-500 px-2.5 font-mono text-[10px] font-bold tracking-[0.08em] uppercase text-onaccent"
+                                type="button"
+                                title="Retirer de ce cran"
+                                onClick={() => removeFromStep(si, sid)}
+                                className={`flex h-[26px] items-center gap-1.5 rounded-full border px-2.5 font-mono text-[10px] font-bold tracking-[0.08em] uppercase ${meta.soft} ${meta.text}`}
+                                style={{ borderColor: meta.hex + '59' }}
                               >
-                                <Star className="h-2.5 w-2.5 fill-current" /> {name.trim() || 'Cette séance'}
-                              </span>
+                                <CategoryIcon category={x.category} className="h-3 w-3" /> {x.name}
+                                <X className="h-3 w-3 opacity-60" />
+                              </button>
                             )
-                          }
-                          const x = sessions.find((q) => q.id === sid)
-                          if (!x) return null
-                          const meta = CATEGORY_META[x.category]
-                          return (
-                            <button
-                              key={sid}
-                              type="button"
-                              title="Retirer de ce jour"
-                              onClick={() => removeFromStep(si, sid)}
-                              className={`flex h-[26px] items-center gap-1.5 rounded-full border px-2.5 font-mono text-[10px] font-bold tracking-[0.08em] uppercase ${meta.soft} ${meta.text}`}
-                              style={{ borderColor: meta.hex + '59' }}
-                            >
-                              <CategoryIcon category={x.category} className="h-3 w-3" /> {x.name}
-                              <X className="h-3 w-3 opacity-60" />
-                            </button>
-                          )
-                        })}
-                        <button
-                          type="button"
-                          aria-label={`Ajouter une séance au jour ${si + 1}`}
-                          onClick={() => setAddingDay(addingDay === si ? null : si)}
-                          className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-hairline-strong bg-glass-soft text-ink active:bg-glass"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                        {!st.includes(selfKey) && steps.length > 1 && (
+                          })}
                           <button
                             type="button"
-                            aria-label={`Retirer le jour ${si + 1}`}
-                            title="Retirer ce jour de la rotation"
-                            onClick={() => removeStep(si)}
-                            className="ml-auto px-0.5 text-ink-soft/40 active:text-ink-soft"
+                            aria-label={`Ajouter une séance au cran ${cranLetter(si)}`}
+                            title="Le même jour, aussi…"
+                            onClick={() => setAddingDay(addingDay === si ? null : si)}
+                            className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-hairline-strong bg-glass-soft text-ink active:bg-glass"
                           >
-                            <X className="h-4 w-4" />
+                            <Plus className="h-3 w-3" />
                           </button>
+                          {!st.includes(selfKey) && steps.length > 1 && (
+                            <button
+                              type="button"
+                              aria-label={`Retirer le cran ${cranLetter(si)}`}
+                              title="Retirer ce cran de l'alternance"
+                              onClick={() => removeStep(si)}
+                              className="ml-auto px-0.5 text-ink-soft/40 active:text-ink-soft"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                        {addingDay === si && (
+                          <div className="mt-2">
+                            <Select
+                              value=""
+                              onChange={(v) => {
+                                if (v) {
+                                  addToStep(si, v)
+                                  setAddingDay(null)
+                                }
+                              }}
+                            >
+                              <option value="">Choisir une séance…</option>
+                              {sessions
+                                .filter((s) => s.id !== existing?.id && !usedIds.has(s.id))
+                                .map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.name}
+                                  </option>
+                                ))}
+                            </Select>
+                          </div>
                         )}
                       </div>
-                      {addingDay === si && (
-                        <div className="mt-2">
-                          <Select
-                            value=""
-                            onChange={(v) => {
-                              if (v) {
-                                addToStep(si, v)
-                                setAddingDay(null)
-                              }
-                            }}
-                          >
-                            <option value="">Choisir une séance…</option>
-                            {sessions
-                              .filter((s) => s.id !== existing?.id && !usedIds.has(s.id))
-                              .map((s) => (
-                                <option key={s.id} value={s.id}>
-                                  {s.name}
-                                </option>
-                              ))}
-                          </Select>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {planMode === 'weekdays' && steps.length > 1 && onDays.length > 0 && (
+                    ))}
+                  {alternating && steps.length > 1 && (planMode === 'every' || days.length > 0) && (
                     <div className={row}>
                       <span className={rowLabel}>Commencer par</span>
                       <div className="ml-auto">
                         <Seg
                           compact
-                          options={steps.map((_, i) => ({ value: String(i), label: `J${i + 1}` }))}
+                          options={steps.map((_, i) => ({ value: String(i), label: cranLetter(i) }))}
                           value={String(startStep % steps.length)}
                           onChange={(v) => setStartStep(Number(v))}
                         />
@@ -1279,6 +1372,59 @@ export default function SessionForm() {
                   )}
                 </>
               )}
+
+              {/* ── Aperçu : ce que le Planning montrera, deux semaines à partir de lundi ── */}
+              <div className={row + ' flex-col items-start gap-0 pt-3 pb-3.5'}>
+                <span className={rowLabel + ' mb-2'}>Aperçu · 2 semaines</span>
+                <div className="grid w-full grid-cols-7 gap-1">
+                  {DAY_LETTER.map((l, i) => (
+                    <span key={'h' + i} className="pb-0.5 text-center font-mono text-[9px] tracking-[0.1em] uppercase text-ink/45">
+                      {l}
+                    </span>
+                  ))}
+                  {preview.cells.map((c) => {
+                    const otherMeta = !c.me && c.other ? CATEGORY_META[c.other.category] : undefined
+                    return (
+                      <span
+                        key={c.dStr}
+                        title={c.other ? c.other.name : undefined}
+                        className={
+                          'flex h-[34px] items-center justify-center rounded-sm font-mono text-[10px] ' +
+                          (c.past
+                            ? 'text-ink/30'
+                            : c.me
+                              ? 'bg-sage-500 font-bold text-onaccent'
+                              : c.other
+                                ? 'border font-bold'
+                                : 'text-ink/70') +
+                          (c.today ? ' ring-1 ring-inset ring-ink/75' : '')
+                        }
+                        style={!c.past && otherMeta ? { borderColor: otherMeta.hex + '99', color: otherMeta.hex } : undefined}
+                      >
+                        {c.d.getDate()}
+                      </span>
+                    )
+                  })}
+                </div>
+                {noDays ? (
+                  <p className="mt-2.5 font-mono text-[9px] leading-relaxed tracking-[0.12em] uppercase text-hiit">
+                    Aucun jour choisi : ce programme n'apparaîtra ni dans le Planning ni dans Aujourd'hui.
+                  </p>
+                ) : (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 font-mono text-[9px] tracking-[0.12em] uppercase text-ink/65">
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block h-2.5 w-2.5 rounded-xs bg-sage-500" /> Ce programme
+                    </span>
+                    {preview.partners.map((p) => (
+                      <span key={p.id} className="flex items-center gap-1.5">
+                        <span className="inline-block h-2.5 w-2.5 rounded-xs border" style={{ borderColor: CATEGORY_META[p.category].hex + 'b3' }} />{' '}
+                        {p.name}
+                      </span>
+                    ))}
+                    <span className="w-full text-ink/85">Prochaine fois : {preview.nextLabel}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

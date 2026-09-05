@@ -37,7 +37,7 @@ try {
   await page.waitForSelector('text=Avant chaque')
   // ⚠ Les tuiles de catégorie affichent les mêmes textes (HIIT, VÉLO) avec aria-pressed :
   // toute interaction avec les chips se scope à la rangée « Avant chaque ».
-  const chipRow = page.locator('div:has(> span:text-is("Avant chaque"))')
+  const chipRow = page.locator('div:has(> span:text-is("Avant chaque séance de"))')
   await chipRow.locator('button[aria-pressed="true"]:has-text("Vélo")').waitFor()
   // Choisir HIIT explicitement, les jours fixes ne doivent plus être proposés
   await chipRow.locator('button:has-text("HIIT")').click()

@@ -26,8 +26,8 @@ try {
   await page.waitForSelector('text=Planification')
   await page.getByRole('button', { name: 'Tous les X jours', exact: true }).click()
   await page.waitForSelector('text=à partir du')
-  // Le HIIT sur un nouveau jour de la rotation (jour 2) : « + jour » ouvre le sélecteur
-  await page.getByRole('button', { name: 'jour', exact: true }).click()
+  // Le HIIT sur un nouveau cran de l'alternance (B) : « + Ajouter » ouvre le sélecteur
+  await page.getByRole('button', { name: 'Ajouter', exact: true }).click()
   await page.locator('select:has-text("Choisir une séance")').selectOption({ label: 'HIIT — Cardio express' })
   await page.waitForSelector('button:has-text("HIIT — Cardio express")') // chip ajoutée au jour 2
   await page.click('text=Enregistrer')
