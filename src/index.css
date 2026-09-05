@@ -102,18 +102,15 @@ body {
   overscroll-behavior-y: none;
 }
 
-/* Animations de la maquette : grain photographique, reflet qui balaie l'image,
-   et remplissage « marée » des ronds du planning quand une séance est faite.
-   Toutes sont décoratives — coupées si l'utilisateur limite les animations. */
+/* Animations de la maquette : grain photographique et remplissage « marée » des ronds
+   du planning quand une séance est faite. Toutes sont décoratives — coupées si
+   l'utilisateur limite les animations. (Le reflet `sweep` qui balayait la photo a été
+   retiré le 03/09/2026 : jugé kitsch par l'utilisateur.) */
 @keyframes grain {
   0%, 100% { transform: translate(0, 0); }
   25% { transform: translate(-2px, 1px); }
   50% { transform: translate(1px, -2px); }
   75% { transform: translate(-1px, -1px); }
-}
-@keyframes sweep {
-  from { transform: translateX(-60%); }
-  to { transform: translateX(60%); }
 }
 @keyframes tide {
   from { transform: translateY(100%); }

@@ -27,8 +27,8 @@ export default function SeaBackdrop() {
       />
       {/* Scrim de lisibilité — cf. plus haut, il tient tout l'écran */}
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgb(7_26_38/0.5)_0%,rgb(7_26_38/0.72)_45%,rgb(7_26_38/0.94)_100%)]" />
-      {/* Reflet qui balaie lentement l'image, comme un pinceau de phare */}
-      <div className="absolute -inset-x-[30%] -inset-y-[30%] animate-[sweep_13s_linear_infinite] bg-[linear-gradient(100deg,transparent_44%,rgb(255_244_214/0.13)_50%,transparent_56%)]" />
+      {/* Le « pinceau de phare » (reflet qui balayait l'image en 13 s) a été retiré le
+          03/09/2026 : jugé kitsch par l'utilisateur. Ne pas le remettre. */}
       {/* Grain argentique : trame de 3 px qui vibre, casse le lissé du dégradé */}
       <div className="absolute -inset-1 animate-[grain_1.4s_steps(2)_infinite] bg-[radial-gradient(rgb(255_255_255/0.14)_1px,transparent_1px)] bg-[length:3px_3px] opacity-30" />
     </div>
