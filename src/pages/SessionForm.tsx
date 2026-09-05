@@ -16,6 +16,8 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS, getEventCoordinates } from '@dnd-kit/utilities'
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   GripVertical,
   LayoutGrid,
@@ -39,10 +41,13 @@ import {
   type Session,
   type SessionItem,
 } from '../types'
-import { DAY_LETTER, DAY_NAMES, addDays, mondayIndex, startOfWeek, toDateStr, todayStr } from '../lib/dates'
-import { canonicalCycles, countWeekdays, cycleStepsOf, diffDays, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
-import { planToDoOn, warmupsDueOn } from '../lib/planDay'
+import { DAY_LETTER, DAY_NAMES, addDays, formatShortFr, mondayIndex, toDateStr, todayStr } from '../lib/dates'
+import { canonicalCycles, countWeekdays, cycleStepsOf, describeSchedule, diffDays, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
+import { isPlanLog, planToDoOn, warmupsDueOn } from '../lib/planDay'
+import { usePlanningWeek } from '../lib/usePlanningWeek'
+import { TYPE_META } from '../data/plan'
 import { CategoryIcon, Chip, Combobox, Eyebrow, FormActions, PageHeader, Seg, Select, Sheet, Stepper, glassCard } from '../components/ui'
+import { DayDot, dayCell } from '../components/DayDot'
 import ExercisePicker from '../components/ExercisePicker'
 
 /* ── Vocabulaire de l'écran (maquette « Fiche séance », direction B, sept. 2026) ─────
@@ -114,6 +119,53 @@ function DayButton({ d, on, onClick }: { d: number; on: boolean; onClick: () => 
     >
       {DAY_LETTER[d]}
     </button>
+  )
+}
+
+/** Grille de l'aperçu : celle du Planning sans la poignée, jours en 24 px (28 dans le Planning) — rien
+ *  ne s'y déplace, et la colonne du nom est déjà la plus étreinte dans une carte. */
+const previewGrid = 'grid grid-cols-[minmax(0,1fr)_repeat(7,1.5rem)] items-center gap-x-0.5'
+
+/** Ligne de l'aperçu : une séance (la fiche en cours, une autre, ou une course du plan)
+ *  et ses sept ronds — mêmes `DayDot` que le Planning. La ligne de la fiche est teintée. */
+function PreviewRow({
+  id,
+  title,
+  code,
+  hex,
+  self,
+  planned,
+  done,
+  todayIdx,
+}: {
+  id: string
+  title: string
+  code: string
+  hex: string
+  self?: boolean
+  planned: boolean[]
+  done: boolean[]
+  todayIdx: number
+}) {
+  return (
+    <div
+      data-session={id}
+      className={
+        previewGrid + ' rounded-md border p-1 ' + (self ? 'border-sage-500/60 bg-sage-500/10' : 'border-hairline bg-glass-sunken')
+      }
+    >
+      <div className="min-w-0 pl-1">
+        <span className="block truncate font-display text-[15px] leading-[1.05] font-bold uppercase">{title}</span>
+        <span className="block truncate font-mono text-[9px] tracking-[0.1em] uppercase" style={{ color: hex }}>
+          {code}
+        </span>
+      </div>
+      {Array.from({ length: 7 }, (_, d) => (
+        <span key={d} className={dayCell(d === todayIdx)}>
+          <DayDot state={done[d] ? 'done' : planned[d] ? 'planned' : 'none'} hex={hex} />
+        </span>
+      ))}
+    </div>
   )
 }
 
@@ -567,14 +619,18 @@ export default function SessionForm() {
   const cranLetter = (i: number) => String.fromCharCode(65 + i)
   const noDays = planMode === 'weekly' && days.length === 0
 
-  // --- Aperçu : ce que le Planning montrera, calculé par SA fonction (plannedSessionIdsOn)
-  // sur une copie des séances où cette fiche et ses écritures d'alternance sont appliquées.
+  // --- Aperçu : la grille du Planning (une ligne par séance, un rond par jour, semaine
+  // navigable), pour caler ce programme en fonction de ce qui est déjà posé — séances de
+  // l'utilisateur et courses du plan. Calculé par SA fonction (plannedSessionIdsOn) sur une
+  // copie des séances où cette fiche et ses écritures d'alternance sont appliquées.
   // Une seule source de vérité : l'aperçu ne peut pas mentir sur l'enregistrement.
+  const [weekOffset, setWeekOffset] = useState(0)
+  const { weekDates, todayIdx, planStates } = usePlanningWeek(weekOffset, logs)
   const preview = useMemo(() => {
     const draft: Session = {
       ...(existing ?? { items: [], createdAt: 0 }),
       id: selfKey,
-      name: name.trim() || 'Séance',
+      name: name.trim() || 'Ce programme',
       category,
       days: planMode === 'weekly' ? days : [],
       repeat: null,
@@ -583,9 +639,6 @@ export default function SessionForm() {
     let pool = [...sessions.filter((s) => s.id !== selfKey), draft]
     for (const w of scheduleWrites(selfKey, pool)) pool = pool.map((s) => (s.id === w.id ? { ...s, ...w.patch } : s))
     const cycles = canonicalCycles(pool)
-    // Les partenaires d'alternance n'existent qu'en cycle : en « Avant une autre » les crans
-    // saisis restent en mémoire mais ne s'enregistrent pas, l'aperçu ne doit pas les montrer
-    const partnerIds = new Set(planMode === 'warmup' ? [] : steps.flat().filter((id) => id !== selfKey && id !== '__self__'))
     const dueOn = (d: Date) => {
       const ids = plannedSessionIdsOn(d, pool, cycles)
       const me =
@@ -594,14 +647,26 @@ export default function SessionForm() {
           : ids.has(selfKey)
       return { ids, me }
     }
-    const today = todayStr()
-    const monday = startOfWeek()
-    const cells = Array.from({ length: 14 }, (_, i) => {
-      const d = addDays(monday, i)
-      const dStr = toDateStr(d)
-      const { ids, me } = dueOn(d)
-      const other = pool.find((s) => partnerIds.has(s.id) && ids.has(s.id))
-      return { d, dStr, me, other, past: dStr < today, today: dStr === today }
+    const byDay = weekDates.map((ds) => dueOn(new Date(ds + 'T12:00:00')))
+    const doneByDay = weekDates.map((ds) => new Set(logs.filter((l) => l.date === ds && !isPlanLog(l)).map((l) => l.sessionId)))
+    // Même filtre que le Planning : une séance sans jour n'encombre pas la grille
+    const others = pool
+      .filter(
+        (s) =>
+          s.id !== selfKey &&
+          (s.days.length > 0 || !!s.repeat || !!ownerOf(s.id, pool, cycles) || doneByDay.some((ids) => ids.has(s.id))),
+      )
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    const rows = [pool.find((s) => s.id === selfKey) ?? draft, ...others].map((s) => {
+      const self = s.id === selfKey
+      const cadence = ownerOf(s.id, pool, cycles) ? describeSchedule(s, pool, cycles) : undefined
+      return {
+        session: s,
+        self,
+        code: CATEGORY_META[s.category].code + (cadence ? ` · ↻ ${cadence}` : ''),
+        planned: byDay.map((x) => (self ? x.me : x.ids.has(s.id))),
+        done: doneByDay.map((ids) => ids.has(s.id)),
+      }
     })
     let nextLabel = '—'
     for (let i = 0; i < 60; i++) {
@@ -611,10 +676,9 @@ export default function SessionForm() {
         break
       }
     }
-    const partners = [...partnerIds].map((id) => pool.find((s) => s.id === id)).filter((s): s is Session => !!s)
-    return { cells, nextLabel, partners }
+    return { rows, nextLabel }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions, logs, existing, selfKey, name, category, planMode, days, everyDays, startDate, steps, startStep, warmupFor])
+  }, [sessions, logs, existing, selfKey, name, category, planMode, days, everyDays, startDate, steps, startStep, warmupFor, weekDates[0]])
 
   const save = async () => {
     const maxOrder = sessions.reduce((a, s) => Math.max(a, s.sortOrder ?? -1), -1)
@@ -1373,56 +1437,86 @@ export default function SessionForm() {
                 </>
               )}
 
-              {/* ── Aperçu : ce que le Planning montrera, deux semaines à partir de lundi ── */}
-              <div className={row + ' flex-col items-start gap-0 pt-3 pb-3.5'}>
-                <span className={rowLabel + ' mb-2'}>Aperçu · 2 semaines</span>
-                <div className="grid w-full grid-cols-7 gap-1">
-                  {DAY_LETTER.map((l, i) => (
-                    <span key={'h' + i} className="pb-0.5 text-center font-mono text-[9px] tracking-[0.1em] uppercase text-ink/45">
-                      {l}
+              {/* ── Aperçu : la grille du Planning, semaine par semaine, avec tout ce qui est déjà posé ── */}
+              <div className={row + ' flex-col items-stretch gap-0 px-3 pt-3 pb-3.5'}>
+                <div className="flex items-center justify-between gap-2 pl-1">
+                  <span className={rowLabel}>Aperçu</span>
+                  <div className="flex items-center gap-1.5">
+                    <button type="button" aria-label="Semaine précédente" onClick={() => setWeekOffset((o) => o - 1)} className={iconBtn}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="min-w-[7.5rem] text-center font-mono text-[10px] tracking-[0.14em] uppercase text-ink/85">
+                      {weekOffset === 0 ? 'Cette semaine' : `Sem. du ${formatShortFr(weekDates[0])}`}
                     </span>
-                  ))}
-                  {preview.cells.map((c) => {
-                    const otherMeta = !c.me && c.other ? CATEGORY_META[c.other.category] : undefined
+                    <button type="button" aria-label="Semaine suivante" onClick={() => setWeekOffset((o) => o + 1)} className={iconBtn}>
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                {/* En-tête des jours : lettre + numéro, aujourd'hui en pastille pleine — comme le Planning */}
+                <div className={previewGrid + ' mt-2.5 px-1 pb-1'}>
+                  <span />
+                  {DAY_LETTER.map((letter, d) => {
+                    const isToday = d === todayIdx
                     return (
-                      <span
-                        key={c.dStr}
-                        title={c.other ? c.other.name : undefined}
-                        className={
-                          'flex h-[34px] items-center justify-center rounded-sm font-mono text-[10px] ' +
-                          (c.past
-                            ? 'text-ink/30'
-                            : c.me
-                              ? 'bg-sage-500 font-bold text-onaccent'
-                              : c.other
-                                ? 'border font-bold'
-                                : 'text-ink/70') +
-                          (c.today ? ' ring-1 ring-inset ring-ink/75' : '')
-                        }
-                        style={!c.past && otherMeta ? { borderColor: otherMeta.hex + '99', color: otherMeta.hex } : undefined}
-                      >
-                        {c.d.getDate()}
-                      </span>
+                      <div key={d} title={DAY_NAMES[d]} className="mx-auto flex flex-col items-center gap-0.5">
+                        <span className={'font-mono text-[10px] tracking-[0.1em] ' + (isToday ? 'text-sage-500' : 'text-ink/55')}>
+                          {letter}
+                        </span>
+                        <span
+                          className={
+                            'flex h-5 w-5 items-center justify-center rounded-full font-mono text-[10px] tabular-nums ' +
+                            (isToday ? 'bg-sage-500 text-onaccent' : 'text-ink/55')
+                          }
+                        >
+                          {Number(weekDates[d].slice(8, 10))}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="space-y-1" data-preview>
+                  {preview.rows.map((r) => (
+                    <PreviewRow
+                      key={r.session.id}
+                      id={r.session.id}
+                      title={r.session.name}
+                      code={r.code}
+                      hex={CATEGORY_META[r.session.category].hex}
+                      self={r.self}
+                      planned={r.planned}
+                      done={r.done}
+                      todayIdx={todayIdx}
+                    />
+                  ))}
+                  {/* Courses du plan semi de la semaine, en lecture seule, comme dans le Planning :
+                      rond plein sur le jour réellement fait, anneau sur le jour prévu tant que rien n'est fait */}
+                  {planStates.map((st) => {
+                    const t = TYPE_META[st.seance.type]
+                    const inWeek = st.doneDate ? weekDates.indexOf(st.doneDate) : -1
+                    const doneCol = !st.done ? -1 : inWeek >= 0 ? inWeek : st.seance.day
+                    return (
+                      <PreviewRow
+                        key={'plan-' + st.seance.day}
+                        id={'plan-' + st.seance.day}
+                        title={st.seance.title}
+                        code={t.code + ' · plan semi'}
+                        hex={t.hex}
+                        planned={Array.from({ length: 7 }, (_, d) => d === st.seance.day && !st.done)}
+                        done={Array.from({ length: 7 }, (_, d) => d === doneCol)}
+                        todayIdx={todayIdx}
+                      />
                     )
                   })}
                 </div>
                 {noDays ? (
-                  <p className="mt-2.5 font-mono text-[9px] leading-relaxed tracking-[0.12em] uppercase text-hiit">
+                  <p className="mt-2.5 pl-1 font-mono text-[9px] leading-relaxed tracking-[0.12em] uppercase text-hiit">
                     Aucun jour choisi : ce programme n'apparaîtra ni dans le Planning ni dans Aujourd'hui.
                   </p>
                 ) : (
-                  <div className="mt-2.5 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 font-mono text-[9px] tracking-[0.12em] uppercase text-ink/65">
-                    <span className="flex items-center gap-1.5">
-                      <span className="inline-block h-2.5 w-2.5 rounded-xs bg-sage-500" /> Ce programme
-                    </span>
-                    {preview.partners.map((p) => (
-                      <span key={p.id} className="flex items-center gap-1.5">
-                        <span className="inline-block h-2.5 w-2.5 rounded-xs border" style={{ borderColor: CATEGORY_META[p.category].hex + 'b3' }} />{' '}
-                        {p.name}
-                      </span>
-                    ))}
-                    <span className="w-full text-ink/85">Prochaine fois : {preview.nextLabel}</span>
-                  </div>
+                  <p className="mt-2.5 pl-1 font-mono text-[9px] tracking-[0.12em] uppercase text-ink/85">
+                    Prochaine fois : {preview.nextLabel}
+                  </p>
                 )}
               </div>
             </div>
