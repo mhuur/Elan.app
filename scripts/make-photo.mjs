@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const SRC = resolve(here, '../../decoration-murale-finistere-le-phare-dar-men-bretagne.jpg')
+const SRC = resolve(here, '../../docs/archive/decoration-murale-finistere-le-phare-dar-men-bretagne.jpg')
 const OUT = resolve(here, '../src/assets/bord-de-mer.webp')
 
 const arg = (name, fallback) => {
