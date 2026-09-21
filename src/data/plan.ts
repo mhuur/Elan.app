@@ -361,15 +361,36 @@ export const PLAN_SEMI = {
         ],
       }),
     ] },
-    { start: '2026-09-21', phase: 'Affûtage', km: 34, seances: [
-      mk(1, 'vma', 'VMA 6×400 m', '6×400 m à 4:40, récup 1:00', vma(6, 400, '4:40', 60)),
-      mk(2, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
-      mk(4, 'as', 'Allure semi 2×2 km', '2×2 km à 5:18, récup 2 min', asInt(2, 2000, '5:18', 120)),
-      mk(6, 'sl', 'Sortie longue 11 km', '11 km en EF', longRun(11)),
+    // Rhume du 11 au 20/09 : 0 km sur 11 jours (dernière sortie : VMA 5×1000 du 10/09). La semaine du
+    // 14/09 (pic de volume, répétition générale du 20/09) n'a pas eu lieu ; elle reste ci-dessus en
+    // historique. Re-calage du 21/09 : la forme aérobie n'a pas bougé (seuil COROS 5:15, prédiction
+    // semi 1:59:45, FC de repos 48) ; ce qui manque, c'est le contact avec l'allure course et une sortie
+    // longue récente (dernière : 15 km le 07/09). Objectif 1h53 maintenu, allure de départ tranchée sur
+    // la longue du dim. 27/09. Ni VMA ni seuil de rattrapage : à 13 jours de la course, une VMA après
+    // 11 jours d'arrêt coûte plus qu'elle ne rapporte. Lundi = repos après la longue de la veille.
+    { start: '2026-09-21', phase: 'Affûtage', label: 'reprise après rhume', km: 42, seances: [
+      mk(1, 'ef', 'Footing reprise 6 km', '6 km en EF · 4 lignes droites · test FC', {
+        surface: 'route',
+        parts: [{ kind: 'steady', label: 'EF', distanceM: 6000, pace: EF, hr: HR.ef, note: 'reprise après rhume : si la FC dépasse 155 à 5:50/km, le rhume n’est pas fini → toute la semaine en EF · finir par 4 lignes droites' }],
+      }),
+      mk(2, 'ef', 'Footing 6 km', '6 km en EF · à sauter si la FC de mardi était haute', {
+        surface: 'route',
+        parts: [{ kind: 'steady', label: 'EF', distanceM: 6000, pace: EF, hr: HR.ef, note: 'à sauter si la FC de mardi dépassait 155 à 5:50/km' }],
+      }),
+      mk(3, 'as', 'Allure semi 3×2 km', '3×2 km à 5:20, récup 2 min · retrouver l’allure course', asInt(3, 2000, '5:20', 120)),
+      mk(5, 'ef', 'Footing 6 km', '6 km en EF', footing(6)),
+      mk(6, 'sl', 'Sortie longue 13 km', '5 km EF + 6 km à allure semi + 2 km EF · répétition générale réduite', {
+        surface: 'route',
+        parts: [
+          { kind: 'steady', label: 'EF', distanceM: 5000, pace: EF, hr: HR.ef },
+          { kind: 'work', label: 'Allure semi', distanceM: 6000, pace: p('5:20'), hr: HR.as, note: 'teste gel, tenue et allure du jour J · FC ≤ 170 sur les 6 km = départ à 5:21 validé ; au-delà → départ à 5:30' },
+          { kind: 'steady', label: 'EF', distanceM: 2000, pace: EF, hr: HR.ef },
+        ],
+      }),
     ] },
     { start: '2026-09-28', phase: 'Affûtage', label: 'semaine de course', km: 35, seances: [
       mk(1, 'ef', 'Footing 6 km', '6 km en EF · 4 lignes droites', footing(6, 4)),
-      mk(2, 'ef', 'Footing court 4 km', '4 km en EF, ou repos complet', {
+      mk(3, 'ef', 'Footing court 4 km', '4 km en EF, ou repos complet', {
         surface: 'route',
         parts: [{ kind: 'steady', label: 'EF', distanceM: 4000, pace: EF, hr: HR.ef, note: 'ou repos complet selon la forme' }],
       }),
@@ -383,7 +404,7 @@ export const PLAN_SEMI = {
       }),
       mk(6, 'course', 'Semi-marathon — 21,1 km', 'Tout Rennes Court · objectif 1h53', {
         surface: 'route',
-        parts: [{ kind: 'work', label: 'Semi-marathon', distanceM: 21100, pace: p('5:21'), hr: '163–172', note: 'partir à 5:25–5:27, accélérer sur la fin (négatif split)' }],
+        parts: [{ kind: 'work', label: 'Semi-marathon', distanceM: 21100, pace: p('5:21'), hr: '163–172', note: 'km 1–5 à 5:25–5:27, puis 5:20, accélérer sur la fin (négatif split) · si la longue du 27/09 a été dure : partir à 5:30 (→ 1h56)' }],
       }),
     ] },
   ] satisfies PlanWeek[],
