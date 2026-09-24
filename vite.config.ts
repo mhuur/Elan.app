@@ -9,6 +9,8 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Enregistrement fait par src/lib/registerSW.ts (recharge la page à chaque nouvelle version)
+      injectRegister: false,
       // Service worker écrit à la main (src/sw.ts) : le pré-cache généré ne suffisait plus,
       // il lui faut un gestionnaire `push` pour les rappels de séance.
       strategies: 'injectManifest',

@@ -15,6 +15,9 @@ import '@fontsource/space-mono/latin-400'
 import '@fontsource/space-mono/latin-700'
 import './index.css'
 import App from './App'
+import { registerSW } from './lib/registerSW'
+
+registerSW()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
