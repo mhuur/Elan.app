@@ -168,13 +168,13 @@ function SortableSection({
 }
 
 export default function Planning() {
-  const { sessions, logs, updateSession, addLog, removeLog, user } = useData()
+  const { sessions, logs, updateSession, addLog, removeLog } = useData()
   const navigate = useNavigate()
   // Navigation semaine par semaine (0 = cette semaine), avec dates, comme l'onglet Plan
   const [weekOffset, setWeekOffset] = useState(0)
   const [sheet, setSheet] = useState<PlanSeance | null>(null)
   // Position de la section « Running » du plan (préférence locale partagée avec Aujourd'hui)
-  const [planAnchor, savePlanAnchor] = usePlanAnchor(user?.uid)
+  const [planAnchor, savePlanAnchor] = usePlanAnchor()
 
   // Semaine affichée + alignement de la semaine du plan (audit P2 : extrait en hook pur)
   const { monday, weekDates, todayIdx, planWeek, planWeekIdx, planStates, firstStart, planStartOffset, showStartHint } =

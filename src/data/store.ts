@@ -5,6 +5,7 @@ import {
   doc,
   getDocs,
   onSnapshot,
+  setDoc,
   updateDoc,
   writeBatch,
   type Firestore,
@@ -23,12 +24,14 @@ export interface Store {
   subscribe(col: ColName, cb: (docs: StoreDoc[]) => void): () => void
   add(col: ColName, data: Record<string, unknown>): Promise<string>
   update(col: ColName, id: string, data: Record<string, unknown>): Promise<void>
+  /** Crée le document `id` s'il n'existe pas, sinon y fusionne `data` */
+  set(col: ColName, id: string, data: Record<string, unknown>): Promise<void>
   remove(col: ColName, id: string): Promise<void>
   exportAll(): Promise<StoreData>
   importAll(data: Partial<StoreData>): Promise<void>
 }
 
-const COLS: ColName[] = ['exercises', 'sessions', 'logs', 'ideas', 'activities']
+const COLS: ColName[] = ['exercises', 'sessions', 'logs', 'ideas', 'activities', 'prefs']
 
 /** Firestore refuse `undefined` : on nettoie récursivement */
 function clean<T>(value: T): T {
@@ -48,7 +51,7 @@ function clean<T>(value: T): T {
 const LOCAL_KEY = 'elan-data-v1'
 
 function emptyData(): StoreData {
-  return { exercises: [], sessions: [], logs: [], ideas: [], activities: [] }
+  return { exercises: [], sessions: [], logs: [], ideas: [], activities: [], prefs: [] }
 }
 
 export class LocalStore implements Store {
@@ -60,6 +63,7 @@ export class LocalStore implements Store {
     logs: new Set(),
     ideas: new Set(),
     activities: new Set(),
+    prefs: new Set(),
   }
 
   constructor() {
@@ -103,6 +107,14 @@ export class LocalStore implements Store {
     const i = this.data[col].findIndex((d) => d.id === id)
     if (i === -1) return
     this.data[col][i] = clean({ ...this.data[col][i], ...data, id })
+    this.persist()
+    this.emit(col)
+  }
+
+  async set(col: ColName, id: string, data: Record<string, unknown>): Promise<void> {
+    const i = this.data[col].findIndex((d) => d.id === id)
+    if (i === -1) this.data[col].push({ ...clean(data), id })
+    else this.data[col][i] = clean({ ...this.data[col][i], ...data, id })
     this.persist()
     this.emit(col)
   }
@@ -167,6 +179,10 @@ export class FirestoreStore implements Store {
 
   async update(col: ColName, id: string, data: Record<string, unknown>): Promise<void> {
     await updateDoc(doc(this.colRef(col), id), clean(data))
+  }
+
+  async set(col: ColName, id: string, data: Record<string, unknown>): Promise<void> {
+    await setDoc(doc(this.colRef(col), id), clean(data), { merge: true })
   }
 
   async remove(col: ColName, id: string): Promise<void> {

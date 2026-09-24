@@ -32,6 +32,9 @@ interface DataCtx {
   ideas: Idea[]
   /** Courses réelles importées de COROS via intervals.icu (collection en lecture seule côté app) */
   activities: Activity[]
+  /** Position de la section « Running » du plan dans le Planning et Aujourd'hui (cf. usePlanAnchor) */
+  planAnchor: string
+  setPlanAnchor(k: string): Promise<void>
   addExercise(e: Omit<Exercise, 'id'>): Promise<string>
   updateExercise(id: string, patch: Partial<Exercise>): Promise<void>
   removeExercise(id: string): Promise<void>
@@ -76,6 +79,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [logs, setLogs] = useState<Log[]>([])
   const [ideas, setIdeas] = useState<Idea[]>([])
   const [activities, setActivities] = useState<Activity[]>([])
+  // Préférences d'affichage du compte : document `prefs/ui` (synchronisé entre appareils)
+  const [uiPrefs, setUiPrefs] = useState<{ planAnchor?: string } | null>(null)
   const [dataReady, setDataReady] = useState(false)
   const seedCheckedRef = useRef(false)
   const migCheckedRef = useRef(false)
@@ -136,6 +141,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setIdeas((d as unknown as Idea[]).slice().sort((a, b) => b.createdAt - a.createdAt))
     })
     // Les courses importées (intervals.icu) ne conditionnent pas dataReady non plus
+    const u6 = store.subscribe('prefs', (d) => {
+      setUiPrefs((d.find((p) => p.id === 'ui') as { planAnchor?: string } | undefined) ?? {})
+    })
     const u5 = store.subscribe('activities', (d) => {
       setActivities((d as unknown as Activity[]).slice().sort((a, b) => b.date.localeCompare(a.date)))
     })
@@ -145,6 +153,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       u3()
       u4()
       u5()
+      u6()
+      setUiPrefs(null)
       setDataReady(false)
     }
   }, [store])
@@ -174,6 +184,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [store, dataReady, exercises, mode, user])
 
+  // Reprise unique : la position de la section « Running » était gardée dans le navigateur
+  // (localStorage, par appareil) jusqu'au 24/09/2026 — on la verse dans le compte si celui-ci n'en a pas.
+  useEffect(() => {
+    if (!store || !uiPrefs || uiPrefs.planAnchor) return
+    try {
+      const legacy = localStorage.getItem(`elan-plan-anchor-${mode === 'cloud' && user ? user.uid : 'local'}`)
+      if (legacy) void store.set('prefs', 'ui', { planAnchor: legacy })
+    } catch {
+      /* stockage indisponible */
+    }
+  }, [store, uiPrefs, mode, user])
+
   const need = useCallback((): Store => {
     if (!store) throw new Error('Stockage non initialisé')
     return store
@@ -190,6 +212,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       logs,
       ideas,
       activities,
+      planAnchor: uiPrefs?.planAnchor ?? '__start__',
+      setPlanAnchor: (k) => need().set('prefs', 'ui', { planAnchor: k }),
       addExercise: (e) => need().add('exercises', e as unknown as Record<string, unknown>),
       updateExercise: (id, patch) => need().update('exercises', id, patch as Record<string, unknown>),
       removeExercise: async (id) => {
@@ -253,7 +277,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return { added, total: incoming.length }
       },
     }),
-    [mode, user, authReady, dataReady, exercises, sessions, logs, ideas, activities, need],
+    [mode, user, authReady, dataReady, exercises, sessions, logs, ideas, activities, uiPrefs, need],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

@@ -1,6 +1,6 @@
 export type Category = 'running' | 'velo' | 'muscu' | 'hiit' | 'etirements'
 export type Measure = 'reps' | 'sec'
-export type ColName = 'exercises' | 'sessions' | 'logs' | 'ideas' | 'activities'
+export type ColName = 'exercises' | 'sessions' | 'logs' | 'ideas' | 'activities' | 'prefs'
 
 /** Course réelle importée depuis COROS (via intervals.icu), pour valider une séance du plan */
 export interface Activity {

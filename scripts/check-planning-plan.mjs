@@ -98,6 +98,8 @@ try {
     const raw = localStorage.getItem('elan-data-v1')
     if (!raw) return
     const data = JSON.parse(raw)
+    // Ancre de la section « Running » : dans le compte (prefs/ui) depuis le 24/09/2026
+    data.prefs = []
     const groupFor = (s) => {
       const n = (s.name || '').toLowerCase()
       if (n.includes('routine')) return 'Routine matinale'

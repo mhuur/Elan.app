@@ -1,36 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useData } from '../data/DataContext'
 
 /**
- * Position d'ancrage de la section « Running » du plan (préférence d'affichage locale,
- * par utilisateur). Partagé par Planning (lecture + écriture au drag) et Aujourd'hui
- * (lecture, pour afficher les séances du jour dans le même ordre que le Planning).
+ * Position d'ancrage de la section « Running » du plan : clé de la section utilisateur juste
+ * en dessous d'elle, ou '__start__' / '__end__'. Partagé par Planning (lecture + écriture au
+ * drag) et Aujourd'hui (lecture + écriture au drag des cartes).
+ *
+ * Enregistrée dans le compte (document `prefs/ui`, cf. DataContext) depuis le 24/09/2026 :
+ * la même position sur le téléphone et l'ordinateur. Elle était avant en localStorage.
  */
-export function usePlanAnchor(uid?: string): [string, (k: string) => void] {
-  const key = `elan-plan-anchor-${uid ?? 'local'}`
-  const [anchor, setAnchor] = useState<string>(() => {
-    try {
-      return localStorage.getItem(key) ?? '__start__'
-    } catch {
-      return '__start__'
-    }
-  })
-  useEffect(() => {
-    try {
-      setAnchor(localStorage.getItem(key) ?? '__start__')
-    } catch {
-      setAnchor('__start__')
-    }
-  }, [key])
-  const save = useCallback(
-    (k: string) => {
-      setAnchor(k)
-      try {
-        localStorage.setItem(key, k)
-      } catch {
-        /* stockage indisponible */
-      }
-    },
-    [key],
-  )
-  return [anchor, save]
+export function usePlanAnchor(): [string, (k: string) => void] {
+  const { planAnchor, setPlanAnchor } = useData()
+  return [planAnchor, (k) => void setPlanAnchor(k)]
 }

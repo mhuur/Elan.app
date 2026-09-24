@@ -56,7 +56,7 @@ function SortableCard({ id, label, children }: { id: string; label: string; chil
 }
 
 export default function Today() {
-  const { sessions, logs, user, updateSession } = useData()
+  const { sessions, logs, updateSession } = useData()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [completing, setCompleting] = useState<Session | null>(null)
@@ -78,7 +78,7 @@ export default function Today() {
     }
   }, [])
   const viewDate = useMemo(() => addDays(new Date(), dayOffset), [dayOffset, tick])
-  const [planAnchor, savePlanAnchor] = usePlanAnchor(user?.uid)
+  const [planAnchor, savePlanAnchor] = usePlanAnchor()
 
   const dStr = toDateStr(viewDate)
   const title = formatTitleFr(viewDate)
