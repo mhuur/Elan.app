@@ -16,6 +16,10 @@ export interface PlanningOrdering {
   /** Afficher la grille (plan actif OU au moins une séance) */
   showGrid: boolean
   handleDragEnd: (e: DragEndEvent) => void
+  /** Déplace la section `fromKey` à la place de `toKey` (clés = Session.group, '' = sans section) */
+  moveSection: (fromKey: string, toKey: string) => void
+  /** Déplace la séance `aId` à la place de `oId` ; sur une autre section, elle l'y rejoint */
+  moveSession: (aId: string, oId: string) => void
 }
 
 /**
@@ -75,35 +79,26 @@ export function usePlanningOrdering({
     })
   }
 
-  const handleDragEnd = (e: DragEndEvent) => {
-    const { active, over } = e
-    if (!over || active.id === over.id) return
-    const aId = String(active.id)
-    const oId = String(over.id)
-
-    // Réordonner une SECTION entière (glissée par sa poignée d'en-tête).
-    // L'ordre des sections utilisateur dérive du sortOrder (réécrit par blocs) ; la
-    // section « Running » du plan (sans séance) se repositionne via son ancre.
-    if (aId.startsWith('sec-')) {
-      const displayKeys = sections.map((s) => s.group)
-      const fromKey = aId.slice(4)
-      const toKey = oId.startsWith('sec-') ? oId.slice(4) : groupOf(sessions.find((s) => s.id === oId) ?? ({} as Session))
-      const from = displayKeys.indexOf(fromKey)
-      const to = displayKeys.indexOf(toKey)
-      if (from === -1 || to === -1 || from === to) return
-      const newKeys = arrayMove(displayKeys, from, to)
-      const byKey = new Map(sections.map((s) => [s.group, s.sessions]))
-      // Réécrit le sortOrder des séances dans le nouvel ordre de sections (le plan, sans séance, est ignoré)
-      persistOrder(newKeys.flatMap((k) => (byKey.get(k) ?? []).map((s) => s.id)))
-      // Réancre la section du plan juste au-dessus de la section qui la suit (ou tout en bas)
-      if (showPlanSection) {
-        const idx = newKeys.indexOf(PLAN_SECTION)
-        if (idx >= 0) savePlanAnchor(newKeys[idx + 1] ?? '__end__')
-      }
-      return
+  // Réordonner une SECTION entière. L'ordre des sections utilisateur dérive du sortOrder
+  // (réécrit par blocs) ; la section « Running » du plan (sans séance) se repositionne via son ancre.
+  const moveSection = (fromKey: string, toKey: string) => {
+    const displayKeys = sections.map((s) => s.group)
+    const from = displayKeys.indexOf(fromKey)
+    const to = displayKeys.indexOf(toKey)
+    if (from === -1 || to === -1 || from === to) return
+    const newKeys = arrayMove(displayKeys, from, to)
+    const byKey = new Map(sections.map((s) => [s.group, s.sessions]))
+    // Réécrit le sortOrder des séances dans le nouvel ordre de sections (le plan, sans séance, est ignoré)
+    persistOrder(newKeys.flatMap((k) => (byKey.get(k) ?? []).map((s) => s.id)))
+    // Réancre la section du plan juste au-dessus de la section qui la suit (ou tout en bas)
+    if (showPlanSection) {
+      const idx = newKeys.indexOf(PLAN_SECTION)
+      if (idx >= 0) savePlanAnchor(newKeys[idx + 1] ?? '__end__')
     }
+  }
 
-    // Déplacer une SÉANCE : réordonner, et la déposer sur une autre section l'y déplace.
+  // Déplacer une SÉANCE : réordonner, et la déposer sur une autre section l'y déplace.
+  const moveSession = (aId: string, oId: string) => {
     const oldIdx = orderIds.indexOf(aId)
     const newIdx = orderIds.indexOf(oId)
     if (oldIdx === -1 || newIdx === -1) return
@@ -113,5 +108,19 @@ export function usePlanningOrdering({
     persistOrder(arrayMove(orderIds, oldIdx, newIdx))
   }
 
-  return { sensors, sections, sectionItems, canDragSections, hasGroups, showGrid, handleDragEnd }
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const aId = String(active.id)
+    const oId = String(over.id)
+    // Section glissée par sa poignée d'en-tête
+    if (aId.startsWith('sec-')) {
+      const toKey = oId.startsWith('sec-') ? oId.slice(4) : groupOf(sessions.find((s) => s.id === oId) ?? ({} as Session))
+      moveSection(aId.slice(4), toKey)
+      return
+    }
+    moveSession(aId, oId)
+  }
+
+  return { sensors, sections, sectionItems, canDragSections, hasGroups, showGrid, handleDragEnd, moveSection, moveSession }
 }

@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Settings, Timer, Undo2 } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { ChevronLeft, ChevronRight, GripVertical, Settings, Timer, Undo2 } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORIES, CATEGORY_META, feelingOf, type Category, type Log, type Session } from '../types'
 import { addDays, formatTitleFr, toDateStr } from '../lib/dates'
 import { logSummary, summarizeSession } from '../lib/format'
 import { canonicalCycles, plannedSessionIdsOn } from '../lib/schedule'
 import { isPlanLog, planToDoOn, planWeekFor, warmupsDueOn, type PlanSeanceState } from '../lib/planDay'
-import { planningSections } from '../lib/planningLayout'
 import { usePlanAnchor } from '../lib/usePlanAnchor'
+import { usePlanningOrdering } from '../lib/usePlanningOrdering'
 import { TYPE_META } from '../data/plan'
 import {
   CategoryIcon,
@@ -29,8 +32,31 @@ import WorkoutSheet from '../components/WorkoutSheet'
  *  un chronomètre plutôt qu'un chevron — l'action reste « ouvrir la fiche ». */
 const TIMED: Category[] = ['muscu', 'hiit', 'etirements']
 
+/** Carte déplaçable : la poignée à gauche porte le glisser, le reste de la carte s'ouvre au toucher */
+function SortableCard({ id, label, children }: { id: string; label: string; children: ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`flex items-center ${glassCard}` + (isDragging ? ' relative z-10 shadow-lg ring-2 ring-sage-300' : '')}
+    >
+      <button
+        type="button"
+        aria-label={`Déplacer ${label}`}
+        {...attributes}
+        {...listeners}
+        className="flex cursor-grab touch-none items-center self-stretch pl-2 text-ink/35 active:cursor-grabbing"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      {children}
+    </div>
+  )
+}
+
 export default function Today() {
-  const { sessions, logs, user } = useData()
+  const { sessions, logs, user, updateSession } = useData()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [completing, setCompleting] = useState<Session | null>(null)
@@ -52,7 +78,7 @@ export default function Today() {
     }
   }, [])
   const viewDate = useMemo(() => addDays(new Date(), dayOffset), [dayOffset, tick])
-  const [planAnchor] = usePlanAnchor(user?.uid)
+  const [planAnchor, savePlanAnchor] = usePlanAnchor(user?.uid)
 
   const dStr = toDateStr(viewDate)
   const title = formatTitleFr(viewDate)
@@ -73,18 +99,40 @@ export default function Today() {
   const planWeekIdx = planInfo?.weekIdx ?? -1
   const planToDo = planToDoOn(viewDate, logs)
 
-  // Ordre IDENTIQUE au Planning : on parcourt les sections dans leur ordre vertical et,
-  // dans la section « Running », on insère la séance du plan du jour avant les séances.
-  type DayItem = { kind: 'plan'; st: PlanSeanceState } | { kind: 'session'; s: Session }
-  const toDoSet = new Set(toDo.map((s) => s.id))
-  const sections = planningSections(sessions, !!planInfo, planAnchor)
+  // Ordre IDENTIQUE au Planning, et modifiable ici par glisser-déposer : le hook du
+  // Planning porte l'ordre (sortOrder des séances + ancre de la section « Running »),
+  // Aujourd'hui n'en est qu'une autre vue. On parcourt les sections dans leur ordre
+  // vertical et, dans la section « Running », on insère la séance du plan du jour en tête.
+  // Les échauffements automatiques (warmupFor), invités par une séance à faire de leur
+  // catégorie cible, prennent la place de leur séance comme les autres.
+  type DayItem = { id: string; section: string } & ({ kind: 'plan'; st: PlanSeanceState } | { kind: 'session'; s: Session })
+  const { sensors, sections, moveSection, moveSession } = usePlanningOrdering({
+    sessions,
+    planActive: !!planInfo,
+    planAnchor,
+    savePlanAnchor,
+    updateSession,
+  })
+  const shownIds = new Set([
+    ...toDo.map((s) => s.id),
+    ...warmupsDueOn(sessions, planToDo, plannedIds, doneIds).map((s) => s.id),
+  ])
   const dayItems: DayItem[] = []
-  // Échauffements automatiques (warmupFor) : invités par une séance à faire de leur
-  // catégorie cible, placés en tête — un échauffement se fait avant le reste.
-  for (const s of warmupsDueOn(sessions, planToDo, plannedIds, doneIds)) dayItems.push({ kind: 'session', s })
   for (const sec of sections) {
-    if (sec.plan) for (const st of planToDo) dayItems.push({ kind: 'plan', st })
-    for (const s of sec.sessions) if (toDoSet.has(s.id)) dayItems.push({ kind: 'session', s })
+    if (sec.plan) for (const st of planToDo) dayItems.push({ id: 'plan-' + st.planRef, section: sec.group, kind: 'plan', st })
+    for (const s of sec.sessions) if (shownIds.has(s.id)) dayItems.push({ id: s.id, section: sec.group, kind: 'session', s })
+  }
+
+  /** Carte lâchée sur une autre : même section → la séance change de place ; autre
+   *  section → toute sa section passe à la place de celle d'arrivée (dans le Planning aussi). */
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return
+    const a = dayItems.find((i) => i.id === active.id)
+    const o = dayItems.find((i) => i.id === over.id)
+    if (!a || !o) return
+    if (a.section !== o.section) moveSection(a.section, o.section)
+    // Les séances du plan restent en tête de leur section : seules deux séances à soi s'échangent
+    else if (a.kind === 'session' && o.kind === 'session') moveSession(a.id, o.id)
   }
 
   /** Carte de séance à faire — même moule pour une course du plan et une séance
@@ -97,25 +145,26 @@ export default function Today() {
     // Une séance du plan n'a pas toujours de `detail` : pas de ligne mono vide.
     const sub = plan ? item.st.seance.detail : summarizeSession(item.s)
     return (
-      <button
-        key={plan ? item.st.planRef : item.s.id}
-        type="button"
-        onClick={() => (plan ? setPlanSheet(item.st) : setCompleting(item.s))}
-        className={`flex w-full items-center gap-3.5 p-4 text-left transition-transform active:scale-[0.985] ${glassCard}`}
-      >
-        <CodeTile code={t ? t.code : meta!.code} hex={t ? t.hex : meta!.hex} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-2xl leading-none font-bold uppercase">
-            {plan ? item.st.seance.title : item.s.name}
-          </p>
-          {sub && (
-            <p className="mt-1 truncate font-mono text-[10px] tracking-[0.12em] uppercase text-ink/65">{sub}</p>
-          )}
-        </div>
-        <span className={iconSquare + ' text-sage-500'}>
-          {timed ? <Timer className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </span>
-      </button>
+      <SortableCard key={item.id} id={item.id} label={plan ? item.st.seance.title : item.s.name}>
+        <button
+          type="button"
+          onClick={() => (plan ? setPlanSheet(item.st) : setCompleting(item.s))}
+          className="flex min-w-0 flex-1 items-center gap-3.5 py-4 pr-4 pl-2 text-left transition-transform active:scale-[0.985]"
+        >
+          <CodeTile code={t ? t.code : meta!.code} hex={t ? t.hex : meta!.hex} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-2xl leading-none font-bold uppercase">
+              {plan ? item.st.seance.title : item.s.name}
+            </p>
+            {sub && (
+              <p className="mt-1 truncate font-mono text-[10px] tracking-[0.12em] uppercase text-ink/65">{sub}</p>
+            )}
+          </div>
+          <span className={iconSquare + ' text-sage-500'}>
+            {timed ? <Timer className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </span>
+        </button>
+      </SortableCard>
     )
   }
 
@@ -165,7 +214,11 @@ export default function Today() {
       </header>
 
       <div className="mt-9 space-y-2.5 px-[22px]">
-        {dayItems.map(renderDayItem)}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={dayItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+            {dayItems.map(renderDayItem)}
+          </SortableContext>
+        </DndContext>
 
         {dayItems.length === 0 && todayLogs.length === 0 && (
           <div className={`px-4 py-6 text-center ${glassCard}`}>
