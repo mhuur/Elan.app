@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../data/DataContext'
-import { PRESET_SUBTYPES, subtypesOf, type Exercise } from '../types'
+import { bySubtype, subtypesOf, type Exercise } from '../types'
 import { Play, Plus } from 'lucide-react'
 import { EmptyState, Fab, PageHeader, glassCard } from '../components/ui'
 
@@ -11,7 +11,7 @@ const norm = (s: string) =>
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
 
-/** Groupes de sous-types (un exercice multi-tags apparaît dans chacun) : presets dans l'ordre, customs ensuite, « sans » à la fin */
+/** Groupes de sous-types (un exercice multi-tags apparaît dans chacun) : ordre alphabétique, « sans » à la fin */
 function subtypeGroups(list: Exercise[]): [string, Exercise[]][] {
   const map = new Map<string, Exercise[]>()
   for (const e of list) {
@@ -22,12 +22,8 @@ function subtypeGroups(list: Exercise[]): [string, Exercise[]][] {
       else map.set(k, [e])
     }
   }
-  const rank = (k: string) => {
-    if (!k) return 10000
-    const i = PRESET_SUBTYPES.indexOf(k)
-    return i === -1 ? 5000 : i
-  }
-  return [...map.entries()].sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0], 'fr'))
+  // Ordre alphabétique, « Autres » (sans sous-type) à la fin
+  return [...map.entries()].sort((a, b) => (!a[0] ? 1 : !b[0] ? -1 : bySubtype(a[0], b[0])))
 }
 
 /**

@@ -1,6 +1,6 @@
 import { useState, type RefObject } from 'react'
 import { Check, Plus, Search } from 'lucide-react'
-import { PRESET_SUBTYPES, STRETCH_SUBTYPES, subtypesOf, type Exercise, type Measure } from '../types'
+import { PRESET_SUBTYPES, STRETCH_SUBTYPES, bySubtype, subtypesOf, type Exercise, type Measure } from '../types'
 import { Seg } from './ui'
 
 const norm = (s: string) =>
@@ -20,18 +20,8 @@ function subtypeGroups(list: Exercise[]): [string, Exercise[]][] {
       else map.set(k, [e])
     }
   }
-  const rank = (k: string) => {
-    if (!k) return 10000
-    const i = PRESET_SUBTYPES.indexOf(k)
-    return i === -1 ? 5000 : i
-  }
-  return [...map.entries()].sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0], 'fr'))
-}
-
-/** Ordre des sous-types : presets dans leur ordre, sous-types maison ensuite */
-const subtypeRank = (k: string) => {
-  const i = PRESET_SUBTYPES.indexOf(k)
-  return i === -1 ? 5000 : i
+  // Ordre alphabétique, « Autres » (sans sous-type) à la fin
+  return [...map.entries()].sort((a, b) => (!a[0] ? 1 : !b[0] ? -1 : bySubtype(a[0], b[0])))
 }
 
 /**
@@ -70,16 +60,14 @@ export default function ExercisePicker({
   const [newMeasure, setNewMeasure] = useState<Measure>('reps')
 
   // Pastilles : les sous-types présents dans la banque
-  const filters = [...new Set(exercises.flatMap((e) => subtypesOf(e)))].sort(
-    (a, b) => subtypeRank(a) - subtypeRank(b) || a.localeCompare(b, 'fr'),
-  )
+  const filters = [...new Set(exercises.flatMap((e) => subtypesOf(e)))].sort(bySubtype)
   const pool = filter ? exercises.filter((e) => subtypesOf(e).includes(filter)) : exercises
   const q = norm(query.trim())
   const visible = q ? pool.filter((e) => norm(e.name).includes(q) || subtypesOf(e).some((st) => norm(st).includes(q))) : pool
   const hasExact = pool.some((e) => norm(e.name) === q)
 
-  // Sous-types déjà utilisés d'abord, presets ensuite
-  const subtypeOptions = [...filters, ...PRESET_SUBTYPES.filter((st) => !filters.includes(st))]
+  // Sous-types déjà utilisés et presets, en ordre alphabétique
+  const subtypeOptions = [...new Set([...filters, ...PRESET_SUBTYPES])].sort(bySubtype)
 
   const startCreate = () => {
     setNewName(query.trim())

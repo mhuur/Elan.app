@@ -79,6 +79,10 @@ export function isStretch(e: Exercise | undefined): boolean {
   return !!e && subtypesOf(e).some((st) => STRETCH_SUBTYPES.includes(st))
 }
 
+/** Ordre d'affichage des sous-types partout (listes, groupes, filtres) : alphabétique
+ *  (demande utilisateur, oct. 2026), accents et casse ignorés. */
+export const bySubtype = (a: string, b: string) => a.localeCompare(b, 'fr', { sensitivity: 'base' })
+
 /** Sous-types proposés à la création d'un exercice (saisie libre possible) */
 export const PRESET_SUBTYPES = [
   'Abdominaux',

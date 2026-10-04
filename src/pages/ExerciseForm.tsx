@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Play, Search, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { PRESET_SUBTYPES, STRETCH_SUBTYPES, subtypesOf, type Measure } from '../types'
+import { PRESET_SUBTYPES, STRETCH_SUBTYPES, bySubtype, subtypesOf, type Measure } from '../types'
 import { youtubeSearch } from '../lib/format'
 import { Combobox, Field, FormActions, PageHeader, Seg, TextArea, TextInput } from '../components/ui'
 
@@ -28,13 +28,10 @@ export default function ExerciseForm() {
   const [description, setDescription] = useState(existing?.description ?? '')
   const [videoUrl, setVideoUrl] = useState(existing?.videoUrl ?? '')
 
-  // Sous-types déjà utilisés dans la banque (et sélectionnés ici), en plus des presets
-  const customSubtypes = [
-    ...new Set(
-      [...exercises.flatMap((e) => subtypesOf(e)), ...subtypes].filter((s) => !PRESET_SUBTYPES.includes(s)),
-    ),
-  ].sort((a, b) => a.localeCompare(b, 'fr'))
-  const subtypeOptions = [...PRESET_SUBTYPES, ...customSubtypes].filter((st) => !subtypes.includes(st))
+  // Presets et sous-types déjà utilisés dans la banque, en ordre alphabétique
+  const subtypeOptions = [...new Set([...PRESET_SUBTYPES, ...exercises.flatMap((e) => subtypesOf(e))])]
+    .filter((st) => !subtypes.includes(st))
+    .sort(bySubtype)
 
   const addSubtype = (st: string) => {
     if (st && !subtypes.includes(st)) setSubtypes((p) => [...p, st])
