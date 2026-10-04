@@ -1,7 +1,8 @@
-// Vérification visuelle des formulaires épurés : séance (liste compacte, sélecteur
-// d'exercices en Sheet mobile / volet desktop, barre d'action fixe) et exercice
-// (sous-types en combobox).
+// Vérification visuelle des formulaires épurés : programme (liste compacte, réglages d'un
+// exercice dans sa feuille, sélecteur d'exercices en Sheet mobile / volet desktop, barre
+// d'action fixe) et exercice (fiche commune, muscles en pastilles triées par ordre alphabétique).
 import { chromium } from 'playwright'
+import { closeItem, openItem, openOptions, saveFiche } from './lib/fiche.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
 
@@ -23,9 +24,9 @@ try {
   await page.waitForSelector('text=Mes programmes')
   await page.click('p:has-text("Muscu — Full body")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('text=Planification')
+  await page.waitForSelector('#session-name')
   await page.screenshot({ path: 'screenshots/30-form-seance-haut.png' })
-  await page.locator('text=Exercices de la séance').scrollIntoViewIfNeeded()
+  await page.locator('[data-item="Pompes"]').scrollIntoViewIfNeeded()
   await page.screenshot({ path: 'screenshots/31-form-seance-exos.png' })
 
   // --- Sélecteur d'exercices (Sheet mobile) : filtre puis création à la volée
@@ -41,26 +42,28 @@ try {
   await page.waitForSelector('text=+ Créer « Dips sur chaise »')
   await page.screenshot({ path: 'screenshots/33-combobox-creer.png' })
   await page.click('text=+ Créer « Dips sur chaise »')
-  // Mini-ligne de création : nom prérempli, on choisit le sous-type Bras (mesure reps par défaut)
-  await page.waitForSelector('[role="dialog"] >> text=Nouvel exercice')
-  await page.locator('[role="dialog"] select[aria-label="Sous-type"]').selectOption('Bras')
+  // Fiche d'exercice commune : nom prérempli, on choisit le muscle Bras (répétitions par défaut)
+  await page.waitForSelector('[role="dialog"] h2:text-is("Nouvel exercice")')
+  const nameVal = await page.locator('[role="dialog"] input[aria-label="Nom de l\x27exercice"]').inputValue()
+  if (nameVal !== 'Dips sur chaise') throw new Error(`La fiche devrait être préremplie avec le texte cherché, trouvé ${JSON.stringify(nameVal)}`)
+  await page.locator('[role="dialog"] [aria-label="Muscle travaillé"] button:text-is("Bras")').click()
   await page.click('text=Créer et ajouter')
   await page.click('text=Terminé')
   // Le nom d'item est un simple texte (le select de remplacement a été retiré, août 2026)
   await page.waitForSelector('p:text-is("Dips sur chaise")')
 
-  // --- Séries variées : 3×12 devient 12/12/12 éditables, on passe la 1re à 30
-  // Les cartes sont repliées par défaut et se déplient au CLIC (plus de survol, août 2026) :
-  // la carte ouverte montre l'édition + les infos de l'exercice (lien démo, fiche)
-  await page.locator('div.rounded-md p.truncate').first().click()
-  await page.waitForSelector('a[aria-label="Démo"]') // lien démo en icône (sept. 2026)
-  await page.locator('[aria-label="Varier les séries"]').first().click()
+  // --- Séries différentes : 3×12 devient 12/12/12 éditables, on passe la 1re à 30.
+  // Un tap sur la ligne ouvre la feuille de l'exercice (oct. 2026 : plus de dépliage sur place)
+  await openItem(page, 'Pompes')
+  await page.waitForSelector('[role="dialog"] a[aria-label="Démo"]')
+  await page.click('[role="switch"][aria-label="Séries différentes"]')
   await page.screenshot({ path: 'screenshots/38-series-variees.png' })
-  const firstCard = page.locator('div.rounded-md').filter({ hasText: 'reps' }).first()
-  await firstCard.locator('input[inputmode="numeric"]').nth(1).fill('30')
+  await page.locator('[role="dialog"] input[aria-label="Objectif série 1"]').fill('30')
+  await closeItem(page)
+  await page.waitForSelector('[data-item="Pompes"]:has-text("30/12/12")')
 
   // --- Section du planning : suggestions filtrées dans la combobox
-  await page.click('text=Options avancées') // section repliée derrière son résumé (sept. 2026)
+  await openOptions(page) // catégorie + section, repliées derrière leur résumé (oct. 2026)
   const groupBox = page.getByPlaceholder('Optionnel…')
   await groupBox.scrollIntoViewIfNeeded()
   await groupBox.click()
@@ -68,16 +71,16 @@ try {
   await page.keyboard.press('Escape')
 
   // --- Enregistrer via la barre d'action fixe
-  await page.click('text=Enregistrer')
+  await saveFiche(page)
   await page.waitForSelector('text=Mes programmes')
   const d = await page.evaluate(() => JSON.parse(localStorage.getItem('elan-data-v1')))
   const full = d.sessions.find((s) => s.name.includes('Full body'))
   if (!full.items.some((it) => d.exercises.find((e) => e.id === it.exerciseId)?.name === 'Dips sur chaise'))
     throw new Error("L'exercice créé à la volée devrait être dans la séance")
-  // La mini-ligne de création classe l'exercice dès sa naissance
+  // La fiche de création classe l'exercice dès sa naissance
   const dips = d.exercises.find((e) => e.name === 'Dips sur chaise')
   if (!(dips?.subtypes ?? []).includes('Bras'))
-    throw new Error('Dips sur chaise devrait naître avec le sous-type Bras (mini-ligne du sélecteur)')
+    throw new Error('Dips sur chaise devrait naître avec le muscle Bras (fiche d\x27exercice)')
   // Les champs retirés du formulaire sont préservés tels quels
   if (full.notes === undefined || full.metrics === undefined || full.links === undefined)
     throw new Error('notes/metrics/links devraient être conservés à la sauvegarde')
@@ -89,11 +92,13 @@ try {
   // --- Étirements : blocs disponibles aussi (découpage + tours par bloc)
   await page.click('text=Routine matinale')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('text=Planification')
+  await page.waitForSelector('#session-name')
   await page.waitForSelector('[title="Tours de la routine"]')
-  await page.locator('button:has-text("nouveau bloc")').click()
+  await page.locator('[data-item]').last().click()
+  await page.click('[role="switch"][aria-label="Commencer un nouveau bloc"]')
+  await closeItem(page)
   await page.waitForSelector('text=Bloc 2')
-  await page.click('text=Enregistrer')
+  await saveFiche(page)
   await page.waitForSelector('text=Mes programmes')
   const d2 = await page.evaluate(() => JSON.parse(localStorage.getItem('elan-data-v1')))
   const rout = d2.sessions.find((s) => s.name === 'Routine matinale')
@@ -110,18 +115,25 @@ try {
 
   // --- Nouvelle séance : écran épuré
   await page.click('text=+ Programme')
-  await page.waitForSelector('text=Nouvelle séance')
+  await page.waitForSelector('text=Nouveau programme')
   await page.screenshot({ path: 'screenshots/35-form-nouvelle-seance.png' })
   await page.click('[aria-label="Retour"]')
 
-  // --- Fiche exercice : combobox de sous-types
+  // --- Fiche exercice (banque) : muscles en pastilles, ordre alphabétique, « + Autre »
   await page.getByRole('button', { name: "Banque d'exercices", exact: true }).click()
   await page.click('button:has-text("Pompes")')
   await page.waitForSelector("text=Modifier l'exercice")
   await page.screenshot({ path: 'screenshots/36-form-exercice.png' })
-  await page.getByPlaceholder('Ajouter un sous-type').fill('tri')
-  await page.waitForSelector('text=+ Créer « tri »')
-  await page.screenshot({ path: 'screenshots/37-form-exercice-combobox.png' })
+  const chips = await page.locator('[aria-label="Muscle travaillé"] button[aria-pressed]').allInnerTexts()
+  const sorted = [...chips].sort((a, b) => a.localeCompare(b, 'fr'))
+  if (chips.join('|') !== sorted.join('|')) throw new Error(`Les muscles devraient être triés par ordre alphabétique : ${chips.join(', ')}`)
+  if (!(await page.locator('[aria-label="Muscle travaillé"] button[aria-pressed="true"]:text-is("Pectoraux")').count()))
+    throw new Error('Pompes devrait arriver avec le muscle Pectoraux sélectionné')
+  await page.click('button:has-text("Autre")')
+  await page.getByLabel('Autre muscle').fill('Triceps')
+  await page.keyboard.press('Enter')
+  await page.waitForSelector('[aria-label="Muscle travaillé"] button[aria-pressed="true"]:text-is("Triceps")')
+  await page.screenshot({ path: 'screenshots/37-form-exercice-muscles.png' })
 
   // --- Desktop (≥ lg) : le volet banque est permanent à droite du formulaire,
   //     un clic sur une ligne ajoute l'exercice sans rien fermer
@@ -135,7 +147,7 @@ try {
   await desk.getByRole('link', { name: 'Exercices', exact: true }).click()
   await desk.click('p:has-text("Muscu — Full body")')
   await desk.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await desk.waitForSelector('text=Planification')
+  await desk.waitForSelector('#session-name')
   await desk.waitForSelector("aside >> text=Banque d'exercices")
   // Compter les poignées : une par carte d'exercice, toujours dans le DOM
   const nBefore = await desk.locator('[aria-label^="Réordonner"]').count()

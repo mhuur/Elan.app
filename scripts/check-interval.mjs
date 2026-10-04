@@ -1,5 +1,6 @@
 // Vérifie la planification par intervalle + alternance multiple bidirectionnelle (mode démo)
 import { chromium } from 'playwright'
+import { closeQuand, openQuand, saveFiche } from './lib/fiche.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
 const DAY_NAMES = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
@@ -23,13 +24,14 @@ try {
   await page.waitForSelector('text=Mes programmes')
   await page.click('text=appartement')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('text=Planification')
+  await page.waitForSelector('#session-name')
+  await openQuand(page)
   await page.getByRole('button', { name: 'Tous les X jours', exact: true }).click()
   await page.waitForSelector('text=à partir du')
   // « En alternance avec » → HIIT (sélecteur « Aucune » → pastille avec sa croix)
   await page.locator('select[aria-label="En alternance avec"]').selectOption({ label: 'HIIT — Cardio express' })
   await page.waitForSelector("[aria-label=\"Retirer l'alternance\"]")
-  await page.click('text=Enregistrer')
+  await saveFiche(page)
 
   // La carte de la séance décrit l'alternance
   await page.waitForSelector('text=en alternance avec HIIT')
@@ -37,9 +39,11 @@ try {
   // Bidirectionnel : la fiche du HIIT montre la même planification (pastille Vélo)
   await page.click('p:has-text("HIIT — Cardio express")') // titre de la carte HIIT (pas le badge du vélo)
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('text=Planification')
+  await page.waitForSelector('#session-name')
+  await openQuand(page)
   await page.waitForSelector('div:has(> span:text-is("En alternance avec")):has-text("Vélo d’appartement")')
   await page.screenshot({ path: 'screenshots/20-alternance-bidirectionnelle.png' })
+  await closeQuand(page)
   await page.click('[aria-label="Retour"]')
 
   // Le planning montre un anneau sur la colonne du jour (occurrence 0 = vélo)

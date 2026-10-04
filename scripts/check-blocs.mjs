@@ -1,6 +1,7 @@
 // Vérifie les blocs muscu : découpage d'une séance en blocs avec tours
 // indépendants (ex. Pompes seules, puis circuit du reste × 2 tours).
 import { chromium } from 'playwright'
+import { closeItem, openItem, saveFiche } from './lib/fiche.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
 
@@ -17,19 +18,22 @@ try {
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
-  // --- Découper Full body : le bouton unique du bas isole le dernier exercice en bloc 2 × 2 tours
+  // --- Découper Full body : « Commencer un nouveau bloc » dans la feuille du dernier exercice
+  //     l'isole en bloc 2 × 2 tours
   await page.getByRole('link', { name: 'Exercices', exact: true }).click()
   await page.waitForSelector('text=Mes programmes')
   await page.click('p:has-text("Muscu — Full body")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('text=Planification')
-  await page.locator('button:has-text("nouveau bloc")').click()
+  await page.waitForSelector('#session-name')
+  await openItem(page, 'Pont fessier')
+  await page.click('[role="switch"][aria-label="Commencer un nouveau bloc"]')
+  await closeItem(page)
   await page.waitForSelector('text=Bloc 2')
   await page.waitForSelector('text=Bloc 1')
   // Le bloc 2 fait 2 tours (saisie directe dans le stepper du séparateur)
   await page.locator('div[class*="bg-muscu"] input').nth(1).fill('2')
   await page.screenshot({ path: 'screenshots/27-blocs-form.png' })
-  await page.click('text=Enregistrer')
+  await saveFiche(page)
   await page.waitForSelector('text=Mes programmes')
 
   // --- Données : flags posés sur le dernier exercice (Pont fessier, 5e du seed)

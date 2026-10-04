@@ -1,7 +1,6 @@
 import { useState, type RefObject } from 'react'
 import { Check, Plus, Search } from 'lucide-react'
-import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, subtypesOf, type Category, type Exercise, type Measure } from '../types'
-import { Seg } from './ui'
+import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, subtypesOf, type Category, type Exercise } from '../types'
 
 const norm = (s: string) =>
   s
@@ -37,8 +36,8 @@ function subtypeGroups(list: Exercise[]): [string, Exercise[]][] {
  * friction n° 1 de la création de séance). Affiché en volet latéral permanent sur
  * desktop (SessionForm) et dans une Sheet sur mobile. `counts` marque d'une coche les
  * exercices déjà dans la séance (re-tap = deuxième ajout, utile pour les blocs).
- * « + Créer » déplie une mini-ligne nom + sous-type + mesure : l'exercice naît classé
- * (dans la catégorie filtrée) et mesuré, plus besoin de repasser par la banque.
+ * « + Créer » ouvre la fiche d'exercice commune (`ExerciseSheet`, oct. 2026), préremplie
+ * avec le texte cherché et la catégorie filtrée : la même fiche que dans la banque.
  */
 export default function ExercisePicker({
   exercises,
@@ -55,38 +54,23 @@ export default function ExercisePicker({
   /** Nombre d'occurrences de chaque exercice déjà dans la séance */
   counts: Map<string, number>
   onAdd: (exId: string) => void
-  onCreate: (draft: { name: string; subtype: string; measure: Measure; category: Category }) => void
+  /** Demande de création : le parent ouvre la fiche d'exercice préremplie */
+  onCreate: (preset: { name: string; category: Category }) => void
   /** Le champ de recherche, pour lui donner le focus depuis le formulaire (volet desktop) */
   searchRef?: RefObject<HTMLInputElement | null>
 }) {
   const [query, setQuery] = useState('')
   const [cat, setCat] = useState<Category | 'all'>(category)
-  const [creating, setCreating] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newSubtype, setNewSubtype] = useState('')
   // Un exercice créé depuis le sélecteur naît dans la catégorie filtrée
   const createCat: Category = cat === 'all' ? category : cat
-  const [newMeasure, setNewMeasure] = useState<Measure>(createCat === 'etirements' ? 'sec' : 'reps')
 
   const pool = cat === 'all' ? exercises : exercises.filter((e) => e.category === cat)
   const q = norm(query.trim())
   const visible = q ? pool.filter((e) => norm(e.name).includes(q) || subtypesOf(e).some((st) => norm(st).includes(q))) : pool
   const hasExact = pool.some((e) => norm(e.name) === q)
 
-  // Sous-types de la catégorie d'abord (les plus pertinents), presets ensuite
-  const catSubtypes = [...new Set(pool.flatMap((e) => subtypesOf(e)))]
-  const subtypeOptions = [...catSubtypes, ...PRESET_SUBTYPES.filter((st) => !catSubtypes.includes(st))]
-
   const startCreate = () => {
-    setNewName(query.trim())
-    setNewSubtype('')
-    setNewMeasure(createCat === 'etirements' ? 'sec' : 'reps')
-    setCreating(true)
-  }
-  const submitCreate = () => {
-    if (!newName.trim()) return
-    onCreate({ name: newName.trim(), subtype: newSubtype, measure: newMeasure, category: createCat })
-    setCreating(false)
+    onCreate({ name: query.trim(), category: createCat })
     setQuery('')
   }
 
@@ -184,7 +168,7 @@ export default function ExercisePicker({
             Aucun {label} {cat === 'all' ? '' : 'dans cette catégorie '}pour l'instant.
           </p>
         )}
-        {!creating && q.length > 0 && !hasExact && (
+        {q.length > 0 && !hasExact && (
           <button
             type="button"
             onClick={startCreate}
@@ -194,68 +178,6 @@ export default function ExercisePicker({
           </button>
         )}
       </div>
-
-      {creating && (
-        <div className="mt-3 shrink-0 space-y-2 border-t border-hairline-strong pt-3">
-          <p className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink/60">
-            {createCat === 'etirements' ? 'Nouvelle posture' : 'Nouvel exercice'} · {CATEGORY_META[createCat].label}
-          </p>
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                submitCreate()
-              }
-            }}
-            autoFocus
-            placeholder="Nom"
-            className="w-full rounded-sm border border-hairline bg-shoal px-3 py-2.5 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <select
-              value={newSubtype}
-              onChange={(e) => setNewSubtype(e.target.value)}
-              aria-label="Sous-type"
-              className="w-full rounded-sm border border-hairline bg-shoal px-2.5 py-2 text-sm font-bold outline-none focus:border-sage-500"
-            >
-              <option value="">— Sous-type —</option>
-              {subtypeOptions.map((st) => (
-                <option key={st} value={st}>
-                  {st}
-                </option>
-              ))}
-            </select>
-            <Seg
-              options={[
-                { value: 'reps' as const, label: 'Reps' },
-                { value: 'sec' as const, label: 'Secondes' },
-              ]}
-              value={newMeasure}
-              onChange={setNewMeasure}
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={submitCreate}
-              disabled={!newName.trim()}
-              className="flex-1 rounded-sm bg-sage-500 px-3 py-2.5 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-onaccent disabled:opacity-40"
-            >
-              Créer et ajouter
-            </button>
-            <button
-              type="button"
-              onClick={() => setCreating(false)}
-              className="rounded-sm border border-hairline px-3 py-2.5 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-ink/60"
-            >
-              Annuler
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

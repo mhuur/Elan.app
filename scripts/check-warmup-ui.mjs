@@ -4,6 +4,7 @@
 // fiche rouverte re-sélectionne le mode et la cible. Repasser en « Jours choisis » nettoie.
 // Prérequis : `npm run dev:demo` lancé, puis `node scripts/check-warmup-ui.mjs`
 import { chromium } from 'playwright'
+import { openQuand, saveFiche } from './lib/fiche.mjs'
 import { mkdirSync } from 'node:fs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
@@ -30,10 +31,11 @@ try {
   await page.waitForSelector('text=Mes programmes')
   await page.click('p:has-text("Sortie courte")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('text=Planification')
+  await page.waitForSelector('#session-name')
 
   // Mode « Avant une autre » : la cible se présélectionne (1re catégorie ≠ running)
-  await page.getByRole('button', { name: 'Avant une autre', exact: true }).click()
+  await openQuand(page)
+  await page.getByRole('button', { name: 'Avant une autre séance', exact: true }).click()
   await page.waitForSelector('text=Avant chaque')
   // ⚠ Les tuiles de catégorie affichent les mêmes textes (HIIT, VÉLO) avec aria-pressed :
   // toute interaction avec les chips se scope à la rangée « Avant chaque ».
@@ -45,7 +47,7 @@ try {
     throw new Error('Les cases de jour ne devraient pas s’afficher en mode « Avant une autre »')
   }
   await page.screenshot({ path: `${DIR}/54-form-avant-une-autre.png` })
-  await page.click('text=Enregistrer')
+  await saveFiche(page)
   await page.waitForSelector('text=Mes programmes')
 
   const wf = await warmupForOf()
@@ -56,13 +58,15 @@ try {
   // Rouvrir : mode et cible re-sélectionnés
   await page.click('p:has-text("Sortie courte")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('text=Planification')
+  await page.waitForSelector('#session-name')
+  await page.waitForSelector('[data-quand]:has-text("Avant chaque séance HIIT")')
+  await openQuand(page)
   await chipRow.locator('button[aria-pressed="true"]:has-text("HIIT")').waitFor()
 
   // Repasser en « Jours choisis » nettoie le jumelage à l'enregistrement
   await page.getByRole('button', { name: 'Jours choisis', exact: true }).click()
   await page.waitForSelector('button[title="Lundi"]')
-  await page.click('text=Enregistrer')
+  await saveFiche(page)
   await page.waitForSelector('text=Mes programmes')
   const wf2 = await warmupForOf()
   if (wf2 != null) throw new Error(`warmupFor devrait être nettoyé, trouvé : ${JSON.stringify(wf2)}`)

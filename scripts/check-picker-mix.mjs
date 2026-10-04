@@ -4,9 +4,12 @@
 //  - le sélecteur s'ouvre filtré sur la catégorie de la séance (MUS), « Tous » montre tout ;
 //  - filtre ÉTIR → « Chat-vache (dos) » s'ajoute à la séance muscu avec les réglages muscu ;
 //  - filtre HIIT → « + Créer » crée l'exercice en HIIT, pas dans la catégorie de la séance ;
-//  - changer la catégorie de la séance garde les exercices (réglages remis par défaut).
+//  - changer la catégorie de la séance garde les exercices (réglages remis par défaut) ;
+//  - un NOUVEAU programme prend la catégorie de son premier exercice (oct. 2026 : le choix de
+//    catégorie a quitté le haut de la fiche, il vit sous « Plus d'options »).
 // Prérequis : `npm run dev:demo` lancé.
 import { chromium } from 'playwright'
+import { openOptions, saveFiche } from './lib/fiche.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
 
@@ -26,7 +29,7 @@ const openForm = async () => {
   await page.waitForSelector('text=Mes programmes')
   await page.click('p:has-text("Muscu — Full body")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('text=Planification')
+  await page.waitForSelector('#session-name')
 }
 const openPicker = async () => {
   const addBtn = page.getByRole('button', { name: /Ajouter un exercice/ })
@@ -61,17 +64,19 @@ try {
   await page.click(`${dlg} button[aria-label="HIIT"]`)
   await page.fill(`${dlg} input[aria-label="Rechercher un exercice"]`, 'Corde à sauter')
   await page.click('text=+ Créer « Corde à sauter »')
-  await page.waitForSelector(`${dlg} >> text=Nouvel exercice · HIIT`)
+  // La fiche d'exercice commune s'ouvre préremplie, dans la famille filtrée (HIIT)
+  await page.waitForSelector(`${dlg} h2:text-is("Nouvel exercice")`)
+  await page.waitForSelector(`${dlg} button[aria-expanded]:has-text("HIIT")`)
   await page.click(`${dlg} button:has-text("Créer et ajouter")`)
   await page.waitForSelector(`${dlg} button:has-text("Corde à sauter")`)
   await page.click(`${dlg} button:has-text("Terminé")`)
 
   // La liste de la séance porte les deux nouveaux venus, en réglages muscu
-  await page.waitForSelector('div.rounded-md p.truncate:text-is("Chat-vache (dos)")')
-  await page.waitForSelector('div.rounded-md p.truncate:text-is("Corde à sauter")')
-  await page.waitForSelector('text=7 exercices')
+  await page.waitForSelector('[data-item="Chat-vache (dos)"]')
+  await page.waitForSelector('[data-item="Corde à sauter"]')
+  await page.waitForSelector('text=Exercices · 7')
   await page.screenshot({ path: 'screenshots/mix-03-liste-mixte.png' })
-  await page.click('text=Enregistrer')
+  await saveFiche(page)
   await page.waitForSelector('text=Mes programmes')
 
   const d1 = await data()
@@ -87,11 +92,11 @@ try {
   // --- Changer la catégorie de la séance garde les exercices, réglages remis par défaut
   await page.click('p:has-text("Muscu — Full body")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('text=Planification')
+  await page.waitForSelector('#session-name')
+  await openOptions(page)
   await page.click('div:has(> span:text-is("Catégorie")) button[title="Étirements"]')
-  await page.waitForSelector('text=Postures de la routine')
-  await page.waitForSelector('text=7 postures')
-  await page.click('text=Enregistrer')
+  await page.waitForSelector('text=Postures · 7')
+  await saveFiche(page)
   await page.waitForSelector('text=Mes programmes')
   const d2 = await data()
   const full2 = d2.sessions.find((s) => s.name === 'Muscu — Full body')
@@ -99,7 +104,24 @@ try {
   const pompes = full2.items.find((it) => it.exerciseId === d2.exercises.find((e) => e.name === 'Pompes').id)
   if (pompes.sets !== undefined || pompes.target !== 10) throw new Error(`En routine, « Pompes » (reps) devrait passer en 10 reps sans séries, trouvé : ${JSON.stringify(pompes)}`)
 
-  console.log('PICKER-MIX OK — filtre de catégorie dans la banque, séance mixte muscu + étirement + HIIT, création dans la catégorie filtrée, changement de catégorie sans perte')
+  // --- Nouveau programme : le premier exercice donne la catégorie (ici un étirement → ÉTIR)
+  await page.click('text=+ Programme')
+  await page.waitForSelector('#session-name')
+  await page.fill('#session-name', 'Souplesse du soir')
+  await openPicker()
+  await page.click(`${dlg} button[aria-label="Étirements"]`)
+  await page.click(`${dlg} button:has-text("Cobra")`)
+  await page.click(`${dlg} button:has-text("Terminé")`)
+  await page.waitForSelector('text=Postures · 1')
+  await page.waitForSelector('[data-item="Cobra"]:has-text("1 × 30 s")')
+  await page.waitForSelector('button[aria-expanded]:has-text("Étirements")') // résumé de « Plus d'options »
+  await saveFiche(page)
+  await page.waitForSelector('text=Mes programmes')
+  const d3 = await data()
+  const soir = d3.sessions.find((s) => s.name === 'Souplesse du soir')
+  if (soir?.category !== 'etirements') throw new Error(`Un programme commencé par un étirement devrait être en étirements, trouvé : ${soir?.category}`)
+
+  console.log('PICKER-MIX OK — filtre de catégorie dans la banque, séance mixte muscu + étirement + HIIT, création dans la catégorie filtrée, changement de catégorie sans perte, catégorie déduite du premier exercice')
   if (errors.length) {
     console.error('ERREURS DÉTECTÉES :')
     for (const e of errors) console.error(' -', e)

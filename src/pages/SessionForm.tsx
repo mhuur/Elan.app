@@ -14,22 +14,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS, getEventCoordinates } from '@dnd-kit/utilities'
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-  GripVertical,
-  LayoutGrid,
-  Link2,
-  Merge,
-  MessageSquarePlus,
-  Play,
-  Plus,
-  SlidersHorizontal,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, GripVertical, Merge, Pencil, Play, Plus, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import {
   CATEGORIES,
@@ -40,7 +25,7 @@ import {
   type Session,
   type SessionItem,
 } from '../types'
-import { DAY_LETTER, DAY_NAMES, addDays, formatShortFr, mondayIndex, toDateStr, todayStr } from '../lib/dates'
+import { DAY_LETTER, DAY_NAMES, DAY_SHORT, addDays, formatShortFr, mondayIndex, toDateStr, todayStr } from '../lib/dates'
 import { canonicalCycles, countWeekdays, cycleStepsOf, describeSchedule, diffDays, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
 import { isPlanLog, planToDoOn, warmupsDueOn } from '../lib/planDay'
 import { usePlanningWeek } from '../lib/usePlanningWeek'
@@ -48,6 +33,7 @@ import { TYPE_META } from '../data/plan'
 import { CategoryIcon, Chip, Combobox, Eyebrow, FormActions, PageHeader, Seg, Sheet, Stepper, glassCard } from '../components/ui'
 import { DayDot, dayCell } from '../components/DayDot'
 import ExercisePicker from '../components/ExercisePicker'
+import { ExerciseSheet, type ExercisePreset } from '../components/ExerciseEditor'
 
 /* ── Vocabulaire de l'écran (maquette « Fiche séance », direction B, sept. 2026) ─────
  * Une carte de verre par section, des RANGÉES de 48 px « libellé mono à gauche, valeur
@@ -60,14 +46,35 @@ const row = 'flex min-h-12 items-center gap-3 border-t border-hairline px-4'
 const rowLabel = 'shrink-0 font-mono text-[10px] tracking-[0.14em] uppercase text-ink-soft'
 const iconBtn =
   'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-hairline-strong bg-glass-soft text-ink/70 active:bg-glass'
-const iconBtnOn = 'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-ink bg-ink text-onaccent'
-const iconBtnDanger =
-  'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-hiit/40 text-hiit active:bg-hiit/10'
 const miniInput =
   'h-[30px] rounded-sm border border-hairline bg-glass-sunken text-center font-mono text-xs font-bold tabular-nums text-ink outline-none focus:border-sage-500'
-/** Bascule reps / secondes : une valeur, pas une action — d'où la pilule texte */
-const togglePill =
-  'h-[30px] rounded-sm border border-hairline-strong px-2 font-mono text-[10px] font-bold tracking-[0.12em] uppercase text-ink/70 active:bg-glass'
+/** Rangée de la feuille d'un exercice : libellé à gauche, contrôle à droite, 56 px */
+const sheetRow = 'flex min-h-14 items-center gap-3 border-t border-hairline'
+
+/** Interrupteur libellé (feuille d'un exercice) : toute la rangée est la cible */
+function Toggle({ label, sub, on, onChange }: { label: string; sub?: string; on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} className={sheetRow + ' w-full text-left'}>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-bold text-ink">{label}</span>
+        {sub && <span className="block truncate text-xs font-semibold text-ink-soft">{sub}</span>}
+      </span>
+      <span className={'relative h-7 w-12 shrink-0 rounded-full transition-colors ' + (on ? 'bg-sage-500' : 'bg-glass-raised')}>
+        <span className={'absolute top-[3px] h-[22px] w-[22px] rounded-full transition-all ' + (on ? 'left-[23px] bg-onaccent' : 'left-[3px] bg-ink')} />
+      </span>
+    </button>
+  )
+}
+
+/** Choix d'un « quand » dans la feuille « Quand ? » : pastille radio + libellé */
+function ModeOption({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+  return (
+    <button type="button" aria-pressed={on} onClick={onClick} className="flex min-h-12 w-full items-center gap-3 text-left">
+      <span className={'h-5 w-5 shrink-0 rounded-full ' + (on ? 'border-[6px] border-sage-500' : 'border-2 border-ink/35')} />
+      <span className="text-[15px] font-bold text-ink">{label}</span>
+    </button>
+  )
+}
 
 /** Petit champ numérique à saisie directe (plus compact que le Stepper dans les listes) */
 function MiniNum({ value, onChange, min = 0, max = 990, label }: { value: number; onChange: (v: number) => void; min?: number; max?: number; label?: string }) {
@@ -172,9 +179,9 @@ function PreviewRow({
 type DraftItem = SessionItem & { uid: string }
 const newUid = () => crypto.randomUUID()
 
-/** Tout l'état éditable du formulaire — l'instantané du garde-fou du retour, et le brouillon
- *  mis de côté quand on ouvre la fiche d'un exercice depuis la séance (bug du 05/09/2026 :
- *  cette navigation démontait le formulaire et perdait tout ce qui était en cours). */
+/** Tout l'état éditable du formulaire — l'instantané du garde-fou du retour. (Le brouillon en
+ *  sessionStorage du 06/09/2026 a disparu en oct. 2026 : la fiche d'un exercice s'ouvre
+ *  désormais en feuille, sans quitter la page, donc sans rien perdre.) */
 interface Draft {
   name: string
   category: Category
@@ -193,20 +200,6 @@ interface Draft {
   muscuRounds: number
   group: string
   warmupFor: Category | ''
-}
-const draftKeyOf = (id: string | undefined) => `elan-session-draft-${id ?? 'new'}`
-/** Brouillon mis de côté pour cette fiche, consommé à la lecture (une seule restauration) ;
- *  ignoré passé une heure, pour ne pas ressusciter un vieux brouillon abandonné. */
-function takeDraft(key: string): Draft | null {
-  try {
-    const raw = sessionStorage.getItem(key)
-    if (!raw) return null
-    sessionStorage.removeItem(key)
-    const { at, draft } = JSON.parse(raw) as { at: number; draft: Draft }
-    return Date.now() - at < 3_600_000 ? draft : null
-  } catch {
-    return null
-  }
 }
 
 /** Enveloppe sortable d'une ligne d'exercice — la poignée reçoit attributes/listeners.
@@ -249,10 +242,12 @@ const followCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform })
   }
 }
 
-/** Les trois « quand » d'une séance : jours fixes, tous les X jours, avant une autre.
- *  L'alternance n'en fait plus partie (sept. 2026) : c'est une section à part, cumulable
- *  avec les deux premiers — Jours choisis + alternance = `repeat.onDays` + `steps`. */
-type PlanMode = 'weekly' | 'every' | 'warmup'
+/** Les « quand » d'un programme : pas de jour fixe, jours choisis, tous les X jours, avant une
+ *  autre. L'alternance n'en fait pas partie (sept. 2026) : c'est une ligne à part, cumulable
+ *  avec Jours choisis et Tous les X jours — Jours choisis + alternance = `repeat.onDays` + `steps`.
+ *  `none` (oct. 2026) s'enregistre comme Jours choisis sans jour : c'est un choix explicite,
+ *  plus un avertissement rouge. */
+type PlanMode = 'none' | 'weekly' | 'every' | 'warmup'
 
 /** Prochaine occurrence (aujourd'hui inclus) d'une cadence « tous les X jours » et son rang */
 function nextEveryOccurrence(startDate: string, everyDays: number): { dateStr: string; index: number } {
@@ -287,7 +282,7 @@ function backOccurrences(fromStr: string, k: number, days: number[]): string {
 export default function SessionForm() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { sessions, exercises, logs, addSession, updateSession, removeSession, updateExercise, addExercise } = useData()
+  const { sessions, exercises, logs, addSession, updateSession, removeSession } = useData()
   const existing = sessions.find((s) => s.id === id)
 
   // Cycle d'alternance : la séance « propriétaire » porte la planification, les
@@ -297,41 +292,38 @@ export default function SessionForm() {
   // Identifiant de « cette séance » dans la rotation (placeholder tant qu'elle n'existe pas)
   const selfKey = existing?.id ?? '__self__'
 
-  // Brouillon mis de côté par « Fiche exercice » (voir `Draft`) : lu une seule fois, au montage
-  const draftKey = draftKeyOf(id)
-  const draftRef = useRef<Draft | null | undefined>(undefined)
-  if (draftRef.current === undefined) draftRef.current = takeDraft(draftKey)
-  const d = draftRef.current
-
-  const [name, setName] = useState(d?.name ?? existing?.name ?? '')
-  const [category, setCategory] = useState<Category>(d?.category ?? existing?.category ?? 'muscu')
+  const [name, setName] = useState(existing?.name ?? '')
+  const [category, setCategory] = useState<Category>(existing?.category ?? 'muscu')
+  // Un nouveau programme prend la catégorie (le déroulé) de son PREMIER exercice, tant que
+  // l'utilisateur ne l'a pas choisie lui-même dans « Plus d'options » (oct. 2026 : le choix
+  // RUN/VÉLO/MUS/HIIT/ÉTIR a quitté le haut de la fiche, décision utilisateur)
+  const categoryTouched = useRef(!!existing)
   // Jours de la séance : jours fixes (`days`) OU, en alternance, jours de semaine du cycle
   // (`repeat.onDays`) — mêmes cases, même état, seule l'écriture change
   const [days, setDays] = useState<number[]>(
-    d ? d.days : cycleOwner?.repeat?.onDays?.length ? cycleOwner.repeat.onDays : (existing?.days ?? []),
+    cycleOwner?.repeat?.onDays?.length ? cycleOwner.repeat.onDays : (existing?.days ?? []),
   )
-  // Jours choisis / tous les X jours / avant une autre (warmupFor) — un seul « quand »
+  // Pas de jour fixe / jours choisis / tous les X jours / avant une autre (warmupFor)
   const [planMode, setPlanMode] = useState<PlanMode>(
-    d
-      ? d.planMode
-      : cycleOwner
-        ? cycleOwner.repeat?.onDays?.length
+    cycleOwner
+      ? cycleOwner.repeat?.onDays?.length
+        ? 'weekly'
+        : 'every'
+      : existing?.warmupFor && !existing.days.length
+        ? 'warmup'
+        : existing?.days.length
           ? 'weekly'
-          : 'every'
-        : existing?.warmupFor && !existing.days.length
-          ? 'warmup'
-          : 'weekly',
+          : 'none',
   )
-  const [everyDays, setEveryDays] = useState(d?.everyDays ?? cycleOwner?.repeat?.everyDays ?? 2)
-  const [startDate, setStartDate] = useState(d?.startDate ?? cycleOwner?.repeat?.startDate ?? todayStr())
+  const [everyDays, setEveryDays] = useState(cycleOwner?.repeat?.everyDays ?? 2)
+  const [startDate, setStartDate] = useState(cycleOwner?.repeat?.startDate ?? todayStr())
   // Alternance en cours d'édition : un tableau de « crans » (A, B, C…), chacun regroupant
   // les séances faites ensemble ce jour-là (selfKey = cette séance). [[selfKey]] = pas
   // d'alternance.
-  const [steps, setSteps] = useState<string[][]>(() => d?.steps ?? (ownerSteps.length ? ownerSteps : [[selfKey]]))
+  const [steps, setSteps] = useState<string[][]>(() => (ownerSteps.length ? ownerSteps : [[selfKey]]))
   // « Commencer par » : cran qui tombera à la prochaine occurrence — dérivé de l'ancre
   // stockée pour refléter la phase actuelle du cycle, dans les deux cadences.
   const [startStep, setStartStep] = useState(() => {
-    if (d) return d.startStep
     const r = cycleOwner?.repeat
     if (!r || ownerSteps.length < 2) return 0
     if (r.onDays?.length) return countWeekdays(r.startDate, nextOccurrenceStr(r.onDays), r.onDays) % ownerSteps.length
@@ -340,21 +332,26 @@ export default function SessionForm() {
   // `comment: ''` (un commentaire ajouté puis laissé vide — Firestore stocke les champs vidés
   // comme '') redevient « pas de commentaire » : le champ ne s'affiche que s'il y a du texte.
   const [items, setItems] = useState<DraftItem[]>(() =>
-    (d?.items ?? existing?.items ?? []).map((it) => ({ ...it, comment: it.comment || undefined, uid: newUid() })),
+    (existing?.items ?? []).map((it) => ({ ...it, comment: it.comment || undefined, uid: newUid() })),
   )
-  const [workSec, setWorkSec] = useState(d?.workSec ?? existing?.workSec ?? 45)
-  const [restSec, setRestSec] = useState(d?.restSec ?? existing?.restSec ?? 15)
-  const [rounds, setRounds] = useState(d?.rounds ?? existing?.rounds ?? 2)
-  const [stretchRest, setStretchRest] = useState(d?.stretchRest ?? (existing?.category === 'etirements' ? (existing.restSec ?? 0) : 5))
-  const [stretchRounds, setStretchRounds] = useState(d?.stretchRounds ?? (existing?.category === 'etirements' ? (existing.rounds ?? 1) : 1))
-  const [muscuRounds, setMuscuRounds] = useState(d?.muscuRounds ?? (existing?.category === 'muscu' ? (existing.rounds ?? 1) : 1))
-  const [group, setGroup] = useState(d?.group ?? existing?.group ?? '')
+  const [workSec, setWorkSec] = useState(existing?.workSec ?? 45)
+  const [restSec, setRestSec] = useState(existing?.restSec ?? 15)
+  const [rounds, setRounds] = useState(existing?.rounds ?? 2)
+  const [stretchRest, setStretchRest] = useState(existing?.category === 'etirements' ? (existing.restSec ?? 0) : 5)
+  const [stretchRounds, setStretchRounds] = useState(existing?.category === 'etirements' ? (existing.rounds ?? 1) : 1)
+  const [muscuRounds, setMuscuRounds] = useState(existing?.category === 'muscu' ? (existing.rounds ?? 1) : 1)
+  const [group, setGroup] = useState(existing?.group ?? '')
   // Échauffement automatique : s'inviter dans Aujourd'hui les jours de telle catégorie
-  const [warmupFor, setWarmupFor] = useState<Category | ''>(d?.warmupFor ?? existing?.warmupFor ?? '')
+  const [warmupFor, setWarmupFor] = useState<Category | ''>(existing?.warmupFor ?? '')
   // Sheet mobile du sélecteur d'exercices (sur desktop le volet est permanent)
   const [pickerOpen, setPickerOpen] = useState(false)
-  // Section du planning + échauffement : options de niche, repliées derrière leur résumé
+  // Catégorie (déroulé) + section du planning : repliées derrière leur résumé
   const [optionsOpen, setOptionsOpen] = useState(false)
+  // Feuilles : réglage d'un exercice du programme (uid de la ligne), « Quand ? », fiche
+  // d'exercice (création depuis le sélecteur ou modification depuis la feuille d'un exercice)
+  const [editUid, setEditUid] = useState<string | null>(null)
+  const [quandOpen, setQuandOpen] = useState(false)
+  const [exSheet, setExSheet] = useState<{ existingId?: string; preset?: ExercisePreset } | null>(null)
   // Sur desktop, « + Ajouter un exercice » envoie le focus dans la recherche du volet
   const searchRef = useRef<HTMLInputElement | null>(null)
 
@@ -398,7 +395,6 @@ export default function SessionForm() {
   const canBlocks = category === 'muscu' || category === 'etirements'
   const hasBreaks = canBlocks && items.some((it, i) => i > 0 && it.blockBreak)
   const catMeta = CATEGORY_META[category]
-  const itemWord = category === 'etirements' ? 'posture' : 'exercice'
   // Groupes de blocs pour l'affichage et le drag & drop (un seul bloc si pas de découpage)
   const blocksArr: DraftItem[][] = []
   items.forEach((it, i) => {
@@ -428,6 +424,7 @@ export default function SessionForm() {
 
   // Changer le déroulé garde les exercices, seuls leurs réglages repartent des défauts
   const switchCategory = (c: Category) => {
+    categoryTouched.current = true
     if (c === category) return
     if (items.length && !window.confirm('Changer de catégorie remet les réglages des exercices par défaut. Continuer ?')) return
     setCategory(c)
@@ -442,25 +439,16 @@ export default function SessionForm() {
    * `measure` évite de dépendre de `exercises` pour un exercice qui vient d'être créé
    * (l'abonnement du store peut ne pas l'avoir encore livré).
    */
-  const appendItem = (exId: string, measure?: Measure) => {
+  const appendItem = (exId: string, measure?: Measure, exCategory?: Category) => {
     const m = measure ?? exOf(exId)?.measure
-    setItems((p) => [...p, { exerciseId: exId, uid: newUid(), ...itemDefaults(category, m) }])
-  }
-
-  /** Crée un exercice à la volée (mini-ligne du sélecteur, dans la catégorie filtrée) et l'ajoute */
-  const quickCreate = async ({ name: nm, subtype, measure, category: cat }: { name: string; subtype: string; measure: Measure; category: Category }) => {
-    if (!nm) return
-    const exId = await addExercise({
-      name: nm,
-      category: cat,
-      subtypes: subtype ? [subtype] : [],
-      subtype: '',
-      measure,
-      description: '',
-      videoUrl: '',
-      createdAt: Date.now(),
-    })
-    appendItem(exId, measure)
+    // Premier exercice d'un nouveau programme : il donne son déroulé au programme
+    let cat = category
+    const exCat = exCategory ?? exOf(exId)?.category
+    if (!categoryTouched.current && items.length === 0 && (exCat === 'muscu' || exCat === 'hiit' || exCat === 'etirements')) {
+      cat = exCat
+      if (cat !== category) setCategory(cat)
+    }
+    setItems((p) => [...p, { exerciseId: exId, uid: newUid(), ...itemDefaults(cat, m) }])
   }
 
   // Occurrences de chaque exercice déjà dans la séance (coches du sélecteur)
@@ -469,6 +457,18 @@ export default function SessionForm() {
 
   const setItem = (idx: number, patch: Partial<SessionItem>) =>
     setItems((p) => p.map((it, i) => (i === idx ? { ...it, ...patch } : it)))
+
+  /** Résumé d'une ligne d'exercice : « 3 × 12 · 60 S », « 3 × 10 · SUPERSET », « 2 × 30 S » */
+  const summaryOf = (it: SessionItem) => {
+    const ex = exOf(it.exerciseId)
+    const isSec = ex?.measure === 'sec'
+    if (category === 'muscu') {
+      const target = it.targets ? setTargetsOf(it).join('/') : (it.target ?? 10)
+      return `${it.sets ?? 3} × ${target}${isSec ? ' s' : ''} · ${it.linkNext ? 'superset' : `${it.restSec ?? 60} s`}`
+    }
+    if (category === 'etirements') return `${it.sets ?? 1} × ${!ex || isSec ? `${it.durationSec ?? 30} s` : `${it.target ?? 10} reps`}`
+    return ''
+  }
 
   // Retrait avec filet : le dernier exercice retiré reste annulable 6 s (un ✕ pendant
   // un drag raté coûtait la re-création de l'item et de tous ses réglages)
@@ -495,15 +495,9 @@ export default function SessionForm() {
   }
 
   // Drag & drop de la liste d'exercices (mêmes réglages tactiles que le Planning).
-  // Pendant un drag (`dragId` posé), toutes les cartes se replient sur leur ligne de titre :
-  // hauteurs uniformes → les échanges deviennent progressifs au lieu de sauter de la hauteur
-  // d'une carte pleine, et la liste entière reste visible pour viser.
+  // Les lignes ont toutes la même hauteur (les réglages vivent dans la feuille de
+  // l'exercice depuis oct. 2026, plus de dépliage sur place) : les échanges sont réguliers.
   const [dragId, setDragId] = useState<string | null>(null)
-  // Lignes repliées par défaut, une seule dépliée à la fois, au CLIC partout — le survol
-  // ouvrait les cartes au passage de la souris et faisait danser le layout (abandonné
-  // août 2026). La ligne repliée = poignée + nom (+ commentaire) + résumé ; tout le reste
-  // (réglages, actions, infos de l'exercice) n'apparaît qu'une fois dépliée.
-  const [openUid, setOpenUid] = useState<string | null>(null)
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
@@ -674,7 +668,26 @@ export default function SessionForm() {
     for (const w of scheduleWrites(selfId)) await updateSession(w.id, w.patch)
   }
 
-  const noDays = planMode === 'weekly' && days.length === 0
+  // Résumé du « quand », sur la ligne de la fiche (la feuille « Quand ? » porte le détail)
+  const noDays = planMode === 'none' || (planMode === 'weekly' && days.length === 0)
+  const quandSummary = (() => {
+    if (noDays) return 'Pas de jour fixe'
+    let s =
+      planMode === 'weekly'
+        ? days.length === 7
+          ? 'Tous les jours'
+          : days.map((x) => DAY_SHORT[x]).join(' · ')
+        : planMode === 'every'
+          ? everyDays === 1
+            ? 'Tous les jours'
+            : `Tous les ${everyDays} jours`
+          : `Avant chaque séance ${warmupFor ? CATEGORY_META[warmupFor].label : ''}`
+    if (planMode !== 'warmup' && steps.length > 1) {
+      const others = steps.flat().filter((x) => x !== selfKey)
+      s += ' · en alternance avec ' + others.map(nameOf).join(', ')
+    }
+    return s
+  })()
 
   // --- Aperçu : la grille du Planning (une ligne par séance, un rond par jour, semaine
   // navigable), pour caler ce programme en fonction de ce qui est déjà posé — séances de
@@ -740,7 +753,7 @@ export default function SessionForm() {
   const save = async () => {
     const maxOrder = sessions.reduce((a, s) => Math.max(a, s.sortOrder ?? -1), -1)
     const data = {
-      name: name.trim() || 'Séance',
+      name: name.trim() || 'Programme',
       category,
       days: planMode === 'weekly' ? days : [],
       // La planification par cycle est réécrite par applySchedule ci-dessous
@@ -787,7 +800,7 @@ export default function SessionForm() {
 
   const del = async () => {
     if (!existing) return
-    if (!window.confirm(`Supprimer la séance « ${existing.name} » ? L'historique déjà enregistré est conservé.`)) return
+    if (!window.confirm(`Supprimer le programme « ${existing.name} » ? L'historique déjà enregistré est conservé.`)) return
     await removeSession(existing.id)
     navigate('/library', { replace: true })
   }
@@ -803,18 +816,9 @@ export default function SessionForm() {
   const initialRef = useRef<string | null>(null)
   // Formulaire restauré d'un brouillon : il diffère forcément de la séance enregistrée,
   // le retour doit demander confirmation ('' n'égale aucun instantané)
-  if (initialRef.current === null) initialRef.current = d ? '' : snapshot
+  if (initialRef.current === null) initialRef.current = snapshot
   const back = () => {
     if (snapshot === initialRef.current || window.confirm('Abandonner les modifications ?')) navigate(-1)
-  }
-  // « Fiche exercice » quitte la page : le brouillon est mis de côté et repris au retour
-  const openExerciseSheet = (exId: string) => {
-    try {
-      sessionStorage.setItem(draftKey, JSON.stringify({ at: Date.now(), draft }))
-    } catch {
-      /* stockage indisponible : on navigue quand même */
-    }
-    navigate(`/exercise/${exId}`)
   }
 
   const addFromList = () => {
@@ -823,7 +827,13 @@ export default function SessionForm() {
     else setPickerOpen(true)
   }
 
-  const optionsSummary = group.trim() || 'Aucune section'
+  const optionsSummary = CATEGORY_META[category].label + (group.trim() ? ` · section ${group.trim()}` : '')
+
+  // Ligne en cours de réglage dans la feuille de l'exercice
+  const editIdx = editUid ? items.findIndex((x) => x.uid === editUid) : -1
+  const editItem = editIdx >= 0 ? items[editIdx] : undefined
+  const editEx = editItem ? exOf(editItem.exerciseId) : undefined
+  const sheetExisting = exSheet?.existingId ? exOf(exSheet.existingId) : undefined
 
   return (
     // Avec des exercices à composer, l'écran passe en deux colonnes dès `lg` :
@@ -839,205 +849,179 @@ export default function SessionForm() {
       }
     >
       <div className="min-w-0">
-        <PageHeader title={existing ? 'Modifier la séance' : 'Nouvelle séance'} onBack={back} />
+        <PageHeader title={existing ? 'Modifier le programme' : 'Nouveau programme'} onBack={back} />
 
-        <div className="space-y-5 px-5 pb-2">
-          {/* ── Nom + catégorie ── */}
-          <div className={card}>
-            <div className={row + ' border-t-0'}>
-              <label htmlFor="session-name" className={rowLabel}>
-                Nom
-              </label>
-              <input
-                id="session-name"
-                type="text"
-                value={name}
-                placeholder="Ex. HIIT du mardi"
-                onChange={(e) => setName(e.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-right text-[15px] font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink/40"
-              />
-            </div>
-            <div className={row}>
-              <span className={rowLabel}>Catégorie</span>
-              {/* Tuiles de catégorie (les codes de CodeTile) — remplace le <select> natif dont le
-                  popup restait illisible sous Windows */}
-              <div className="ml-auto flex gap-1">
-                {CATEGORIES.map((c) => {
-                  const m = CATEGORY_META[c]
-                  const on = c === category
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      title={m.label}
-                      aria-label={m.label}
-                      aria-pressed={on}
-                      onClick={() => switchCategory(c)}
-                      className={
-                        'flex h-8 w-8 items-center justify-center rounded-xs border font-mono text-[8px] font-bold tracking-[0.06em] uppercase ' +
-                        (on ? '' : 'border-hairline-strong text-ink/50 active:bg-glass')
-                      }
-                      style={on ? { backgroundColor: m.hex + '29', borderColor: m.hex + '66', color: m.hex } : undefined}
-                    >
-                      {m.code}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+        {/* Fiche en trois blocs — Nom → Exercices → Quand (canvas « Créer simple », validé le
+            04/10/2026). Les réglages d'un exercice s'ouvrent dans sa feuille, la planification
+            dans la feuille « Quand ? », la catégorie et la section sous « Plus d'options ». */}
+        <div className="space-y-6 px-5 pb-28">
+          {/* ── Nom ── */}
+          <div className="space-y-2">
+            <label htmlFor="session-name" className={rowLabel + ' ml-1 block'}>
+              Nom
+            </label>
+            <input
+              id="session-name"
+              type="text"
+              value={name}
+              placeholder="Ex. Haut du corps"
+              onChange={(e) => setName(e.target.value)}
+              className="h-14 w-full rounded-md border border-hairline-strong bg-shoal px-4 text-lg font-bold text-ink outline-none placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
+            />
           </div>
 
           {/* ── Exercices ── */}
           {hasItems && (
             <div className="space-y-2">
               <Eyebrow className="ml-1 text-ink/60">
-                {category === 'etirements' ? 'Postures de la routine' : 'Exercices de la séance'}
+                {category === 'etirements' ? 'Postures' : 'Exercices'}
+                {items.length ? ` · ${items.length}` : ''}
+                {hasBreaks ? ` · ${blocksArr.length} blocs` : ''}
               </Eyebrow>
-              <div className={card}>
-                {/* En-tête : compte + réglages de la séance (tours, effort/repos, transition) */}
-                <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-1.5">
-                  <span className={rowLabel + ' text-ink/45'}>
-                    {items.length} {itemWord}
-                    {items.length > 1 ? 's' : ''}
-                    {hasBreaks ? ` · ${blocksArr.length} blocs` : ''}
-                  </span>
-                  <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                    {category === 'muscu' && !hasBreaks && (
-                      <span className="flex items-center gap-2" title="Tours du circuit">
-                        <span className={rowLabel}>Tours</span>
-                        <Stepper value={muscuRounds} onChange={setMuscuRounds} min={1} max={10} small />
-                      </span>
-                    )}
-                    {category === 'hiit' && (
-                      <>
-                        <span className="flex items-center gap-1.5">
-                          <span className={rowLabel}>Effort</span>
-                          <MiniNum value={workSec} onChange={setWorkSec} min={5} max={600} label="Secondes d'effort" />
-                          <span className={rowLabel}>s</span>
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <span className={rowLabel}>Repos</span>
-                          <MiniNum value={restSec} onChange={setRestSec} min={0} max={600} label="Secondes de repos" />
-                          <span className={rowLabel}>s</span>
-                        </span>
-                        <span className="flex items-center gap-2">
-                          <span className={rowLabel}>Tours</span>
-                          <Stepper value={rounds} onChange={setRounds} min={1} small />
-                        </span>
-                      </>
-                    )}
-                    {category === 'etirements' && (
-                      <>
-                        {!hasBreaks && (
-                          <span className="flex items-center gap-2" title="Tours de la routine">
-                            <span className={rowLabel}>Tours</span>
-                            <Stepper value={stretchRounds} onChange={setStretchRounds} min={1} max={10} small />
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1.5" title="Transition entre postures">
-                          <span className={rowLabel}>Transition</span>
-                          <MiniNum value={stretchRest} onChange={setStretchRest} min={0} max={120} label="Transition entre postures" />
-                          <span className={rowLabel}>s</span>
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <DndContext
-                  sensors={dndSensors}
-                  collisionDetection={closestCenter}
-                  modifiers={[followCursor]}
-                  // La ligne dépliée se referme au dragStart (les rangées du dessous remontent) :
-                  // re-mesurer les cibles en continu, sinon dnd-kit garde les rects d'avant fermeture
-                  measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-                  onDragStart={(e) => {
-                    setOpenUid(null)
-                    setDragId(String(e.active.id))
-                  }}
-                  onDragCancel={() => setDragId(null)}
-                  onDragEnd={(e) => {
-                    setDragId(null)
-                    onDragEnd(e)
-                  }}
+              {items.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={addFromList}
+                  className={card + ' flex h-28 w-full flex-col items-center justify-center gap-2.5 text-sage-500 active:bg-glass-raised'}
                 >
-                  {/* UN SEUL SortableContext plat (en-têtes de bloc + lignes) : les contexts imbriqués
-                      appliquaient un transform au bloc entier EN PLUS de celui des lignes — d'où les
-                      trous géants et les chevauchements pendant le drag (retour utilisateur août 2026). */}
-                  <SortableContext
-                    items={
-                      hasBreaks
-                        ? blocksArr.flatMap((b) => ['blk-' + b[0].uid, ...b.map((x) => x.uid)])
-                        : items.map((x) => x.uid)
-                    }
-                    strategy={verticalListSortingStrategy}
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sage-500 text-onaccent">
+                    <Plus className="h-5 w-5" />
+                  </span>
+                  <span className="font-mono text-[11px] font-bold tracking-[0.14em] uppercase">
+                    Ajouter {category === 'etirements' ? 'une posture' : 'un exercice'}
+                  </span>
+                </button>
+              ) : (
+                <div className={card}>
+                  {/* Réglages de tout le programme (tours, effort/repos, transition) : une rangée
+                      en tête, seulement quand le déroulé en a */}
+                  {((category === 'muscu' && !hasBreaks) || category === 'hiit' || category === 'etirements') && (
+                    <div className="flex min-h-12 flex-wrap items-center justify-end gap-x-4 gap-y-1.5 px-4 py-1.5">
+                      {category === 'muscu' && !hasBreaks && (
+                        <span className="flex items-center gap-2" title="Tours du circuit">
+                          <span className={rowLabel}>Tours du circuit</span>
+                          <Stepper value={muscuRounds} onChange={setMuscuRounds} min={1} max={10} small />
+                        </span>
+                      )}
+                      {category === 'hiit' && (
+                        <>
+                          <span className="flex items-center gap-1.5">
+                            <span className={rowLabel}>Effort</span>
+                            <MiniNum value={workSec} onChange={setWorkSec} min={5} max={600} label="Secondes d'effort" />
+                            <span className={rowLabel}>s</span>
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className={rowLabel}>Repos</span>
+                            <MiniNum value={restSec} onChange={setRestSec} min={0} max={600} label="Secondes de repos" />
+                            <span className={rowLabel}>s</span>
+                          </span>
+                          <span className="flex items-center gap-2">
+                            <span className={rowLabel}>Tours</span>
+                            <Stepper value={rounds} onChange={setRounds} min={1} small />
+                          </span>
+                        </>
+                      )}
+                      {category === 'etirements' && (
+                        <>
+                          {!hasBreaks && (
+                            <span className="flex items-center gap-2" title="Tours de la routine">
+                              <span className={rowLabel}>Tours</span>
+                              <Stepper value={stretchRounds} onChange={setStretchRounds} min={1} max={10} small />
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1.5" title="Transition entre postures">
+                            <span className={rowLabel}>Transition</span>
+                            <MiniNum value={stretchRest} onChange={setStretchRest} min={0} max={120} label="Transition entre postures" />
+                            <span className={rowLabel}>s</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  <DndContext
+                    sensors={dndSensors}
+                    collisionDetection={closestCenter}
+                    modifiers={[followCursor]}
+                    measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+                    onDragStart={(e) => setDragId(String(e.active.id))}
+                    onDragCancel={() => setDragId(null)}
+                    onDragEnd={(e) => {
+                      setDragId(null)
+                      onDragEnd(e)
+                    }}
                   >
-                    {blocksArr.map((blk, bi) => (
-                      <div key={'blk-' + blk[0].uid}>
-                        {hasBreaks && (
-                          <SortableItem uid={'blk-' + blk[0].uid}>
-                            {(blockDrag) => (
-                              <div className={`flex min-h-10 items-center gap-2.5 border-t border-hairline px-4 ${catMeta.soft}`}>
-                                <button
-                                  type="button"
-                                  aria-label={`Déplacer le bloc ${bi + 1}`}
-                                  {...blockDrag.attributes}
-                                  {...blockDrag.listeners}
-                                  className="-ml-1.5 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
-                                >
-                                  <GripVertical className="h-4 w-4" />
-                                </button>
-                                <span className={`font-mono text-[10px] font-bold tracking-[0.16em] uppercase ${catMeta.text}`}>
-                                  Bloc {bi + 1}
-                                </span>
-                                <div className="ml-auto flex items-center gap-2">
-                                  <span className={rowLabel}>Tours</span>
-                                  <Stepper
-                                    small
-                                    value={items[blockStarts[bi]]?.blockRounds ?? 1}
-                                    onChange={(v) => setItem(blockStarts[bi], { blockRounds: v })}
-                                    min={1}
-                                    max={10}
-                                  />
-                                  {bi > 0 && (
-                                    <button
-                                      type="button"
-                                      aria-label="Fusionner avec le bloc précédent"
-                                      title="Fusionner avec le bloc précédent"
-                                      onClick={() => setItem(blockStarts[bi], { blockBreak: false })}
-                                      className={iconBtn + ' ml-1 h-[26px] w-[26px]'}
-                                    >
-                                      <Merge className="h-3.5 w-3.5" />
-                                    </button>
-                                  )}
+                    {/* UN SEUL SortableContext plat (en-têtes de bloc + lignes) : les contexts imbriqués
+                        appliquaient un transform au bloc entier EN PLUS de celui des lignes — d'où les
+                        trous géants et les chevauchements pendant le drag (retour utilisateur août 2026). */}
+                    <SortableContext
+                      items={hasBreaks ? blocksArr.flatMap((b) => ['blk-' + b[0].uid, ...b.map((x) => x.uid)]) : items.map((x) => x.uid)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {blocksArr.map((blk, bi) => (
+                        <div key={'blk-' + blk[0].uid}>
+                          {hasBreaks && (
+                            <SortableItem uid={'blk-' + blk[0].uid}>
+                              {(blockDrag) => (
+                                <div className={`flex min-h-10 items-center gap-2.5 border-t border-hairline px-4 ${catMeta.soft}`}>
+                                  <button
+                                    type="button"
+                                    aria-label={`Déplacer le bloc ${bi + 1}`}
+                                    {...blockDrag.attributes}
+                                    {...blockDrag.listeners}
+                                    className="-ml-1.5 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
+                                  >
+                                    <GripVertical className="h-4 w-4" />
+                                  </button>
+                                  <span className={`font-mono text-[10px] font-bold tracking-[0.16em] uppercase ${catMeta.text}`}>Bloc {bi + 1}</span>
+                                  <div className="ml-auto flex items-center gap-2">
+                                    <span className={rowLabel}>Tours</span>
+                                    <Stepper
+                                      small
+                                      value={items[blockStarts[bi]]?.blockRounds ?? 1}
+                                      onChange={(v) => setItem(blockStarts[bi], { blockRounds: v })}
+                                      min={1}
+                                      max={10}
+                                    />
+                                    {bi > 0 && (
+                                      <button
+                                        type="button"
+                                        aria-label="Fusionner avec le bloc précédent"
+                                        title="Fusionner avec le bloc précédent"
+                                        onClick={() => setItem(blockStarts[bi], { blockBreak: false })}
+                                        className={iconBtn + ' ml-1 h-[26px] w-[26px]'}
+                                      >
+                                        <Merge className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                          </SortableItem>
-                        )}
-                        {blk.map((it, ii) => {
-                          const idx = blockStarts[bi] + ii
-                          const ex = exOf(it.exerciseId)
-                          const isSec = ex?.measure === 'sec'
-                          const isOpen = openUid === it.uid && !dragId
-                          const summary =
-                            category === 'muscu'
-                              ? `${it.sets ?? 3} × ${it.targets ? setTargetsOf(it).join('/') : (it.target ?? 10)}${isSec ? ' s' : ''} · ${it.restSec ?? 60} s`
-                              : category === 'etirements'
-                                ? `${it.sets ?? 1} × ${!ex || isSec ? `${it.durationSec ?? 30} s` : `${it.target ?? 10} reps`}`
-                                : ''
-                          return (
-                            <SortableItem key={it.uid} uid={it.uid}>
-                              {(drag) => (
-                                <div>
-                                  {/* Ligne repliée : poignée · nom (+ commentaire) · résumé · chevron.
-                                      Le clic n'importe où (hors contrôles) déplie SOUS la ligne. */}
+                              )}
+                            </SortableItem>
+                          )}
+                          {blk.map((it, ii) => {
+                            const idx = blockStarts[bi] + ii
+                            const ex = exOf(it.exerciseId)
+                            const summary = summaryOf(it)
+                            // Superset : un filet de la couleur muscu sur toute la chaîne enchaînée
+                            const inChain =
+                              category === 'muscu' && (!!it.linkNext || (idx > 0 && !!items[idx - 1].linkNext && !it.blockBreak))
+                            return (
+                              <SortableItem key={it.uid} uid={it.uid}>
+                                {(drag) => (
+                                  // Ligne = poignée · nom (+ consigne) · résumé · chevron. Un tap ouvre
+                                  // la feuille de réglage de l'exercice (plus de dépliage sur place).
                                   <div
-                                    className={row + ' cursor-pointer'}
+                                    role="button"
+                                    tabIndex={0}
+                                    data-item={ex?.name ?? ''}
+                                    className={row + ' cursor-pointer active:bg-glass-raised' + (inChain ? ' shadow-[inset_3px_0_0_var(--color-muscu)]' : '')}
                                     onClick={(e) => {
-                                      const t = e.target as Element
-                                      if (t.closest('button,input,select,a')) return
-                                      setOpenUid((u) => (u === it.uid ? null : it.uid))
+                                      if ((e.target as Element).closest('button,input,select,a')) return
+                                      setEditUid(it.uid)
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') setEditUid(it.uid)
                                     }}
                                   >
                                     <button
@@ -1051,514 +1035,92 @@ export default function SessionForm() {
                                     </button>
                                     <div className="min-w-0 flex-1 py-2">
                                       <p className="truncate text-[15px] font-bold text-ink">{ex?.name ?? '—'}</p>
-                                      {it.comment && !isOpen && (
-                                        <p className="truncate text-xs font-semibold text-ink-soft">{it.comment}</p>
-                                      )}
+                                      {it.comment && <p className="truncate text-xs font-semibold text-ink-soft">{it.comment}</p>}
                                     </div>
                                     {summary && (
                                       <span className="shrink-0 font-mono text-[11px] tracking-[0.06em] uppercase tabular-nums text-ink-soft">
                                         {summary}
                                       </span>
                                     )}
-                                    <ChevronDown
-                                      className={
-                                        'h-4 w-4 shrink-0 text-ink-soft/40 transition-transform duration-150 ' +
-                                        (isOpen ? 'rotate-180 text-ink-soft/70' : '')
-                                      }
-                                    />
+                                    <ChevronRight className="h-4 w-4 shrink-0 text-sage-500/70" />
                                   </div>
-
-                                  {/* Vrai dépliage : les lignes suivantes descendent (transition 150 ms) */}
-                                  <div
-                                    className={
-                                      'overflow-hidden transition-all duration-150 ' +
-                                      (isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0')
-                                    }
-                                  >
-                                    <div className="space-y-2.5 border-t border-hairline py-3 pr-4 pl-11">
-                                      {category === 'muscu' && (
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <span className={rowLabel}>Séries</span>
-                                          <MiniNum
-                                            value={it.sets ?? 3}
-                                            onChange={(v) => {
-                                              const patch: Partial<SessionItem> = { sets: v }
-                                              if (it.targets) patch.targets = setTargetsOf({ ...it, sets: v })
-                                              setItem(idx, patch)
-                                            }}
-                                            min={1}
-                                            max={12}
-                                            label="Séries"
-                                          />
-                                          <span className={rowLabel}>×</span>
-                                          {it.targets ? (
-                                            setTargetsOf(it).map((t, s) => (
-                                              <MiniNum
-                                                key={s}
-                                                value={t}
-                                                onChange={(v) =>
-                                                  setItem(idx, { targets: setTargetsOf(it).map((x, j) => (j === s ? v : x)) })
-                                                }
-                                                min={1}
-                                                label={`Objectif série ${s + 1}`}
-                                              />
-                                            ))
-                                          ) : (
-                                            <MiniNum value={it.target ?? 10} onChange={(v) => setItem(idx, { target: v })} min={1} label="Objectif par série" />
-                                          )}
-                                          <button
-                                            type="button"
-                                            title="Basculer répétitions / secondes"
-                                            onClick={() => ex && void updateExercise(ex.id, { measure: isSec ? 'reps' : 'sec' })}
-                                            className={togglePill}
-                                          >
-                                            {isSec ? 'sec' : 'reps'}
-                                          </button>
-                                          <span className="ml-auto flex items-center gap-1.5" title="Repos entre séries">
-                                            <span className={rowLabel}>Repos</span>
-                                            <MiniNum value={it.restSec ?? 60} onChange={(v) => setItem(idx, { restSec: v })} max={600} label="Repos entre séries" />
-                                            <span className={rowLabel}>s</span>
-                                          </span>
-                                        </div>
-                                      )}
-
-                                      {category === 'etirements' && (
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          {/* Séries de la posture : 2 × 30 s pour un étirement fait des deux côtés */}
-                                          <span className={rowLabel}>Séries</span>
-                                          <MiniNum value={it.sets ?? 1} onChange={(v) => setItem(idx, { sets: v })} min={1} max={6} label="Séries" />
-                                          <span className={rowLabel}>×</span>
-                                          {!ex || isSec ? (
-                                            <>
-                                              <MiniNum value={it.durationSec ?? 30} onChange={(v) => setItem(idx, { durationSec: v })} min={5} label="Durée de la posture" />
-                                              <span className={rowLabel}>s</span>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <MiniNum value={it.target ?? 10} onChange={(v) => setItem(idx, { target: v })} min={1} label="Répétitions" />
-                                              <span className={rowLabel}>reps</span>
-                                            </>
-                                          )}
-                                          <button
-                                            type="button"
-                                            title="Basculer secondes / répétitions (modifie l'exercice)"
-                                            onClick={() => ex && void updateExercise(ex.id, { measure: isSec ? 'reps' : 'sec' })}
-                                            className={togglePill + ' ml-auto'}
-                                          >
-                                            {isSec ? 'sec' : 'reps'}
-                                          </button>
-                                        </div>
-                                      )}
-
-                                      {it.comment !== undefined && (
-                                        <input
-                                          type="text"
-                                          value={it.comment}
-                                          onChange={(e) => setItem(idx, { comment: e.target.value })}
-                                          onBlur={() => {
-                                            // Laissé vide → le champ disparaît (retour à l'icône), rien n'est persisté
-                                            if (!it.comment?.trim()) setItem(idx, { comment: undefined })
-                                          }}
-                                          autoFocus={it.comment === ''}
-                                          placeholder="Commentaire (tempo, consigne…)"
-                                          className="h-[34px] w-full rounded-sm border border-hairline bg-glass-sunken px-3 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
-                                        />
-                                      )}
-
-                                      {ex?.description && <p className="text-xs font-medium text-ink-soft/80">{ex.description}</p>}
-
-                                      {/* Actions de la ligne, en icônes : varier · commenter · démo · fiche · retirer */}
-                                      <div className="flex items-center gap-1.5">
-                                        {category === 'muscu' && (
-                                          <button
-                                            type="button"
-                                            aria-label="Varier les séries"
-                                            aria-pressed={!!it.targets}
-                                            title={it.targets ? 'Revenir à des séries identiques' : 'Varier l’objectif de chaque série (ex. 30 / 20 / 15)'}
-                                            onClick={() =>
-                                              setItem(
-                                                idx,
-                                                it.targets
-                                                  ? { targets: undefined, target: setTargetsOf(it)[0] }
-                                                  : { targets: setTargetsOf(it) },
-                                              )
-                                            }
-                                            className={it.targets ? iconBtnOn : iconBtn}
-                                          >
-                                            <SlidersHorizontal className="h-[15px] w-[15px]" />
-                                          </button>
-                                        )}
-                                        <button
-                                          type="button"
-                                          aria-label="Commentaire"
-                                          aria-pressed={it.comment !== undefined}
-                                          title="Ajouter un commentaire"
-                                          onClick={() => {
-                                            if (it.comment === undefined) setItem(idx, { comment: '' })
-                                          }}
-                                          className={it.comment !== undefined ? iconBtnOn : iconBtn}
-                                        >
-                                          <MessageSquarePlus className="h-[15px] w-[15px]" />
-                                        </button>
-                                        {ex?.videoUrl && (
-                                          <a
-                                            href={ex.videoUrl}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            aria-label="Démo"
-                                            title="Vidéo de démonstration"
-                                            className={iconBtn}
-                                          >
-                                            <Play className="h-[15px] w-[15px]" />
-                                          </a>
-                                        )}
-                                        {ex && (
-                                          <button
-                                            type="button"
-                                            aria-label="Fiche exercice"
-                                            title="Fiche exercice"
-                                            onClick={() => openExerciseSheet(ex.id)}
-                                            className={iconBtn}
-                                          >
-                                            <FileText className="h-[15px] w-[15px]" />
-                                          </button>
-                                        )}
-                                        <button
-                                          type="button"
-                                          aria-label="Retirer"
-                                          title="Retirer de la séance"
-                                          onClick={() => removeItem(idx)}
-                                          className={iconBtnDanger + ' ml-auto'}
-                                        >
-                                          <Trash2 className="h-[15px] w-[15px]" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Superset : une pastille posée sur le filet entre deux lignes */}
-                                  {category === 'muscu' && idx < items.length - 1 && !items[idx + 1].blockBreak && (
-                                    <div className="relative z-10 flex h-0 justify-center">
-                                      <button
-                                        type="button"
-                                        aria-pressed={!!it.linkNext}
-                                        title={it.linkNext ? 'Superset — enchaîné sans repos' : 'Enchaîner avec le suivant sans repos (superset)'}
-                                        onClick={() => setItem(idx, { linkNext: !it.linkNext })}
-                                        className={
-                                          'flex h-6 -translate-y-1/2 items-center gap-1 rounded-full px-3 font-mono text-[9px] font-bold tracking-[0.12em] uppercase transition-colors ' +
-                                          (it.linkNext ? 'bg-muscu text-onaccent shadow-sm' : 'border border-hairline-strong bg-shoal text-ink-soft')
-                                        }
-                                      >
-                                        <Link2 className="h-3 w-3" />
-                                        superset
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </SortableItem>
-                          )
-                        })}
-                      </div>
-                    ))}
-                  </SortableContext>
-                  {/* La vignette qui suit le doigt : compacte et opaque, elle ne cache plus la liste */}
-                  <DragOverlay>
-                    {dragId &&
-                      (() => {
-                        if (dragId.startsWith('blk-')) {
-                          const bi = blocksArr.findIndex((b) => 'blk-' + b[0].uid === dragId)
-                          if (bi === -1) return null
+                                )}
+                              </SortableItem>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </SortableContext>
+                    {/* La vignette qui suit le doigt : compacte et opaque, elle ne cache plus la liste */}
+                    <DragOverlay>
+                      {dragId &&
+                        (() => {
+                          if (dragId.startsWith('blk-')) {
+                            const bi = blocksArr.findIndex((b) => 'blk-' + b[0].uid === dragId)
+                            if (bi === -1) return null
+                            return (
+                              <div className={`flex items-center gap-2.5 rounded-sm px-4 py-2 shadow-xl backdrop-blur-lg ${catMeta.soft}`}>
+                                <GripVertical className="h-4 w-4 text-ink-soft/40" />
+                                <span className={`font-mono text-[10px] font-bold tracking-[0.16em] uppercase ${catMeta.text}`}>
+                                  Bloc {bi + 1} · {blocksArr[bi].length} exo{blocksArr[bi].length > 1 ? 's' : ''}
+                                </span>
+                              </div>
+                            )
+                          }
+                          const it = items.find((x) => x.uid === dragId)
+                          const ex = it && exOf(it.exerciseId)
                           return (
-                            <div className={`flex items-center gap-2.5 rounded-sm px-4 py-2 shadow-xl backdrop-blur-lg ${catMeta.soft}`}>
-                              <GripVertical className="h-4 w-4 text-ink-soft/40" />
-                              <span className={`font-mono text-[10px] font-bold tracking-[0.16em] uppercase ${catMeta.text}`}>
-                                Bloc {bi + 1} · {blocksArr[bi].length} exo{blocksArr[bi].length > 1 ? 's' : ''}
-                              </span>
+                            <div className="flex items-center gap-3 rounded-sm border border-hairline bg-shoal px-4 py-2 shadow-xl">
+                              <GripVertical className="h-4 w-4 shrink-0 text-ink-soft/40" />
+                              <p className="min-w-0 flex-1 truncate text-[15px] font-bold text-ink">{ex?.name ?? '—'}</p>
                             </div>
                           )
-                        }
-                        const it = items.find((x) => x.uid === dragId)
-                        const ex = it && exOf(it.exerciseId)
-                        return (
-                          <div className="flex items-center gap-3 rounded-sm border border-hairline bg-shoal px-4 py-2 shadow-xl">
-                            <GripVertical className="h-4 w-4 shrink-0 text-ink-soft/40" />
-                            <p className="min-w-0 flex-1 truncate text-[15px] font-bold text-ink">{ex?.name ?? '—'}</p>
-                          </div>
-                        )
-                      })()}
-                  </DragOverlay>
-                </DndContext>
+                        })()}
+                    </DragOverlay>
+                  </DndContext>
 
-                {/* Pied de liste : ajouter (Sheet mobile / focus du volet desktop) · nouveau bloc */}
-                <div className={row + ' min-h-11'}>
-                  <button
-                    type="button"
-                    onClick={addFromList}
-                    className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-sage-600 active:text-sage-700"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Ajouter {category === 'etirements' ? 'une posture' : 'un exercice'}
-                  </button>
-                  {/* Un seul point de découpe, en bas : le dernier exercice démarre le nouveau bloc,
-                      le drag & drop fait le reste (remplace les pilules entre chaque paire d'exercices) */}
-                  {canBlocks && items.length >= 2 && !items[items.length - 1].blockBreak && (
+                  <div className={row + ' min-h-12'}>
                     <button
                       type="button"
-                      title="Le dernier exercice démarre un nouveau bloc — glisses-y les autres"
-                      onClick={() => {
-                        const last = items.length - 1
-                        setItem(last, { blockBreak: true, blockRounds: items[last].blockRounds ?? 1 })
-                        setItem(last - 1, { linkNext: false })
-                      }}
-                      className="ml-auto flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-ink/60 active:text-ink"
+                      onClick={addFromList}
+                      className="flex items-center gap-2 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-sage-600 active:text-sage-700"
                     >
-                      <LayoutGrid className="h-3.5 w-3.5" /> nouveau bloc
+                      <Plus className="h-4 w-4" /> Ajouter {category === 'etirements' ? 'une posture' : 'un exercice'}
                     </button>
+                  </div>
+                  {category === 'hiit' && (
+                    <p className="border-t border-hairline bg-glass-sunken px-4 py-2.5 text-center font-mono text-[10px] tracking-[0.12em] uppercase text-ink/45">
+                      {items.length} exercice{items.length > 1 ? 's' : ''} × {rounds} tour{rounds > 1 ? 's' : ''} · {workSec} s d'effort / {restSec} s de repos
+                    </p>
                   )}
                 </div>
-                {category === 'hiit' && items.length > 0 && (
-                  <p className="border-t border-hairline bg-glass-sunken px-4 py-2.5 text-center font-mono text-[10px] tracking-[0.12em] uppercase text-ink/45">
-                    {items.length} exercice{items.length > 1 ? 's' : ''} × {rounds} tour{rounds > 1 ? 's' : ''} · {workSec} s
-                    d'effort / {restSec} s de repos
-                  </p>
-                )}
-              </div>
+              )}
             </div>
           )}
 
-          {/* ── Planification ── */}
+          {/* ── Quand : une ligne résumée, le détail dans la feuille « Quand ? » ── */}
           <div className="space-y-2">
-            <Eyebrow className="ml-1 text-ink/60">Planification</Eyebrow>
-            <div className={card}>
-              {/* Le « quand » : trois positions. L'alternance est une section à part, plus bas. */}
-              <div className="px-3 py-2.5">
-                <Seg
-                  compact
-                  options={[
-                    { value: 'weekly' as const, label: 'Jours choisis' },
-                    { value: 'every' as const, label: 'Tous les X jours' },
-                    { value: 'warmup' as const, label: 'Avant une autre' },
-                  ]}
-                  value={planMode}
-                  onChange={(v) => {
-                    setPlanMode(v)
-                    // « Avant une autre » sans cible n'a pas de sens : on présélectionne
-                    if (v === 'warmup' && !warmupFor) setWarmupFor(CATEGORIES.find((c) => c !== category) ?? '')
-                  }}
-                />
-              </div>
-
-              {planMode === 'weekly' && (
-                <div className={row + ' min-h-14'}>
-                  <div className="flex w-full items-center justify-between">
-                    {DAY_LETTER.map((_, d) => (
-                      <DayButton key={d} d={d} on={days.includes(d)} onClick={() => toggleDay(d)} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Jumelée : s'invite dans Aujourd'hui les jours où une séance de la
-                  catégorie cible est due (courses du plan comprises) — pas de jour propre.
-                  Libellé au-dessus, chips en dessous : côte à côte, elles passaient sur deux
-                  lignes et chevauchaient le libellé. */}
-              {planMode === 'warmup' && (
-                <div className={row + ' flex-col items-start gap-2.5 py-3'}>
-                  <span className={rowLabel}>Avant chaque séance de</span>
-                  <div className="flex flex-wrap gap-2">
-                    {CATEGORIES.filter((c) => c !== category).map((c) => (
-                      <Chip key={c} active={warmupFor === c} onClick={() => setWarmupFor(c)}>
-                        {CATEGORY_META[c].label}
-                      </Chip>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {planMode === 'every' && (
-                <div className={row}>
-                  <span className={rowLabel}>Tous les</span>
-                  <div className="ml-auto flex items-center gap-2">
-                    <MiniNum value={everyDays} onChange={setEveryDays} min={1} max={30} label="Intervalle en jours" />
-                    <span className={rowLabel}>jour{everyDays > 1 ? 's' : ''}</span>
-                  </div>
-                </div>
-              )}
-              {planMode === 'every' && (
-                <div className={row}>
-                  <span className={rowLabel}>À partir du</span>
-                  {/* Champ natif habillé : le sélecteur reste celui du système (color-scheme: dark) */}
-                  <input
-                    type="date"
-                    aria-label="Date de départ du cycle"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value || todayStr())}
-                    className={miniInput + ' ml-auto px-2.5 text-left [&::-webkit-calendar-picker-indicator]:opacity-60'}
-                  />
-                </div>
-              )}
-
-              {/* ── En alternance avec : UNE séance partenaire (sélecteur « Aucune » → pastille avec sa
-                  croix). Cumulable avec Jours choisis et Tous les X jours. Un cycle existant plus
-                  complexe (trois crans, plusieurs séances le même jour) se lit en texte. ── */}
-              {planMode !== 'warmup' && (
-                <>
-                  {partner ? (
-                    <div className={row + ' flex-col items-stretch gap-2 py-3'}>
-                      <span className={rowLabel}>En alternance avec</span>
-                      <div
-                        className={`flex h-[30px] items-center justify-between rounded-full border pl-3 pr-1 ${CATEGORY_META[partner.category].soft} ${CATEGORY_META[partner.category].text}`}
-                        style={{ borderColor: CATEGORY_META[partner.category].hex + '73' }}
-                      >
-                        <span className="flex min-w-0 items-center gap-2 font-mono text-[10px] font-bold tracking-[0.08em] uppercase">
-                          <CategoryIcon category={partner.category} className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{partner.name}</span>
-                        </span>
-                        <button
-                          type="button"
-                          aria-label="Retirer l'alternance"
-                          onClick={() => setPartner('')}
-                          className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full opacity-75 active:opacity-100"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : !simpleSteps ? (
-                    <div className={row + ' flex-col items-stretch gap-2 py-3'}>
-                      <span className={rowLabel}>En alternance avec</span>
-                      <div className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 font-mono text-[10px] leading-relaxed font-bold tracking-[0.08em] uppercase text-ink/85">
-                          {steps.map((st) => st.map(nameOf).join(' + ')).join(' → ')}
-                        </span>
-                        <button type="button" aria-label="Retirer l'alternance" onClick={() => setPartner('')} className={iconBtn}>
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={row}>
-                      <span className={rowLabel}>En alternance avec</span>
-                      <div className="relative ml-auto">
-                        <select
-                          aria-label="En alternance avec"
-                          value=""
-                          onChange={(e) => setPartner(e.target.value)}
-                          className="h-[30px] appearance-none rounded-sm border border-hairline bg-glass-sunken pl-3 pr-7 font-mono text-[10px] tracking-[0.14em] uppercase text-ink/70 outline-none focus:border-sage-500"
-                        >
-                          <option value="">Aucune</option>
-                          {sessions
-                            .filter((s) => s.id !== existing?.id)
-                            .map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name}
-                              </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-ink/60" />
-                      </div>
-                    </div>
-                  )}
-                  {steps.length > 1 && (planMode === 'every' || days.length > 0) && (
-                    <div className={row + ' flex-col items-stretch gap-2 py-3'}>
-                      <span className={rowLabel}>Commencer par</span>
-                      <Seg
-                        compact
-                        options={startOptions}
-                        value={String(startStep % steps.length)}
-                        onChange={(v) => setStartStep(Number(v))}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* ── Aperçu : la grille du Planning, semaine par semaine, avec tout ce qui est déjà posé ── */}
-              <div className={row + ' flex-col items-stretch gap-0 px-3 pt-3 pb-3.5'}>
-                <div className="flex items-center justify-between gap-2 pl-1">
-                  <span className={rowLabel}>Aperçu</span>
-                  <div className="flex items-center gap-1.5">
-                    <button type="button" aria-label="Semaine précédente" onClick={() => setWeekOffset((o) => o - 1)} className={iconBtn}>
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <span className="min-w-[7.5rem] text-center font-mono text-[10px] tracking-[0.14em] uppercase text-ink/85">
-                      {weekOffset === 0 ? 'Cette semaine' : `Sem. du ${formatShortFr(weekDates[0])}`}
-                    </span>
-                    <button type="button" aria-label="Semaine suivante" onClick={() => setWeekOffset((o) => o + 1)} className={iconBtn}>
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                {/* En-tête des jours : lettre + numéro, aujourd'hui en pastille pleine — comme le Planning */}
-                <div className={previewGrid + ' mt-2.5 px-1 pb-1'}>
-                  <span />
-                  {DAY_LETTER.map((letter, d) => {
-                    const isToday = d === todayIdx
-                    return (
-                      <div key={d} title={DAY_NAMES[d]} className="mx-auto flex flex-col items-center gap-0.5">
-                        <span className={'font-mono text-[10px] tracking-[0.1em] ' + (isToday ? 'text-sage-500' : 'text-ink/55')}>
-                          {letter}
-                        </span>
-                        <span
-                          className={
-                            'flex h-5 w-5 items-center justify-center rounded-full font-mono text-[10px] tabular-nums ' +
-                            (isToday ? 'bg-sage-500 text-onaccent' : 'text-ink/55')
-                          }
-                        >
-                          {Number(weekDates[d].slice(8, 10))}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="space-y-1" data-preview>
-                  {preview.rows.map((r) => (
-                    <PreviewRow
-                      key={r.session.id}
-                      id={r.session.id}
-                      title={r.session.name}
-                      code={r.code}
-                      hex={CATEGORY_META[r.session.category].hex}
-                      self={r.self}
-                      planned={r.planned}
-                      done={r.done}
-                      todayIdx={todayIdx}
-                    />
-                  ))}
-                  {/* Courses du plan semi de la semaine, en lecture seule, comme dans le Planning :
-                      rond plein sur le jour réellement fait, anneau sur le jour prévu tant que rien n'est fait */}
-                  {planStates.map((st) => {
-                    const t = TYPE_META[st.seance.type]
-                    const inWeek = st.doneDate ? weekDates.indexOf(st.doneDate) : -1
-                    const doneCol = !st.done ? -1 : inWeek >= 0 ? inWeek : st.seance.day
-                    return (
-                      <PreviewRow
-                        key={'plan-' + st.seance.day}
-                        id={'plan-' + st.seance.day}
-                        title={st.seance.title}
-                        code={t.code + ' · plan semi'}
-                        hex={t.hex}
-                        planned={Array.from({ length: 7 }, (_, d) => d === st.seance.day && !st.done)}
-                        done={Array.from({ length: 7 }, (_, d) => d === doneCol)}
-                        todayIdx={todayIdx}
-                      />
-                    )
-                  })}
-                </div>
-                {noDays ? (
-                  <p className="mt-2.5 pl-1 font-mono text-[9px] leading-relaxed tracking-[0.12em] uppercase text-hiit">
-                    Aucun jour choisi : ce programme n'apparaîtra ni dans le Planning ni dans Aujourd'hui.
-                  </p>
-                ) : (
-                  <p className="mt-2.5 pl-1 font-mono text-[9px] tracking-[0.12em] uppercase text-ink/85">
-                    Prochaine fois : {preview.nextLabel}
-                  </p>
+            <Eyebrow className="ml-1 text-ink/60">Quand</Eyebrow>
+            <button
+              type="button"
+              data-quand
+              onClick={() => setQuandOpen(true)}
+              className={card + ' flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left active:bg-glass-raised'}
+            >
+              <span className="min-w-0 flex-1">
+                <span className={'block text-[15px] font-bold ' + (noDays ? 'text-ink-soft' : 'text-ink')}>{quandSummary}</span>
+                {!noDays && (
+                  <span className="block font-mono text-[9px] tracking-[0.12em] uppercase text-ink-soft">Prochaine fois : {preview.nextLabel}</span>
                 )}
-              </div>
-            </div>
+              </span>
+              <span className="shrink-0 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-sage-500">
+                {noDays ? 'Choisir' : 'Modifier'}
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-sage-500" />
+            </button>
           </div>
 
-          {/* ── Options avancées (repliées derrière leur résumé) ── */}
+          {/* ── Plus d'options : catégorie (déroulé) + section du planning, repliées ── */}
           <div className={card}>
             <button
               type="button"
@@ -1566,14 +1128,40 @@ export default function SessionForm() {
               onClick={() => setOptionsOpen((o) => !o)}
               className="flex min-h-12 w-full items-center gap-3 px-4 text-left"
             >
-              <span className={rowLabel}>Options avancées</span>
-              {!optionsOpen && <p className="truncate text-[13px] font-semibold text-ink-soft">{optionsSummary}</p>}
-              <ChevronDown
-                className={'ml-auto h-4 w-4 shrink-0 text-ink-soft/60 transition-transform duration-150 ' + (optionsOpen ? 'rotate-180' : '')}
-              />
+              <span className={rowLabel}>Plus d'options</span>
+              {!optionsOpen && <p className="min-w-0 flex-1 truncate text-right text-[13px] font-semibold text-ink-soft">{optionsSummary}</p>}
+              <ChevronDown className={'ml-auto h-4 w-4 shrink-0 text-ink-soft/60 transition-transform duration-150 ' + (optionsOpen ? 'rotate-180' : '')} />
             </button>
             {optionsOpen && (
               <>
+                <div className={row}>
+                  <span className={rowLabel}>Catégorie</span>
+                  {/* Le déroulé : minuteur, saisie, couleur. Déduit du premier exercice d'un
+                      nouveau programme ; ici pour le corriger, ou pour un programme de course ou de vélo */}
+                  <div className="ml-auto flex gap-1">
+                    {CATEGORIES.map((c) => {
+                      const m = CATEGORY_META[c]
+                      const on = c === category
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          title={m.label}
+                          aria-label={m.label}
+                          aria-pressed={on}
+                          onClick={() => switchCategory(c)}
+                          className={
+                            'flex h-9 w-9 items-center justify-center rounded-xs border font-mono text-[8px] font-bold tracking-[0.06em] uppercase ' +
+                            (on ? '' : 'border-hairline-strong text-ink/50 active:bg-glass')
+                          }
+                          style={on ? { backgroundColor: m.hex + '29', borderColor: m.hex + '66', color: m.hex } : undefined}
+                        >
+                          {m.code}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
                 <div className={row}>
                   <span className={rowLabel}>Section du planning</span>
                   <div className="ml-auto w-full max-w-60">
@@ -1591,6 +1179,390 @@ export default function SessionForm() {
             )}
           </div>
         </div>
+
+        {/* ── Feuille d'un exercice du programme : ses réglages, en clair ── */}
+        <Sheet
+          open={!!editItem}
+          onClose={() => setEditUid(null)}
+          title={editEx?.name ?? 'Exercice'}
+          actions={
+            editEx?.videoUrl ? (
+              <a
+                href={editEx.videoUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Démo"
+                className="flex h-9 shrink-0 items-center gap-1.5 rounded-sm border border-sage-500/50 px-3 font-mono text-[10px] font-bold tracking-[0.12em] uppercase text-sage-500"
+              >
+                <Play className="h-3 w-3" /> Démo
+              </a>
+            ) : undefined
+          }
+        >
+          {editItem &&
+            (() => {
+              const it = editItem
+              const idx = editIdx
+              const isSec = editEx?.measure === 'sec'
+              const prev = idx > 0 ? items[idx - 1] : undefined
+              const prevEx = prev ? exOf(prev.exerciseId) : undefined
+              return (
+                <div>
+                  {editEx?.description && <p className="mb-3 text-[13px] font-semibold text-ink-soft">{editEx.description}</p>}
+                  {category === 'muscu' && (
+                    <>
+                      <div className={sheetRow}>
+                        <span className={rowLabel + ' flex-1'}>Séries</span>
+                        <Stepper
+                          value={it.sets ?? 3}
+                          onChange={(v) => {
+                            const patch: Partial<SessionItem> = { sets: v }
+                            if (it.targets) patch.targets = setTargetsOf({ ...it, sets: v })
+                            setItem(idx, patch)
+                          }}
+                          min={1}
+                          max={12}
+                        />
+                      </div>
+                      {it.targets ? (
+                        <div className={sheetRow + ' flex-wrap py-2'}>
+                          <span className={rowLabel + ' flex-1'}>{isSec ? 'Secondes' : 'Répétitions'} par série</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {setTargetsOf(it).map((t, s) => (
+                              <MiniNum
+                                key={s}
+                                value={t}
+                                onChange={(v) => setItem(idx, { targets: setTargetsOf(it).map((x, j) => (j === s ? v : x)) })}
+                                min={1}
+                                label={`Objectif série ${s + 1}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={sheetRow}>
+                          <span className={rowLabel + ' flex-1'}>{isSec ? 'Secondes' : 'Répétitions'}</span>
+                          <Stepper value={it.target ?? 10} onChange={(v) => setItem(idx, { target: v })} min={1} step={isSec ? 5 : 1} />
+                        </div>
+                      )}
+                      {!it.linkNext && (
+                        <div className={sheetRow}>
+                          <span className={rowLabel + ' flex-1'}>Repos · secondes</span>
+                          <Stepper value={it.restSec ?? 60} onChange={(v) => setItem(idx, { restSec: v })} max={600} step={15} />
+                        </div>
+                      )}
+                      <Toggle
+                        label="Séries différentes"
+                        sub="ex. 12 · 10 · 8"
+                        on={!!it.targets}
+                        onChange={(on) =>
+                          setItem(idx, on ? { targets: setTargetsOf(it) } : { targets: undefined, target: setTargetsOf(it)[0] })
+                        }
+                      />
+                      {prev && !it.blockBreak && (
+                        <Toggle
+                          label="Enchaîner avec le précédent"
+                          sub={`superset avec ${prevEx?.name ?? "l'exercice précédent"}`}
+                          on={!!prev.linkNext}
+                          onChange={(on) => setItem(idx - 1, { linkNext: on })}
+                        />
+                      )}
+                    </>
+                  )}
+                  {category === 'etirements' && (
+                    <>
+                      <div className={sheetRow}>
+                        <span className={rowLabel + ' flex-1'}>Séries</span>
+                        <Stepper value={it.sets ?? 1} onChange={(v) => setItem(idx, { sets: v })} min={1} max={6} />
+                      </div>
+                      {!editEx || isSec ? (
+                        <div className={sheetRow}>
+                          <span className={rowLabel + ' flex-1'}>Durée · secondes</span>
+                          <Stepper value={it.durationSec ?? 30} onChange={(v) => setItem(idx, { durationSec: v })} min={5} step={5} />
+                        </div>
+                      ) : (
+                        <div className={sheetRow}>
+                          <span className={rowLabel + ' flex-1'}>Répétitions</span>
+                          <Stepper value={it.target ?? 10} onChange={(v) => setItem(idx, { target: v })} min={1} />
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {canBlocks && idx > 0 && (
+                    <Toggle
+                      label="Commencer un nouveau bloc"
+                      sub="ce bloc a ses propres tours"
+                      on={!!it.blockBreak}
+                      onChange={(on) => {
+                        setItem(idx, on ? { blockBreak: true, blockRounds: it.blockRounds ?? 1 } : { blockBreak: false })
+                        if (on) setItem(idx - 1, { linkNext: false })
+                      }}
+                    />
+                  )}
+                  <div className={sheetRow + ' py-2'}>
+                    <input
+                      type="text"
+                      aria-label="Consigne"
+                      value={it.comment ?? ''}
+                      onChange={(e) => setItem(idx, { comment: e.target.value || undefined })}
+                      placeholder="Consigne pour ce programme (ex. 10 par jambe)"
+                      className="h-11 w-full rounded-sm border border-hairline bg-shoal px-3 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
+                    />
+                  </div>
+                  {editEx && (
+                    <button type="button" onClick={() => setExSheet({ existingId: editEx.id })} className={sheetRow + ' w-full text-left'}>
+                      <Pencil className="h-4 w-4 shrink-0 text-ink-soft" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] font-bold text-ink">Modifier l'exercice</span>
+                        <span className="block truncate text-xs font-semibold text-ink-soft">nom, muscle, consignes, vidéo</span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-ink-soft" />
+                    </button>
+                  )}
+                  <div className="mt-5 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditUid(null)
+                        removeItem(idx)
+                      }}
+                      className="h-12 shrink-0 rounded-sm border border-hiit/50 px-4 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-hiit active:bg-hiit/10"
+                    >
+                      Retirer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditUid(null)}
+                      className="h-12 flex-1 rounded-sm bg-sage-500 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-onaccent"
+                    >
+                      OK
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
+        </Sheet>
+
+        {/* ── Feuille « Quand ? » : le choix, l'alternance et l'aperçu du planning ── */}
+        <Sheet open={quandOpen} onClose={() => setQuandOpen(false)} title="Quand ?">
+          <div className={card}>
+            <div className="px-4 py-1">
+              <ModeOption label="Pas de jour fixe" on={planMode === 'none'} onClick={() => setPlanMode('none')} />
+              <ModeOption label="Jours choisis" on={planMode === 'weekly'} onClick={() => setPlanMode('weekly')} />
+            </div>
+            {planMode === 'weekly' && (
+              <div className={row + ' min-h-14'}>
+                <div className="flex w-full items-center justify-between">
+                  {DAY_LETTER.map((_, d) => (
+                    <DayButton key={d} d={d} on={days.includes(d)} onClick={() => toggleDay(d)} />
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="border-t border-hairline px-4 py-1">
+              <ModeOption label="Tous les X jours" on={planMode === 'every'} onClick={() => setPlanMode('every')} />
+            </div>
+            {planMode === 'every' && (
+              <>
+                <div className={row}>
+                  <span className={rowLabel}>Tous les</span>
+                  <div className="ml-auto flex items-center gap-2">
+                    <MiniNum value={everyDays} onChange={setEveryDays} min={1} max={30} label="Intervalle en jours" />
+                    <span className={rowLabel}>jour{everyDays > 1 ? 's' : ''}</span>
+                  </div>
+                </div>
+                <div className={row}>
+                  <span className={rowLabel}>À partir du</span>
+                  {/* Champ natif habillé : le sélecteur reste celui du système (color-scheme: dark) */}
+                  <input
+                    type="date"
+                    aria-label="Date de départ du cycle"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value || todayStr())}
+                    className={miniInput + ' ml-auto px-2.5 text-left [&::-webkit-calendar-picker-indicator]:opacity-60'}
+                  />
+                </div>
+              </>
+            )}
+            <div className="border-t border-hairline px-4 py-1">
+              <ModeOption
+                label="Avant une autre séance"
+                on={planMode === 'warmup'}
+                onClick={() => {
+                  setPlanMode('warmup')
+                  // « Avant une autre » sans cible n'a pas de sens : on présélectionne
+                  if (!warmupFor) setWarmupFor(CATEGORIES.find((c) => c !== category) ?? '')
+                }}
+              />
+            </div>
+            {/* Jumelée : s'invite dans Aujourd'hui les jours où une séance de la catégorie cible
+                est due (courses du plan comprises) — pas de jour propre */}
+            {planMode === 'warmup' && (
+              <div className={row + ' flex-col items-start gap-2.5 py-3'}>
+                <span className={rowLabel}>Avant chaque séance de</span>
+                <div className="flex flex-wrap gap-2">
+                  {CATEGORIES.filter((c) => c !== category).map((c) => (
+                    <Chip key={c} active={warmupFor === c} onClick={() => setWarmupFor(c)}>
+                      {CATEGORY_META[c].label}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── En alternance avec : UNE séance partenaire (sélecteur « Aucune » → pastille avec sa
+                croix). Cumulable avec Jours choisis et Tous les X jours. Un cycle existant plus
+                complexe (trois crans, plusieurs séances le même jour) se lit en texte. ── */}
+            {(planMode === 'weekly' || planMode === 'every') && (
+              <>
+                {partner ? (
+                  <div className={row + ' flex-col items-stretch gap-2 py-3'}>
+                    <span className={rowLabel}>En alternance avec</span>
+                    <div
+                      className={`flex h-[30px] items-center justify-between rounded-full border pl-3 pr-1 ${CATEGORY_META[partner.category].soft} ${CATEGORY_META[partner.category].text}`}
+                      style={{ borderColor: CATEGORY_META[partner.category].hex + '73' }}
+                    >
+                      <span className="flex min-w-0 items-center gap-2 font-mono text-[10px] font-bold tracking-[0.08em] uppercase">
+                        <CategoryIcon category={partner.category} className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{partner.name}</span>
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Retirer l'alternance"
+                        onClick={() => setPartner('')}
+                        className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full opacity-75 active:opacity-100"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ) : !simpleSteps ? (
+                  <div className={row + ' flex-col items-stretch gap-2 py-3'}>
+                    <span className={rowLabel}>En alternance avec</span>
+                    <div className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 font-mono text-[10px] leading-relaxed font-bold tracking-[0.08em] uppercase text-ink/85">
+                        {steps.map((st) => st.map(nameOf).join(' + ')).join(' → ')}
+                      </span>
+                      <button type="button" aria-label="Retirer l'alternance" onClick={() => setPartner('')} className={iconBtn}>
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={row}>
+                    <span className={rowLabel}>En alternance avec</span>
+                    <div className="relative ml-auto min-w-0 max-w-[60%]">
+                      <select
+                        aria-label="En alternance avec"
+                        value=""
+                        onChange={(e) => setPartner(e.target.value)}
+                        className="h-[30px] w-full appearance-none truncate rounded-sm border border-hairline bg-glass-sunken pl-3 pr-7 font-mono text-[10px] tracking-[0.14em] uppercase text-ink/70 outline-none focus:border-sage-500"
+                      >
+                        <option value="">Aucune</option>
+                        {sessions
+                          .filter((s) => s.id !== existing?.id)
+                          .map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-ink/60" />
+                    </div>
+                  </div>
+                )}
+                {steps.length > 1 && (planMode === 'every' || days.length > 0) && (
+                  <div className={row + ' flex-col items-stretch gap-2 py-3'}>
+                    <span className={rowLabel}>Commencer par</span>
+                    <Seg compact options={startOptions} value={String(startStep % steps.length)} onChange={(v) => setStartStep(Number(v))} />
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Aperçu : la grille du Planning, semaine par semaine, avec tout ce qui est déjà posé ── */}
+            <div className={row + ' flex-col items-stretch gap-0 px-3 pt-3 pb-3.5'}>
+              <div className="flex items-center justify-between gap-2 pl-1">
+                <span className={rowLabel}>Aperçu</span>
+                <div className="flex items-center gap-1.5">
+                  <button type="button" aria-label="Semaine précédente" onClick={() => setWeekOffset((o) => o - 1)} className={iconBtn}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="min-w-[7.5rem] text-center font-mono text-[10px] tracking-[0.14em] uppercase text-ink/85">
+                    {weekOffset === 0 ? 'Cette semaine' : `Sem. du ${formatShortFr(weekDates[0])}`}
+                  </span>
+                  <button type="button" aria-label="Semaine suivante" onClick={() => setWeekOffset((o) => o + 1)} className={iconBtn}>
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              {/* En-tête des jours : lettre + numéro, aujourd'hui en pastille pleine — comme le Planning */}
+              <div className={previewGrid + ' mt-2.5 px-1 pb-1'}>
+                <span />
+                {DAY_LETTER.map((letter, d) => {
+                  const isToday = d === todayIdx
+                  return (
+                    <div key={d} title={DAY_NAMES[d]} className="mx-auto flex flex-col items-center gap-0.5">
+                      <span className={'font-mono text-[10px] tracking-[0.1em] ' + (isToday ? 'text-sage-500' : 'text-ink/55')}>{letter}</span>
+                      <span
+                        className={
+                          'flex h-5 w-5 items-center justify-center rounded-full font-mono text-[10px] tabular-nums ' +
+                          (isToday ? 'bg-sage-500 text-onaccent' : 'text-ink/55')
+                        }
+                      >
+                        {Number(weekDates[d].slice(8, 10))}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="space-y-1" data-preview>
+                {preview.rows.map((r) => (
+                  <PreviewRow
+                    key={r.session.id}
+                    id={r.session.id}
+                    title={r.session.name}
+                    code={r.code}
+                    hex={CATEGORY_META[r.session.category].hex}
+                    self={r.self}
+                    planned={r.planned}
+                    done={r.done}
+                    todayIdx={todayIdx}
+                  />
+                ))}
+                {/* Courses du plan semi de la semaine, en lecture seule, comme dans le Planning :
+                    rond plein sur le jour réellement fait, anneau sur le jour prévu tant que rien n'est fait */}
+                {planStates.map((st) => {
+                  const t = TYPE_META[st.seance.type]
+                  const inWeek = st.doneDate ? weekDates.indexOf(st.doneDate) : -1
+                  const doneCol = !st.done ? -1 : inWeek >= 0 ? inWeek : st.seance.day
+                  return (
+                    <PreviewRow
+                      key={'plan-' + st.seance.day}
+                      id={'plan-' + st.seance.day}
+                      title={st.seance.title}
+                      code={t.code + ' · plan semi'}
+                      hex={t.hex}
+                      planned={Array.from({ length: 7 }, (_, d) => d === st.seance.day && !st.done)}
+                      done={Array.from({ length: 7 }, (_, d) => d === doneCol)}
+                      todayIdx={todayIdx}
+                    />
+                  )
+                })}
+              </div>
+              {!noDays && (
+                <p className="mt-2.5 pl-1 font-mono text-[9px] tracking-[0.12em] uppercase text-ink/85">Prochaine fois : {preview.nextLabel}</p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setQuandOpen(false)}
+            className="mt-4 h-12 w-full rounded-sm bg-sage-500 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-onaccent"
+          >
+            OK
+          </button>
+        </Sheet>
       </div>
 
       {hasItems && (
@@ -1603,7 +1575,7 @@ export default function SessionForm() {
               category={category}
               counts={itemCounts}
               onAdd={appendItem}
-              onCreate={(d) => void quickCreate(d)}
+              onCreate={(preset) => setExSheet({ preset })}
               searchRef={searchRef}
             />
           </div>
@@ -1622,7 +1594,7 @@ export default function SessionForm() {
             category={category}
             counts={itemCounts}
             onAdd={appendItem}
-            onCreate={(d) => void quickCreate(d)}
+            onCreate={(preset) => setExSheet({ preset })}
           />
         </div>
         <button
@@ -1633,6 +1605,20 @@ export default function SessionForm() {
           Terminé
         </button>
       </Sheet>
+
+      {/* Fiche d'exercice commune (oct. 2026) : création depuis le sélecteur (ajoutée au
+          programme), ou modification depuis la feuille d'un exercice — sans quitter la page */}
+      <ExerciseSheet
+        key={exSheet ? (exSheet.existingId ?? "new:" + (exSheet.preset?.name ?? "")) : "closed"}
+        open={!!exSheet && (!exSheet.existingId || !!sheetExisting)}
+        onClose={() => setExSheet(null)}
+        existing={sheetExisting}
+        preset={exSheet?.preset}
+        submitLabel={exSheet?.existingId ? "Enregistrer" : "Créer et ajouter"}
+        onSaved={(r) => {
+          if (!exSheet?.existingId) appendItem(r.id, r.measure, r.category)
+        }}
+      />
 
       {removed && (
         <div className="fixed inset-x-0 bottom-20 z-50 flex justify-center px-5">
