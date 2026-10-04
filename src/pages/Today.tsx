@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core'
+import FloatingOverlay, { liftedClass } from '../components/FloatingOverlay'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ChevronLeft, ChevronRight, GripVertical, Settings, Timer, Undo2 } from 'lucide-react'
@@ -32,14 +33,15 @@ import WorkoutSheet from '../components/WorkoutSheet'
  *  un chronomètre plutôt qu'un chevron — l'action reste « ouvrir la fiche ». */
 const TIMED: Category[] = ['muscu', 'hiit', 'etirements']
 
-/** Carte déplaçable : la poignée à gauche porte le glisser, le reste de la carte s'ouvre au toucher */
+/** Carte déplaçable : la poignée à gauche porte le glisser, le reste de la carte s'ouvre au toucher.
+ *  Pendant le glisser, c'est sa copie flottante qui suit le doigt ; elle reste en fantôme à sa place. */
 function SortableCard({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`flex items-center ${glassCard}` + (isDragging ? ' relative z-10 shadow-lg ring-2 ring-sage-300' : '')}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={`flex items-center ${glassCard}` + (isDragging ? ' opacity-30' : '')}
     >
       <button
         type="button"
@@ -143,7 +145,16 @@ export default function Today() {
 
   /** Carte de séance à faire — même moule pour une course du plan et une séance
    *  utilisateur : tuile de code, titre condensé, prescription en mono, carré d'action. */
-  const renderDayItem = (item: DayItem) => {
+  const [dragId, setDragId] = useState<string | null>(null)
+  const dragItem = dragId ? dayItems.find((i) => i.id === dragId) : undefined
+
+  const renderDayItem = (item: DayItem) => (
+    <SortableCard key={item.id} id={item.id} label={item.kind === 'plan' ? item.st.seance.title : item.s.name}>
+      {dayItemBody(item)}
+    </SortableCard>
+  )
+
+  const dayItemBody = (item: DayItem) => {
     const plan = item.kind === 'plan'
     const t = plan ? TYPE_META[item.st.seance.type] : null
     const meta = plan ? null : CATEGORY_META[displayCategory(item.s, exercises)]
@@ -151,7 +162,6 @@ export default function Today() {
     // Une séance du plan n'a pas toujours de `detail` : pas de ligne mono vide.
     const sub = plan ? item.st.seance.detail : summarizeSession(item.s)
     return (
-      <SortableCard key={item.id} id={item.id} label={plan ? item.st.seance.title : item.s.name}>
         <button
           type="button"
           onClick={() => (plan ? setPlanSheet(item.st) : setCompleting(item.s))}
@@ -170,7 +180,6 @@ export default function Today() {
             {timed ? <Timer className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </span>
         </button>
-      </SortableCard>
     )
   }
 
@@ -220,10 +229,29 @@ export default function Today() {
       </header>
 
       <div className="mt-9 space-y-2.5 px-[22px]">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={(e) => setDragId(String(e.active.id))}
+          onDragCancel={() => setDragId(null)}
+          onDragEnd={(e) => {
+            setDragId(null)
+            handleDragEnd(e)
+          }}
+        >
           <SortableContext items={dayItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
             {dayItems.map(renderDayItem)}
           </SortableContext>
+          <FloatingOverlay>
+            {dragItem && (
+              <div className={`flex items-center rounded-md ${liftedClass}`}>
+                <span className="flex items-center self-stretch pl-2 text-ink/60">
+                  <GripVertical className="h-4 w-4" />
+                </span>
+                {dayItemBody(dragItem)}
+              </div>
+            )}
+          </FloatingOverlay>
         </DndContext>
 
         {dayItems.length === 0 && todayLogs.length === 0 && (

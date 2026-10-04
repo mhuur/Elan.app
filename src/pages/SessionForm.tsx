@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   DndContext,
-  DragOverlay,
   MeasuringStrategy,
   PointerSensor,
   TouchSensor,
@@ -10,10 +9,9 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type Modifier,
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { CSS, getEventCoordinates } from '@dnd-kit/utilities'
+import { CSS } from '@dnd-kit/utilities'
 import {
   ChevronDown,
   ChevronLeft,
@@ -49,6 +47,7 @@ import { TYPE_META } from '../data/plan'
 import { CategoryIcon, Chip, Combobox, Eyebrow, FormActions, PageHeader, Seg, Sheet, Stepper, glassCard } from '../components/ui'
 import { DayDot, dayCell } from '../components/DayDot'
 import ExercisePicker from '../components/ExercisePicker'
+import FloatingOverlay, { liftedClass } from '../components/FloatingOverlay'
 
 /* ── Vocabulaire de l'écran (maquette « Fiche séance », direction B, sept. 2026) ─────
  * Une carte de verre par section, des RANGÉES de 48 px « libellé mono à gauche, valeur
@@ -222,8 +221,10 @@ function seriesItemOf(it: SessionItem, measure: Measure | undefined, transition:
 }
 
 /** Enveloppe sortable d'une ligne d'exercice — la poignée reçoit attributes/listeners.
- * Pendant un drag, la vignette qui suit le doigt est le DragOverlay : l'original reste
- * dans la liste en fantôme (opacity) et matérialise l'emplacement d'atterrissage. */
+ * Pendant un drag, la vignette qui suit le doigt est la copie flottante (`FloatingOverlay`) :
+ * l'original reste dans la liste en fantôme et matérialise l'emplacement d'atterrissage.
+ * `Translate` et non `Transform` : la stratégie de tri pose aussi un `scaleY` quand deux
+ * lignes n'ont pas la même hauteur, ce qui étirait les rangées au passage. */
 function SortableItem({
   uid,
   children,
@@ -235,30 +236,12 @@ function SortableItem({
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
       className={isDragging ? 'opacity-30' : undefined}
     >
       {children({ attributes, listeners })}
     </div>
   )
-}
-
-/**
- * La vignette reste centrée sous le curseur, alignée sur la colonne (x figé).
- * Indispensable avec le repli des cartes : dnd-kit ancre l'overlay sur le rect
- * mesuré AVANT le repli, et la liste remonte de toute la hauteur perdue — sans
- * cette compensation la vignette flotte à des centimètres du pointeur et le
- * dépôt devient imprécis. Même transform pour la détection de collision.
- */
-const followCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
-  if (!draggingNodeRect || !activatorEvent) return { ...transform, x: 0 }
-  const grab = getEventCoordinates(activatorEvent)
-  if (!grab) return { ...transform, x: 0 }
-  return {
-    ...transform,
-    x: 0,
-    y: transform.y + (grab.y - draggingNodeRect.top) - draggingNodeRect.height / 2,
-  }
 }
 
 /** Les trois « quand » d'une séance : jours fixes, tous les X jours, avant une autre.
@@ -955,7 +938,6 @@ export default function SessionForm() {
                 <DndContext
                   sensors={dndSensors}
                   collisionDetection={closestCenter}
-                  modifiers={[followCursor]}
                   // La ligne dépliée se referme au dragStart (les rangées du dessous remontent) :
                   // re-mesurer les cibles en continu, sinon dnd-kit garde les rects d'avant fermeture
                   measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
@@ -1241,14 +1223,14 @@ export default function SessionForm() {
                     ))}
                   </SortableContext>
                   {/* La vignette qui suit le doigt : compacte et opaque, elle ne cache plus la liste */}
-                  <DragOverlay>
+                  <FloatingOverlay>
                     {dragId &&
                       (() => {
                         if (dragId.startsWith('blk-')) {
                           const bi = blocksArr.findIndex((b) => 'blk-' + b[0].uid === dragId)
                           if (bi === -1) return null
                           return (
-                            <div className={`flex items-center gap-2.5 rounded-sm px-4 py-2 shadow-xl backdrop-blur-lg ${catMeta.soft}`}>
+                            <div className={`flex min-h-10 items-center gap-2.5 rounded-sm px-4 ${liftedClass}`}>
                               <GripVertical className="h-4 w-4 text-ink-soft/40" />
                               <span className={`font-mono text-[10px] font-bold tracking-[0.16em] uppercase ${catMeta.text}`}>
                                 Bloc {bi + 1} · {blocksArr[bi].length} exo{blocksArr[bi].length > 1 ? 's' : ''}
@@ -1259,13 +1241,13 @@ export default function SessionForm() {
                         const it = items.find((x) => x.uid === dragId)
                         const ex = it && exOf(it.exerciseId)
                         return (
-                          <div className="flex items-center gap-3 rounded-sm border border-hairline bg-shoal px-4 py-2 shadow-xl">
-                            <GripVertical className="h-4 w-4 shrink-0 text-ink-soft/40" />
+                          <div className={`flex min-h-12 items-center gap-3 rounded-sm px-4 ${liftedClass}`}>
+                            <GripVertical className="-ml-1.5 h-4 w-6 shrink-0 text-ink-soft/60" />
                             <p className="min-w-0 flex-1 truncate text-[15px] font-bold text-ink">{ex?.name ?? '—'}</p>
                           </div>
                         )
                       })()}
-                  </DragOverlay>
+                  </FloatingOverlay>
                 </DndContext>
 
                 {/* Pied de liste : ajouter (Sheet mobile / focus du volet desktop) · nouveau bloc */}

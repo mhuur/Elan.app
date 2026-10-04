@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DndContext, closestCenter } from '@dnd-kit/core'
+import FloatingOverlay, { liftedClass } from '../components/FloatingOverlay'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ArrowLeft, ArrowRight, GripVertical } from 'lucide-react'
@@ -24,16 +25,10 @@ const GRID = 'grid grid-cols-[0.875rem_minmax(0,1fr)_repeat(7,1.75rem)] items-ce
 
 /** Ligne de séance, en verre dépoli sur la photo (charte bord de mer) */
 const ROW = GRID + ' rounded-md border border-hairline bg-glass p-1 backdrop-blur-lg'
+/** Copie flottante d'une ligne : même grille, habillage « soulevé » (`liftedClass`) */
+const ROW_FACE = GRID
 
-function Row({
-  session,
-  todayIdx,
-  plannedDays,
-  doneDays,
-  sublabel,
-  onDay,
-  onEdit,
-}: {
+type RowProps = {
   session: Session
   todayIdx: number
   /** Jours planifiés cette semaine (jours fixes + rotation) */
@@ -44,21 +39,41 @@ function Row({
   /** Toucher un rond : valider / dévalider la séance ce jour-là */
   onDay: (day: number) => void
   onEdit: () => void
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: session.id })
-  const { exercises } = useData()
-  const meta = CATEGORY_META[displayCategory(session, exercises)]
+}
+
+/** Ligne déplaçable : elle reste en fantôme à sa place, sa copie flottante (`RowFace`) suit le doigt */
+function Row(props: RowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.session.id })
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={ROW + (isDragging ? ' relative z-10 shadow-lg ring-2 ring-sage-300' : '')}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={ROW + (isDragging ? ' opacity-30' : '')}
     >
+      <RowFace {...props} handle={{ ...attributes, ...listeners }} />
+    </div>
+  )
+}
+
+/** Contenu d'une ligne : poignée · nom · 7 jours — partagé par la ligne et sa copie flottante */
+function RowFace({
+  session,
+  todayIdx,
+  plannedDays,
+  doneDays,
+  sublabel,
+  onDay,
+  onEdit,
+  handle,
+}: RowProps & { handle?: object }) {
+  const { exercises } = useData()
+  const meta = CATEGORY_META[displayCategory(session, exercises)]
+  return (
+    <>
       <button
         type="button"
         aria-label={`Déplacer ${session.name}`}
-        {...attributes}
-        {...listeners}
+        {...handle}
         className="flex h-7 cursor-grab touch-none items-center justify-center text-ink/35 active:cursor-grabbing"
       >
         <GripVertical className="h-3 w-3" />
@@ -86,7 +101,7 @@ function Row({
           <DayDot state={doneDays[d] ? 'done' : plannedDays[d] ? 'planned' : 'none'} hex={meta.hex} />
         </button>
       ))}
-    </div>
+    </>
   )
 }
 
@@ -160,8 +175,8 @@ function SortableSection({
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={isDragging ? 'relative z-20' : undefined}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={isDragging ? 'opacity-30' : undefined}
     >
       {children({ attributes, listeners })}
     </div>
@@ -205,6 +220,20 @@ export default function Planning() {
   const perWeek = plannedByDay.reduce((a, ids) => a + ids.size, 0) + planStates.length
 
   const emptyLabel = hasGroups ? 'Autres' : 'Mes séances'
+
+  // Élément en cours de glisser : sa copie flottante est rendue hors des cartes (FloatingOverlay)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const rowProps = (s: Session): RowProps => ({
+    session: s,
+    todayIdx,
+    plannedDays: plannedByDay.map((ids) => ids.has(s.id)),
+    doneDays: doneByDay.map((ids) => ids.has(s.id)),
+    sublabel: ownerOf(s.id, sessions, cycles) ? describeSchedule(s, sessions, cycles) : undefined,
+    onDay: (d) => validateDay(s, d),
+    onEdit: () => navigate(`/session/${s.id}`),
+  })
+  const dragSession = dragId && !dragId.startsWith('sec-') ? sessions.find((s) => s.id === dragId) : undefined
+  const dragSection = dragId?.startsWith('sec-') ? sections.find((sec) => 'sec-' + sec.group === dragId) : undefined
   const showHeaders = hasGroups || !!planWeek
 
   /**
@@ -320,7 +349,16 @@ export default function Planning() {
             })}
           </div>
 
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={(e) => setDragId(String(e.active.id))}
+            onDragCancel={() => setDragId(null)}
+            onDragEnd={(e) => {
+              setDragId(null)
+              handleDragEnd(e)
+            }}
+          >
             <SortableContext items={sectionItems} strategy={verticalListSortingStrategy}>
               {sections.map((sec) => {
                 const g = sec.group
@@ -358,16 +396,7 @@ export default function Planning() {
                         })}
                       <SortableContext items={list.map((s) => s.id)} strategy={verticalListSortingStrategy}>
                         {list.map((s) => (
-                          <Row
-                            key={s.id}
-                            session={s}
-                            todayIdx={todayIdx}
-                            plannedDays={plannedByDay.map((ids) => ids.has(s.id))}
-                            doneDays={doneByDay.map((ids) => ids.has(s.id))}
-                            sublabel={ownerOf(s.id, sessions, cycles) ? describeSchedule(s, sessions, cycles) : undefined}
-                            onDay={(d) => validateDay(s, d)}
-                            onEdit={() => navigate(`/session/${s.id}`)}
-                          />
+                          <Row key={s.id} {...rowProps(s)} />
                         ))}
                       </SortableContext>
                     </div>
@@ -393,6 +422,23 @@ export default function Planning() {
                 )
               })}
             </SortableContext>
+            <FloatingOverlay>
+              {dragSession && (
+                <div className={ROW_FACE + ' rounded-md p-1 ' + liftedClass}>
+                  <RowFace {...rowProps(dragSession)} />
+                </div>
+              )}
+              {dragSection && (
+                <div className={'rounded-md px-1.5 py-2.5 ' + liftedClass}>
+                  <p className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase text-ink/80">
+                    <GripVertical className="h-3.5 w-3.5 text-ink-soft/60" />—&nbsp;{dragSection.group || emptyLabel}
+                    <span className="text-ink/45">
+                      · {dragSection.sessions.filter(visibleInWeek).length + (dragSection.plan ? planStates.length : 0)} séances
+                    </span>
+                  </p>
+                </div>
+              )}
+            </FloatingOverlay>
           </DndContext>
 
           {sessions.length === 0 && (
