@@ -17,7 +17,7 @@ import {
   type User,
 } from 'firebase/auth'
 import { auth, db, firebaseEnabled } from '../firebase'
-import type { Activity, Exercise, Idea, Log, Session } from '../types'
+import { isStretch, subtypesOf, type Activity, type Exercise, type Idea, type Log, type Session } from '../types'
 import { FirestoreStore, LocalStore, type Store, type StoreData } from './store'
 import { runSeed, SUBTYPE_BY_NAME } from './seed'
 
@@ -180,6 +180,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     for (const e of exercises) {
       if (!e.subtype && !e.subtypes?.length && SUBTYPE_BY_NAME[e.name]) {
         void store.update('exercises', e.id, { subtypes: [SUBTYPE_BY_NAME[e.name]] })
+      }
+    }
+  }, [store, dataReady, exercises, mode, user])
+
+  // Migration unique (oct. 2026) : la catégorie des exercices disparaît, l'étirement se lit
+  // désormais au sous-type (`isStretch`). Un ancien exercice d'étirements sans sous-type
+  // Souplesse ni Mobilité reçoit « Souplesse », sinon il perdrait sa couleur ÉTIR.
+  const stretchMigRef = useRef(false)
+  useEffect(() => {
+    if (!store || !dataReady || stretchMigRef.current || !exercises.length) return
+    stretchMigRef.current = true
+    const key = `elan-mig-stretch-${mode === 'cloud' && user ? user.uid : 'local'}`
+    if (localStorage.getItem(key)) return
+    localStorage.setItem(key, '1')
+    for (const e of exercises) {
+      if (e.category === 'etirements' && !isStretch(e)) {
+        void store.update('exercises', e.id, { subtypes: [...subtypesOf(e), 'Souplesse'], subtype: '' })
       }
     }
   }, [store, dataReady, exercises, mode, user])

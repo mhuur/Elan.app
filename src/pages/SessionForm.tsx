@@ -32,7 +32,9 @@ import { useData } from '../data/DataContext'
 import {
   CATEGORIES,
   CATEGORY_META,
+  STRETCH_SUBTYPES,
   displayCategory,
+  isStretch,
   setTargetsOf,
   type Category,
   type Measure,
@@ -425,14 +427,14 @@ export default function SessionForm() {
    * 3 × 10 reps (ou 3 × 30 s) avec 60 s de repos, sauf un étirement, tenu une fois
    * 30 s avec 5 s de transition ; en intervalles, l'effort de la séance.
    */
-  const itemDefaults = (cat: Category, m: Measure | undefined, exCat?: Category): Partial<SessionItem> => {
+  const itemDefaults = (cat: Category, m: Measure | undefined, stretch: boolean): Partial<SessionItem> => {
     if (cat !== 'muscu') return {}
-    if (exCat === 'etirements') return { sets: 1, target: m === 'reps' ? 10 : 30, restSec: 5 }
+    if (stretch) return { sets: 1, target: m === 'reps' ? 10 : 30, restSec: 5 }
     return { sets: 3, target: m === 'sec' ? 30 : 10, restSec: 60 }
   }
   const defaultsOf = (cat: Category, exId: string) => {
     const ex = exOf(exId)
-    return itemDefaults(cat, ex?.measure, ex?.category)
+    return itemDefaults(cat, ex?.measure, isStretch(ex))
   }
 
   // Changer de format garde les exercices, seuls leurs réglages repartent des défauts
@@ -451,17 +453,16 @@ export default function SessionForm() {
    * `measure` évite de dépendre de `exercises` pour un exercice qui vient d'être créé
    * (l'abonnement du store peut ne pas l'avoir encore livré).
    */
-  const appendItem = (exId: string, measure?: Measure, exCat?: Category) => {
+  const appendItem = (exId: string, measure?: Measure, stretch?: boolean) => {
     const ex = exOf(exId)
-    setItems((p) => [...p, { exerciseId: exId, uid: newUid(), ...itemDefaults(category, measure ?? ex?.measure, exCat ?? ex?.category) }])
+    setItems((p) => [...p, { exerciseId: exId, uid: newUid(), ...itemDefaults(category, measure ?? ex?.measure, stretch ?? isStretch(ex)) }])
   }
 
-  /** Crée un exercice à la volée (mini-ligne du sélecteur, dans la catégorie filtrée) et l'ajoute */
-  const quickCreate = async ({ name: nm, subtype, measure, category: cat }: { name: string; subtype: string; measure: Measure; category: Category }) => {
+  /** Crée un exercice à la volée (mini-ligne du sélecteur) et l'ajoute */
+  const quickCreate = async ({ name: nm, subtype, measure }: { name: string; subtype: string; measure: Measure }) => {
     if (!nm) return
     const exId = await addExercise({
       name: nm,
-      category: cat,
       subtypes: subtype ? [subtype] : [],
       subtype: '',
       measure,
@@ -469,7 +470,7 @@ export default function SessionForm() {
       videoUrl: '',
       createdAt: Date.now(),
     })
-    appendItem(exId, measure, cat)
+    appendItem(exId, measure, STRETCH_SUBTYPES.includes(subtype))
   }
 
   // Occurrences de chaque exercice déjà dans la séance (coches du sélecteur)
@@ -1560,7 +1561,6 @@ export default function SessionForm() {
             <Eyebrow className="mb-2.5 text-ink/50">— Banque d'exercices</Eyebrow>
             <ExercisePicker
               exercises={exercises}
-              category={shownCat}
               counts={itemCounts}
               onAdd={appendItem}
               onCreate={(d) => void quickCreate(d)}
@@ -1579,7 +1579,6 @@ export default function SessionForm() {
         <div className="flex max-h-[62dvh] min-h-[45dvh] flex-col">
           <ExercisePicker
             exercises={exercises}
-            category={shownCat}
             counts={itemCounts}
             onAdd={appendItem}
             onCreate={(d) => void quickCreate(d)}

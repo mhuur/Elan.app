@@ -58,7 +58,6 @@ export function buildSeed(): { exercises: Exercise[]; sessions: Session[] } {
   const exercises: Exercise[] = SEED_EXERCISES.map((e, i) => ({
     id: crypto.randomUUID(),
     name: e.name,
-    category: e.category,
     // Les postures d'étirements se tiennent en secondes, le reste se compte en répétitions
     measure: e.measure ?? (e.category === 'etirements' ? 'sec' : 'reps'),
     videoUrl: youtubeSearch(e.name),

@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Play, Search, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORIES, CATEGORY_META, PRESET_SUBTYPES, subtypesOf, type Category, type Measure } from '../types'
+import { PRESET_SUBTYPES, STRETCH_SUBTYPES, subtypesOf, type Measure } from '../types'
 import { youtubeSearch } from '../lib/format'
-import { Combobox, Field, FormActions, PageHeader, Seg, Select, TextArea, TextInput } from '../components/ui'
+import { Combobox, Field, FormActions, PageHeader, Seg, TextArea, TextInput } from '../components/ui'
 
 export default function ExerciseForm() {
   const { id } = useParams()
@@ -13,20 +13,17 @@ export default function ExerciseForm() {
   const { exercises, addExercise, updateExercise, removeExercise } = useData()
   const existing = exercises.find((e) => e.id === id)
 
-  // Préremplissage depuis les « + » de la banque (?cat=…&st=…)
-  const presetCat = params.get('cat') as Category | null
+  // Préremplissage depuis les « + » de la banque (?st=…). Plus de catégorie depuis oct. 2026 :
+  // le sous-type est le seul classement (Souplesse ou Mobilité = étirement, en secondes).
   const presetSubtype = params.get('st')
 
   const [name, setName] = useState(existing?.name ?? '')
-  const [category, setCategory] = useState<Category>(
-    existing?.category ?? (presetCat && CATEGORIES.includes(presetCat) ? presetCat : 'muscu'),
-  )
   const [subtypes, setSubtypes] = useState<string[]>(() =>
     existing ? subtypesOf(existing) : presetSubtype ? [presetSubtype] : [],
   )
   const [subtypeQuery, setSubtypeQuery] = useState('')
   const [measure, setMeasure] = useState<Measure>(
-    existing?.measure ?? (presetCat === 'etirements' ? 'sec' : 'reps'),
+    existing?.measure ?? (presetSubtype && STRETCH_SUBTYPES.includes(presetSubtype) ? 'sec' : 'reps'),
   )
   const [description, setDescription] = useState(existing?.description ?? '')
   const [videoUrl, setVideoUrl] = useState(existing?.videoUrl ?? '')
@@ -41,6 +38,8 @@ export default function ExerciseForm() {
 
   const addSubtype = (st: string) => {
     if (st && !subtypes.includes(st)) setSubtypes((p) => [...p, st])
+    // Un nouvel exercice classé en étirement se tient en secondes
+    if (!existing && STRETCH_SUBTYPES.includes(st)) setMeasure('sec')
     setSubtypeQuery('')
   }
   const removeSubtype = (st: string) => setSubtypes((p) => p.filter((x) => x !== st))
@@ -48,7 +47,6 @@ export default function ExerciseForm() {
   const save = async () => {
     const data = {
       name: name.trim() || 'Exercice',
-      category,
       subtypes,
       subtype: '',
       measure,
@@ -77,27 +75,16 @@ export default function ExerciseForm() {
           <TextInput value={name} onChange={setName} placeholder="Ex. Pompes diamant" />
         </Field>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <Field label="Catégorie">
-            <Select value={category} onChange={(v) => setCategory(v as Category)}>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {CATEGORY_META[c].label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Mesure">
-            <Seg
-              options={[
-                { value: 'reps' as const, label: 'Reps' },
-                { value: 'sec' as const, label: 'Secondes' },
-              ]}
-              value={measure}
-              onChange={setMeasure}
-            />
-          </Field>
-        </div>
+        <Field label="Mesure">
+          <Seg
+            options={[
+              { value: 'reps' as const, label: 'Reps' },
+              { value: 'sec' as const, label: 'Secondes' },
+            ]}
+            value={measure}
+            onChange={setMeasure}
+          />
+        </Field>
 
         <Field label="Sous-types">
           {subtypes.length > 0 && (

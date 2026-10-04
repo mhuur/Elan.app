@@ -40,28 +40,30 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
   await openForm()
 
-  // --- Filtre initial = catégorie de la séance ; « Tous » montre toute la banque
+  // --- Oct. 2026 : plus de catégorie d'exercice, le filtre de la banque est le sous-type.
+  // Ouverture sur « Tous » : toute la banque, pas de tuile de catégorie
   await openPicker()
-  if ((await page.locator(`${dlg} button[aria-label="Muscu"][aria-pressed="true"]`).count()) !== 1) throw new Error('Le sélecteur devrait s\'ouvrir filtré sur la catégorie de la séance (MUS)')
-  if ((await page.locator(`${dlg} button:has-text("Chat-vache (dos)")`).count()) > 0) throw new Error('Filtré sur MUS, les étirements ne devraient pas apparaître')
-  await page.click(`${dlg} button:has-text("Tous")`)
+  const chips = `${dlg} [aria-label="Filtrer par sous-type"]`
+  if ((await page.locator(`${chips} button:text-is("Tous")[aria-pressed="true"]`).count()) !== 1) throw new Error('Le sélecteur devrait s\'ouvrir sur « Tous »')
+  if ((await page.locator(`${dlg} [aria-label="Filtrer par catégorie"]`).count()) > 0) throw new Error('Les tuiles de catégorie devraient avoir disparu')
   await page.waitForSelector(`${dlg} button:has-text("Burpees")`)
   await page.waitForSelector(`${dlg} button:has-text("Chat-vache (dos)")`)
   await page.waitForSelector(`${dlg} button:has-text("Pompes")`)
   await page.screenshot({ path: 'screenshots/mix-01-tous.png' })
 
-  // --- Filtre ÉTIR → un étirement rejoint la séance en séries, tenu 1 × 30 s, 5 s de transition
-  await page.click(`${dlg} button[aria-label="Étirements"]`)
+  // --- Filtre Mobilité → un étirement rejoint la séance en séries, tenu 1 × 30 s, 5 s de transition
+  await page.click(`${chips} button:text-is("Mobilité")`)
   await page.waitForSelector(`${dlg} button:has-text("Chat-vache (dos)")`)
-  if ((await page.locator(`${dlg} button:has-text("Pompes")`).count()) > 0) throw new Error('Filtré sur ÉTIR, la muscu ne devrait pas apparaître')
+  if ((await page.locator(`${dlg} button:has-text("Pompes")`).count()) > 0) throw new Error('Filtré sur Mobilité, « Pompes » ne devrait pas apparaître')
   await page.click(`${dlg} button:has-text("Chat-vache (dos)")`)
   await page.screenshot({ path: 'screenshots/mix-02-etirement-ajoute.png' })
 
-  // --- Filtre HIIT → « + Créer » crée l'exercice en HIIT
-  await page.click(`${dlg} button[aria-label="HIIT"]`)
+  // --- « + Créer » : nom + sous-type + mesure, sans catégorie
+  await page.click(`${chips} button:text-is("Tous")`)
   await page.fill(`${dlg} input[aria-label="Rechercher un exercice"]`, 'Corde à sauter')
   await page.click('text=+ Créer « Corde à sauter »')
-  await page.waitForSelector(`${dlg} >> text=Nouvel exercice · HIIT`)
+  await page.waitForSelector(`${dlg} >> text=Nouvel exercice`)
+  await page.selectOption(`${dlg} select[aria-label="Sous-type"]`, 'Cardio')
   await page.click(`${dlg} button:has-text("Créer et ajouter")`)
   await page.waitForSelector(`${dlg} button:has-text("Corde à sauter")`)
   await page.click(`${dlg} button:has-text("Terminé")`)
@@ -78,7 +80,8 @@ try {
   const corde = d1.exercises.find((e) => e.name === 'Corde à sauter')
   const chat = d1.exercises.find((e) => e.name === 'Chat-vache (dos)')
   const full = d1.sessions.find((s) => s.name === 'Muscu — Full body')
-  if (corde?.category !== 'hiit') throw new Error(`« Corde à sauter » devrait être créé en HIIT, trouvé : ${corde?.category}`)
+  if (!corde || 'category' in corde || (corde.subtypes ?? []).join() !== 'Cardio')
+    throw new Error(`« Corde à sauter » devrait naître sans catégorie, sous-type Cardio — trouvé : ${JSON.stringify(corde)}`)
   if (full.category !== 'muscu') throw new Error('La séance devrait rester en muscu')
   const chatItem = full.items.find((it) => it.exerciseId === chat.id)
   if (!chatItem || !full.items.some((it) => it.exerciseId === corde.id)) throw new Error('La séance devrait contenir l\'étirement ET l\'exercice HIIT')
@@ -117,7 +120,7 @@ try {
   if (!r0.sets || !r0.target || r0.restSec !== (rout0.restSec ?? 0) || r0.durationSec !== undefined) throw new Error(`Posture mal convertie : ${JSON.stringify(r0)} (avant : ${JSON.stringify(rout0.items[0])}, transition ${rout0.restSec})`)
   if (!(await page.locator('text=ÉTIR').count())) throw new Error("La routine faite d'étirements devrait toujours s'afficher ÉTIR")
 
-  console.log('PICKER-MIX OK — filtre de catégorie dans la banque, séance mixte muscu + étirement + HIIT, création dans la catégorie filtrée, passage Séries → Intervalles sans perte, ancienne routine convertie en séries et affichée ÉTIR')
+  console.log('PICKER-MIX OK — filtre par sous-type dans la banque, séance mixte muscu + étirement + cardio, création sans catégorie, passage Séries → Intervalles sans perte, ancienne routine convertie en séries et affichée ÉTIR')
   if (errors.length) {
     console.error('ERREURS DÉTECTÉES :')
     for (const e of errors) console.error(' -', e)

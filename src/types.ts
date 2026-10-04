@@ -46,7 +46,12 @@ export interface Goal {
 export interface Exercise {
   id: string
   name: string
-  category: Category
+  /**
+   * Hérité : plus écrit ni lu depuis oct. 2026 (décision utilisateur — un seul classement,
+   * le sous-type). Seule la migration `elan-mig-stretch-*` le relit, pour donner le
+   * sous-type « Souplesse » aux anciens exercices d'étirements qui n'en avaient pas.
+   */
+  category?: Category
   /** Sous-types : groupes musculaires ou familles (Abdominaux, Jambes, Cardio…) */
   subtypes?: string[]
   /** Hérité : ancien sous-type unique */
@@ -64,6 +69,14 @@ export interface Exercise {
 export function subtypesOf(e: Exercise): string[] {
   if (e.subtypes && e.subtypes.length) return e.subtypes
   return e.subtype ? [e.subtype] : []
+}
+
+/** Sous-types qui font d'un exercice un étirement (couleur ÉTIR, 1 × 30 s par défaut, secondes) */
+export const STRETCH_SUBTYPES = ['Souplesse', 'Mobilité']
+
+/** Un exercice est un étirement s'il porte un sous-type d'étirement */
+export function isStretch(e: Exercise | undefined): boolean {
+  return !!e && subtypesOf(e).some((st) => STRETCH_SUBTYPES.includes(st))
 }
 
 /** Sous-types proposés à la création d'un exercice (saisie libre possible) */
@@ -115,11 +128,11 @@ export function setTargetsOf(it: SessionItem): number[] {
  * Catégorie AFFICHÉE d'une séance (couleur, icône, code). `Session.category` est son
  * déroulé — séries (`muscu`), intervalles (`hiit`), course, vélo — et depuis oct. 2026 la
  * fiche n'écrit plus `etirements` : une séance en séries faite uniquement d'étirements
- * s'affiche ÉTIR. Les anciennes routines encore enregistrées en `etirements` le restent.
+ * (sous-type Souplesse ou Mobilité, `isStretch`) s'affiche ÉTIR. Les anciennes routines encore enregistrées en `etirements` le restent.
  */
 export function displayCategory(s: Pick<Session, 'category' | 'items'>, exercises: Exercise[]): Category {
   if (s.category !== 'muscu' || !s.items.length) return s.category
-  return s.items.every((it) => exercises.find((e) => e.id === it.exerciseId)?.category === 'etirements')
+  return s.items.every((it) => isStretch(exercises.find((e) => e.id === it.exerciseId)))
     ? 'etirements'
     : 'muscu'
 }
