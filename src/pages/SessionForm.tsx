@@ -1010,9 +1010,10 @@ export default function SessionForm() {
                           const ex = exOf(it.exerciseId)
                           const isSec = ex?.measure === 'sec'
                           const isOpen = openUid === it.uid && !dragId
+                          // Résumé de la ligne repliée seulement : dépliée, les champs disent déjà la même chose
                           const summary =
-                            category === 'muscu'
-                              ? `${it.sets ?? 3} × ${it.targets ? setTargetsOf(it).join('/') : (it.target ?? 10)}${isSec ? ' s' : ''} · ${it.restSec ?? 60} s`
+                            category === 'muscu' && !isOpen
+                              ? `${it.sets ?? 3} × ${it.targets ? setTargetsOf(it).join('/') : (it.target ?? 10)} ${isSec ? 's' : 'reps'} · ${it.restSec ?? 60} s`
                               : ''
                           return (
                             <SortableItem key={it.uid} uid={it.uid}>
