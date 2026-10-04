@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, ClipboardList, Lightbulb, Link2, MoreVertical, Pencil, Play, Repeat, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, feelingOf, setTargetsOf, type Exercise, type Log, type MetricValue, type Session, type SessionItem } from '../types'
+import { CATEGORY_META, displayCategory, feelingOf, setTargetsOf, type Exercise, type Log, type MetricValue, type Session, type SessionItem } from '../types'
 import { formatShortFr, relativeDayFr, todayStr } from '../lib/dates'
 import { lastDetailLine, lastPerfLine } from '../lib/format'
 import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
@@ -26,6 +26,7 @@ export default function CompleteSheet({
   date?: string
 }) {
   const navigate = useNavigate()
+  const { exercises } = useData()
   // La saisie du résultat vit dans le menu ⋮ de l'en-tête, rendu par le parent :
   // son état remonte donc ici, et se réinitialise à chaque séance ouverte
   const [entering, setEntering] = useState(false)
@@ -50,8 +51,8 @@ export default function CompleteSheet({
         session ? (
           <span className="flex items-center gap-2">
             <CategoryIcon
-              category={session.category}
-              className={`h-5 w-5 shrink-0 ${CATEGORY_META[session.category].text}`}
+              category={displayCategory(session, exercises)}
+              className={`h-5 w-5 shrink-0 ${CATEGORY_META[displayCategory(session, exercises)].text}`}
             />
             <span className="min-w-0 truncate">{session.name}</span>
           </span>
@@ -114,6 +115,7 @@ export default function CompleteSheet({
  *  muscu / étirements : les blocs, leurs tours et le détail d'UN tour. Partagé avec la liste
  *  des programmes (`pages/Library`), qui le déplie sous chaque carte. */
 export function ProgramView({ session, exOf }: { session: Session; exOf: (id: string) => Exercise | undefined }) {
+  const { exercises } = useData()
   if (session.category === 'hiit') {
     return (
       <div>
@@ -146,7 +148,7 @@ export function ProgramView({ session, exOf }: { session: Session; exOf: (id: st
         <div key={bi}>
           {(blocks.length > 1 || b.rounds > 1) && (
             <p
-              className={`flex items-center gap-1.5 pt-2.5 font-mono text-[10px] tracking-[0.2em] uppercase ${CATEGORY_META[session.category].text}`}
+              className={`flex items-center gap-1.5 pt-2.5 font-mono text-[10px] tracking-[0.2em] uppercase ${CATEGORY_META[displayCategory(session, exercises)].text}`}
             >
               <Repeat className="h-3 w-3" />
               {blocks.length > 1 ? `Bloc ${bi + 1}` : 'Circuit'}

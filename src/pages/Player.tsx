@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Check, ChevronRight, ChevronUp, Lightbulb, Pause, Play, SkipForward, Square, TriangleAlert, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, setTargetsOf, type Category, type Exercise, type Session, type SessionItem } from '../types'
+import { CATEGORY_META, displayCategory, setTargetsOf, type Category, type Exercise, type Session, type SessionItem } from '../types'
 import { todayStr } from '../lib/dates'
 import { mmss } from '../lib/format'
 import { muscuBlocks } from '../lib/blocks'
@@ -461,7 +461,9 @@ export default function Player() {
     )
   }
 
-  const meta = CATEGORY_META[session.category]
+  // Couleur affichée (ÉTIR pour une séance en séries faite d'étirements) ; le déroulé reste `category`
+  const shownCat = displayCategory(session, exercises)
+  const meta = CATEGORY_META[shownCat]
   const step = steps[stepIdx]
   const next = steps.slice(stepIdx + 1).find((s) => s.type === 'work')
   // Position dans la structure : pendant un repos/la préparation, on pointe déjà l'effort suivant
@@ -530,9 +532,9 @@ export default function Player() {
       <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-abysse px-8 text-center text-white">
         <div
           className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white/10"
-          style={{ color: ACCENT[session.category] }}
+          style={{ color: ACCENT[shownCat] }}
         >
-          <CategoryIcon category={session.category} className="h-10 w-10" />
+          <CategoryIcon category={shownCat} className="h-10 w-10" />
         </div>
         <div>
           <h1 className="font-display text-3xl leading-none font-black uppercase">{session.name}</h1>
@@ -577,7 +579,7 @@ export default function Player() {
   }
 
   // Mode immersif sombre : accent lumineux par catégorie, repos sur une teinte apaisée
-  const accent = step.type === 'work' ? ACCENT[session.category] : CALM
+  const accent = step.type === 'work' ? ACCENT[shownCat] : CALM
   const bgByType = step.type === 'work' ? 'bg-abysse' : 'bg-[#08202e]'
 
   return (

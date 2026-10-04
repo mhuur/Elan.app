@@ -4,7 +4,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-
 import { CSS } from '@dnd-kit/utilities'
 import { ChevronLeft, ChevronRight, GripVertical, Settings, Timer, Undo2 } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORIES, CATEGORY_META, feelingOf, type Category, type Log, type Session } from '../types'
+import { CATEGORIES, CATEGORY_META, displayCategory, feelingOf, type Category, type Log, type Session } from '../types'
 import { addDays, formatTitleFr, toDateStr } from '../lib/dates'
 import { logSummary, summarizeSession } from '../lib/format'
 import { canonicalCycles, plannedSessionIdsOn } from '../lib/schedule'
@@ -56,7 +56,13 @@ function SortableCard({ id, label, children }: { id: string; label: string; chil
 }
 
 export default function Today() {
-  const { sessions, logs, updateSession } = useData()
+  const { sessions, exercises, logs, updateSession } = useData()
+  // Couleur d'une séance terminée : celle de sa séance si elle existe encore (une séance en
+  // séries faite d'étirements s'affiche ÉTIR), sinon celle notée dans le log
+  const logCat = (l: Log): Category => {
+    const s = sessions.find((x) => x.id === l.sessionId)
+    return s ? displayCategory(s, exercises) : l.category
+  }
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [completing, setCompleting] = useState<Session | null>(null)
@@ -140,7 +146,7 @@ export default function Today() {
   const renderDayItem = (item: DayItem) => {
     const plan = item.kind === 'plan'
     const t = plan ? TYPE_META[item.st.seance.type] : null
-    const meta = plan ? null : CATEGORY_META[item.s.category]
+    const meta = plan ? null : CATEGORY_META[displayCategory(item.s, exercises)]
     const timed = !plan && TIMED.includes(item.s.category)
     // Une séance du plan n'a pas toujours de `detail` : pas de ligne mono vide.
     const sub = plan ? item.st.seance.detail : summarizeSession(item.s)
@@ -258,7 +264,7 @@ export default function Today() {
           <h2 className="mb-2.5 font-mono text-[10px] tracking-[0.22em] uppercase text-ink/55">— Terminées</h2>
           <div className="space-y-2">
             {todayLogs.map((l) => {
-              const meta = CATEGORY_META[l.category]
+              const meta = CATEGORY_META[logCat(l)]
               return (
                 <button
                   key={l.id}
@@ -270,7 +276,7 @@ export default function Today() {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-1.5">
-                      <CategoryIcon category={l.category} className={`h-3.5 w-3.5 shrink-0 ${meta.text}`} />
+                      <CategoryIcon category={logCat(l)} className={`h-3.5 w-3.5 shrink-0 ${meta.text}`} />
                       <span className="min-w-0 truncate font-display text-xl leading-none font-bold uppercase">
                         {l.sessionName}
                       </span>
@@ -302,7 +308,7 @@ export default function Today() {
       <Sheet open={pickerOpen} onClose={() => setPickerOpen(false)} title="Choisir une séance">
         <div className="space-y-4">
           {CATEGORIES.map((cat) => {
-            const list = sessions.filter((s) => s.category === cat)
+            const list = sessions.filter((s) => displayCategory(s, exercises) === cat)
             if (!list.length) return null
             const meta = CATEGORY_META[cat]
             return (

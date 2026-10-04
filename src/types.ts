@@ -111,6 +111,19 @@ export function setTargetsOf(it: SessionItem): number[] {
   return Array.from({ length: n }, (_, i) => it.targets?.[i] ?? it.targets?.[it.targets.length - 1] ?? base)
 }
 
+/**
+ * Catégorie AFFICHÉE d'une séance (couleur, icône, code). `Session.category` est son
+ * déroulé — séries (`muscu`), intervalles (`hiit`), course, vélo — et depuis oct. 2026 la
+ * fiche n'écrit plus `etirements` : une séance en séries faite uniquement d'étirements
+ * s'affiche ÉTIR. Les anciennes routines encore enregistrées en `etirements` le restent.
+ */
+export function displayCategory(s: Pick<Session, 'category' | 'items'>, exercises: Exercise[]): Category {
+  if (s.category !== 'muscu' || !s.items.length) return s.category
+  return s.items.every((it) => exercises.find((e) => e.id === it.exerciseId)?.category === 'etirements')
+    ? 'etirements'
+    : 'muscu'
+}
+
 /** Planification par intervalle : « tous les X jours » depuis une date */
 export interface Repeat {
   everyDays: number

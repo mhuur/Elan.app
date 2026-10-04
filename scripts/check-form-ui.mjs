@@ -86,11 +86,11 @@ try {
     throw new Error(`Les séries variées devraient être 30,12,12 — trouvé ${(full.items[0].targets ?? []).join(',')}`)
   if (full.items.some((it) => 'uid' in it)) throw new Error("L'uid transitoire ne devrait pas être sauvegardé")
 
-  // --- Étirements : blocs disponibles aussi (découpage + tours par bloc)
+  // --- Étirements : la routine s'édite en séries (oct. 2026), blocs compris
   await page.click('text=Routine matinale')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
-  await page.waitForSelector('[title="Tours de la routine"]')
+  await page.waitForSelector('[title="Tours du circuit"]')
   await page.locator('button:has-text("nouveau bloc")').click()
   await page.waitForSelector('text=Bloc 2')
   await page.click('text=Enregistrer')

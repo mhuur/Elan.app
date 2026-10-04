@@ -34,6 +34,7 @@ import { useData } from '../data/DataContext'
 import {
   CATEGORIES,
   CATEGORY_META,
+  displayCategory,
   setTargetsOf,
   type Category,
   type Measure,
@@ -188,8 +189,6 @@ interface Draft {
   workSec: number
   restSec: number
   rounds: number
-  stretchRest: number
-  stretchRounds: number
   muscuRounds: number
   group: string
   warmupFor: Category | ''
@@ -206,6 +205,19 @@ function takeDraft(key: string): Draft | null {
     return Date.now() - at < 3_600_000 ? draft : null
   } catch {
     return null
+  }
+}
+
+/** Ancienne routine d'étirements (durée de posture `durationSec`, transition commune
+ *  `restSec` de la séance) → réglages d'une séance en séries : séries × objectif, repos
+ *  par exercice. Le lecteur enchaîne pareil : la transition suivait déjà chaque série. */
+function seriesItemOf(it: SessionItem, measure: Measure | undefined, transition: number): SessionItem {
+  const { durationSec, ...rest } = it
+  return {
+    ...rest,
+    sets: Math.max(1, it.sets ?? 1),
+    target: measure === 'reps' ? (it.target ?? 10) : (durationSec ?? 30),
+    restSec: transition,
   }
 }
 
@@ -303,8 +315,12 @@ export default function SessionForm() {
   if (draftRef.current === undefined) draftRef.current = takeDraft(draftKey)
   const d = draftRef.current
 
+  // Ancienne routine d'étirements : elle s'édite désormais comme une séance en séries
+  const legacyStretch = !d && existing?.category === 'etirements'
+
   const [name, setName] = useState(d?.name ?? existing?.name ?? '')
-  const [category, setCategory] = useState<Category>(d?.category ?? existing?.category ?? 'muscu')
+  // Déroulé de la séance : séries (`muscu`) ou intervalles (`hiit`) ; course et vélo restent tels quels
+  const [category, setCategory] = useState<Category>(d?.category ?? (legacyStretch ? 'muscu' : existing?.category) ?? 'muscu')
   // Jours de la séance : jours fixes (`days`) OU, en alternance, jours de semaine du cycle
   // (`repeat.onDays`) — mêmes cases, même état, seule l'écriture change
   const [days, setDays] = useState<number[]>(
@@ -340,14 +356,19 @@ export default function SessionForm() {
   // `comment: ''` (un commentaire ajouté puis laissé vide — Firestore stocke les champs vidés
   // comme '') redevient « pas de commentaire » : le champ ne s'affiche que s'il y a du texte.
   const [items, setItems] = useState<DraftItem[]>(() =>
-    (d?.items ?? existing?.items ?? []).map((it) => ({ ...it, comment: it.comment || undefined, uid: newUid() })),
+    (
+      d?.items ??
+      (legacyStretch
+        ? existing!.items.map((it) => seriesItemOf(it, exercises.find((e) => e.id === it.exerciseId)?.measure, existing!.restSec ?? 0))
+        : (existing?.items ?? []))
+    ).map((it) => ({ ...it, comment: it.comment || undefined, uid: newUid() })),
   )
   const [workSec, setWorkSec] = useState(d?.workSec ?? existing?.workSec ?? 45)
   const [restSec, setRestSec] = useState(d?.restSec ?? existing?.restSec ?? 15)
   const [rounds, setRounds] = useState(d?.rounds ?? existing?.rounds ?? 2)
-  const [stretchRest, setStretchRest] = useState(d?.stretchRest ?? (existing?.category === 'etirements' ? (existing.restSec ?? 0) : 5))
-  const [stretchRounds, setStretchRounds] = useState(d?.stretchRounds ?? (existing?.category === 'etirements' ? (existing.rounds ?? 1) : 1))
-  const [muscuRounds, setMuscuRounds] = useState(d?.muscuRounds ?? (existing?.category === 'muscu' ? (existing.rounds ?? 1) : 1))
+  const [muscuRounds, setMuscuRounds] = useState(
+    d?.muscuRounds ?? (existing?.category === 'muscu' || legacyStretch ? (existing!.rounds ?? 1) : 1),
+  )
   const [group, setGroup] = useState(d?.group ?? existing?.group ?? '')
   // Échauffement automatique : s'inviter dans Aujourd'hui les jours de telle catégorie
   const [warmupFor, setWarmupFor] = useState<Category | ''>(d?.warmupFor ?? existing?.warmupFor ?? '')
@@ -393,12 +414,14 @@ export default function SessionForm() {
   })()
 
   const exOf = (exId: string) => exercises.find((e) => e.id === exId)
-  const hasItems = category === 'muscu' || category === 'hiit' || category === 'etirements'
-  // Blocs (muscu ET étirements) : découpage de la séance en groupes répétés indépendamment
-  const canBlocks = category === 'muscu' || category === 'etirements'
+  const hasItems = category === 'muscu' || category === 'hiit'
+  // Blocs (séries) : découpage de la séance en groupes répétés indépendamment
+  const canBlocks = category === 'muscu'
   const hasBreaks = canBlocks && items.some((it, i) => i > 0 && it.blockBreak)
-  const catMeta = CATEGORY_META[category]
-  const itemWord = category === 'etirements' ? 'posture' : 'exercice'
+  // Teinte affichée : ÉTIR pour une séance en séries faite uniquement d'étirements
+  const shownCat = displayCategory({ category, items }, exercises)
+  const catMeta = CATEGORY_META[shownCat]
+  const partnerCat = partner ? displayCategory(partner, exercises) : shownCat
   // Groupes de blocs pour l'affichage et le drag & drop (un seul bloc si pas de découpage)
   const blocksArr: DraftItem[][] = []
   items.forEach((it, i) => {
@@ -415,23 +438,26 @@ export default function SessionForm() {
   }
 
   /**
-   * Réglages par défaut d'un exercice selon le DÉROULÉ de la séance (sa catégorie) :
-   * muscu = séries, étirements = posture tenue (sec) ou mouvement compté (reps) selon la
-   * mesure de l'exercice, HIIT = intervalle de la séance. La catégorie de l'exercice
-   * lui-même n'entre pas en jeu : une séance mêle librement muscu, HIIT et étirements.
+   * Réglages par défaut d'un exercice selon le DÉROULÉ de la séance : en séries,
+   * 3 × 10 reps (ou 3 × 30 s) avec 60 s de repos, sauf un étirement, tenu une fois
+   * 30 s avec 5 s de transition ; en intervalles, l'effort de la séance.
    */
-  const itemDefaults = (cat: Category, m: Measure | undefined): Partial<SessionItem> => {
-    if (cat === 'muscu') return { sets: 3, target: m === 'sec' ? 30 : 10, restSec: 60 }
-    if (cat === 'etirements') return m === 'reps' ? { target: 10 } : { durationSec: 30 }
-    return {}
+  const itemDefaults = (cat: Category, m: Measure | undefined, exCat?: Category): Partial<SessionItem> => {
+    if (cat !== 'muscu') return {}
+    if (exCat === 'etirements') return { sets: 1, target: m === 'reps' ? 10 : 30, restSec: 5 }
+    return { sets: 3, target: m === 'sec' ? 30 : 10, restSec: 60 }
+  }
+  const defaultsOf = (cat: Category, exId: string) => {
+    const ex = exOf(exId)
+    return itemDefaults(cat, ex?.measure, ex?.category)
   }
 
-  // Changer le déroulé garde les exercices, seuls leurs réglages repartent des défauts
+  // Changer de format garde les exercices, seuls leurs réglages repartent des défauts
   const switchCategory = (c: Category) => {
     if (c === category) return
-    if (items.length && !window.confirm('Changer de catégorie remet les réglages des exercices par défaut. Continuer ?')) return
+    if (items.length && !window.confirm('Changer de format remet les réglages des exercices par défaut. Continuer ?')) return
     setCategory(c)
-    setItems((p) => p.map((it) => ({ exerciseId: it.exerciseId, uid: it.uid, comment: it.comment, ...itemDefaults(c, exOf(it.exerciseId)?.measure) })))
+    setItems((p) => p.map((it) => ({ exerciseId: it.exerciseId, uid: it.uid, comment: it.comment, ...defaultsOf(c, it.exerciseId) })))
   }
 
   const toggleDay = (d: number) =>
@@ -442,9 +468,9 @@ export default function SessionForm() {
    * `measure` évite de dépendre de `exercises` pour un exercice qui vient d'être créé
    * (l'abonnement du store peut ne pas l'avoir encore livré).
    */
-  const appendItem = (exId: string, measure?: Measure) => {
-    const m = measure ?? exOf(exId)?.measure
-    setItems((p) => [...p, { exerciseId: exId, uid: newUid(), ...itemDefaults(category, m) }])
+  const appendItem = (exId: string, measure?: Measure, exCat?: Category) => {
+    const ex = exOf(exId)
+    setItems((p) => [...p, { exerciseId: exId, uid: newUid(), ...itemDefaults(category, measure ?? ex?.measure, exCat ?? ex?.category) }])
   }
 
   /** Crée un exercice à la volée (mini-ligne du sélecteur, dans la catégorie filtrée) et l'ajoute */
@@ -460,7 +486,7 @@ export default function SessionForm() {
       videoUrl: '',
       createdAt: Date.now(),
     })
-    appendItem(exId, measure)
+    appendItem(exId, measure, cat)
   }
 
   // Occurrences de chaque exercice déjà dans la séance (coches du sélecteur)
@@ -720,7 +746,8 @@ export default function SessionForm() {
       return {
         session: s,
         self,
-        code: CATEGORY_META[s.category].code + (cadence ? ` · ↻ ${cadence}` : ''),
+        cat: self ? shownCat : displayCategory(s, exercises),
+        code: CATEGORY_META[self ? shownCat : displayCategory(s, exercises)].code + (cadence ? ` · ↻ ${cadence}` : ''),
         planned: byDay.map((x) => (self ? x.me : x.ids.has(s.id))),
         done: doneByDay.map((ids) => ids.has(s.id)),
       }
@@ -735,7 +762,7 @@ export default function SessionForm() {
     }
     return { rows, nextLabel }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions, logs, existing, selfKey, name, category, planMode, days, everyDays, startDate, steps, startStep, warmupFor, weekDates[0]])
+  }, [sessions, exercises, logs, existing, selfKey, name, category, shownCat, planMode, days, everyDays, startDate, steps, startStep, warmupFor, weekDates[0]])
 
   const save = async () => {
     const maxOrder = sessions.reduce((a, s) => Math.max(a, s.sortOrder ?? -1), -1)
@@ -756,7 +783,6 @@ export default function SessionForm() {
       sortOrder: existing?.sortOrder ?? maxOrder + 1,
       createdAt: existing?.createdAt ?? Date.now(),
       ...(category === 'hiit' ? { workSec, restSec, rounds } : {}),
-      ...(category === 'etirements' ? { restSec: stretchRest, rounds: stretchRounds } : {}),
       ...(category === 'muscu' ? { rounds: muscuRounds } : {}),
     }
     let selfId: string
@@ -797,7 +823,7 @@ export default function SessionForm() {
   const draft: Draft = {
     name, category, planMode, days, everyDays, startDate, steps, startStep,
     items: items.map(({ uid: _uid, ...rest }) => rest),
-    workSec, restSec, rounds, stretchRest, stretchRounds, muscuRounds, group, warmupFor,
+    workSec, restSec, rounds, muscuRounds, group, warmupFor,
   }
   const snapshot = JSON.stringify(draft)
   const initialRef = useRef<string | null>(null)
@@ -858,46 +884,43 @@ export default function SessionForm() {
               />
             </div>
             <div className={row}>
-              <span className={rowLabel}>Catégorie</span>
-              {/* Tuiles de catégorie (les codes de CodeTile) — remplace le <select> natif dont le
-                  popup restait illisible sous Windows */}
-              <div className="ml-auto flex gap-1">
-                {CATEGORIES.map((c) => {
-                  const m = CATEGORY_META[c]
-                  const on = c === category
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      title={m.label}
-                      aria-label={m.label}
-                      aria-pressed={on}
-                      onClick={() => switchCategory(c)}
-                      className={
-                        'flex h-8 w-8 items-center justify-center rounded-xs border font-mono text-[8px] font-bold tracking-[0.06em] uppercase ' +
-                        (on ? '' : 'border-hairline-strong text-ink/50 active:bg-glass')
-                      }
-                      style={on ? { backgroundColor: m.hex + '29', borderColor: m.hex + '66', color: m.hex } : undefined}
-                    >
-                      {m.code}
-                    </button>
-                  )
-                })}
-              </div>
+              <span className={rowLabel}>Format</span>
+              {/* Oct. 2026 : le choix se réduit au déroulé — séries (on valide chaque série,
+                  muscu comme étirements) ou intervalles (le chrono enchaîne tout). La couleur
+                  vient des exercices (`displayCategory`). Course et vélo, sans exercices, ne
+                  se créent plus ici : une séance existante garde son sport, affiché seul. */}
+              {hasItems ? (
+                <div className="ml-auto w-52">
+                  <Seg
+                    compact
+                    options={[
+                      { value: 'muscu' as const, label: 'Séries' },
+                      { value: 'hiit' as const, label: 'Intervalles' },
+                    ]}
+                    value={category as 'muscu' | 'hiit'}
+                    onChange={switchCategory}
+                  />
+                </div>
+              ) : (
+                <span
+                  className="ml-auto flex h-8 items-center rounded-xs border px-2 font-mono text-[9px] font-bold tracking-[0.08em] uppercase"
+                  style={{ backgroundColor: catMeta.hex + '29', borderColor: catMeta.hex + '66', color: catMeta.hex }}
+                >
+                  {catMeta.label}
+                </span>
+              )}
             </div>
           </div>
 
           {/* ── Exercices ── */}
           {hasItems && (
             <div className="space-y-2">
-              <Eyebrow className="ml-1 text-ink/60">
-                {category === 'etirements' ? 'Postures de la routine' : 'Exercices de la séance'}
-              </Eyebrow>
+              <Eyebrow className="ml-1 text-ink/60">Exercices de la séance</Eyebrow>
               <div className={card}>
-                {/* En-tête : compte + réglages de la séance (tours, effort/repos, transition) */}
+                {/* En-tête : compte + réglages de la séance (tours, effort/repos) */}
                 <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-1.5">
                   <span className={rowLabel + ' text-ink/45'}>
-                    {items.length} {itemWord}
+                    {items.length} exercice
                     {items.length > 1 ? 's' : ''}
                     {hasBreaks ? ` · ${blocksArr.length} blocs` : ''}
                   </span>
@@ -923,21 +946,6 @@ export default function SessionForm() {
                         <span className="flex items-center gap-2">
                           <span className={rowLabel}>Tours</span>
                           <Stepper value={rounds} onChange={setRounds} min={1} small />
-                        </span>
-                      </>
-                    )}
-                    {category === 'etirements' && (
-                      <>
-                        {!hasBreaks && (
-                          <span className="flex items-center gap-2" title="Tours de la routine">
-                            <span className={rowLabel}>Tours</span>
-                            <Stepper value={stretchRounds} onChange={setStretchRounds} min={1} max={10} small />
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1.5" title="Transition entre postures">
-                          <span className={rowLabel}>Transition</span>
-                          <MiniNum value={stretchRest} onChange={setStretchRest} min={0} max={120} label="Transition entre postures" />
-                          <span className={rowLabel}>s</span>
                         </span>
                       </>
                     )}
@@ -1023,9 +1031,7 @@ export default function SessionForm() {
                           const summary =
                             category === 'muscu'
                               ? `${it.sets ?? 3} × ${it.targets ? setTargetsOf(it).join('/') : (it.target ?? 10)}${isSec ? ' s' : ''} · ${it.restSec ?? 60} s`
-                              : category === 'etirements'
-                                ? `${it.sets ?? 1} × ${!ex || isSec ? `${it.durationSec ?? 30} s` : `${it.target ?? 10} reps`}`
-                                : ''
+                              : ''
                           return (
                             <SortableItem key={it.uid} uid={it.uid}>
                               {(drag) => (
@@ -1119,34 +1125,6 @@ export default function SessionForm() {
                                             <MiniNum value={it.restSec ?? 60} onChange={(v) => setItem(idx, { restSec: v })} max={600} label="Repos entre séries" />
                                             <span className={rowLabel}>s</span>
                                           </span>
-                                        </div>
-                                      )}
-
-                                      {category === 'etirements' && (
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          {/* Séries de la posture : 2 × 30 s pour un étirement fait des deux côtés */}
-                                          <span className={rowLabel}>Séries</span>
-                                          <MiniNum value={it.sets ?? 1} onChange={(v) => setItem(idx, { sets: v })} min={1} max={6} label="Séries" />
-                                          <span className={rowLabel}>×</span>
-                                          {!ex || isSec ? (
-                                            <>
-                                              <MiniNum value={it.durationSec ?? 30} onChange={(v) => setItem(idx, { durationSec: v })} min={5} label="Durée de la posture" />
-                                              <span className={rowLabel}>s</span>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <MiniNum value={it.target ?? 10} onChange={(v) => setItem(idx, { target: v })} min={1} label="Répétitions" />
-                                              <span className={rowLabel}>reps</span>
-                                            </>
-                                          )}
-                                          <button
-                                            type="button"
-                                            title="Basculer secondes / répétitions (modifie l'exercice)"
-                                            onClick={() => ex && void updateExercise(ex.id, { measure: isSec ? 'reps' : 'sec' })}
-                                            className={togglePill + ' ml-auto'}
-                                          >
-                                            {isSec ? 'sec' : 'reps'}
-                                          </button>
                                         </div>
                                       )}
 
@@ -1297,7 +1275,7 @@ export default function SessionForm() {
                     onClick={addFromList}
                     className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-sage-600 active:text-sage-700"
                   >
-                    <Plus className="h-3.5 w-3.5" /> Ajouter {category === 'etirements' ? 'une posture' : 'un exercice'}
+                    <Plus className="h-3.5 w-3.5" /> Ajouter un exercice
                   </button>
                   {/* Un seul point de découpe, en bas : le dernier exercice démarre le nouveau bloc,
                       le drag & drop fait le reste (remplace les pilules entre chaque paire d'exercices) */}
@@ -1407,11 +1385,11 @@ export default function SessionForm() {
                     <div className={row + ' flex-col items-stretch gap-2 py-3'}>
                       <span className={rowLabel}>En alternance avec</span>
                       <div
-                        className={`flex h-[30px] items-center justify-between rounded-full border pl-3 pr-1 ${CATEGORY_META[partner.category].soft} ${CATEGORY_META[partner.category].text}`}
-                        style={{ borderColor: CATEGORY_META[partner.category].hex + '73' }}
+                        className={`flex h-[30px] items-center justify-between rounded-full border pl-3 pr-1 ${CATEGORY_META[partnerCat].soft} ${CATEGORY_META[partnerCat].text}`}
+                        style={{ borderColor: CATEGORY_META[partnerCat].hex + '73' }}
                       >
                         <span className="flex min-w-0 items-center gap-2 font-mono text-[10px] font-bold tracking-[0.08em] uppercase">
-                          <CategoryIcon category={partner.category} className="h-3 w-3 shrink-0" />
+                          <CategoryIcon category={partnerCat} className="h-3 w-3 shrink-0" />
                           <span className="truncate">{partner.name}</span>
                         </span>
                         <button
@@ -1518,7 +1496,7 @@ export default function SessionForm() {
                       id={r.session.id}
                       title={r.session.name}
                       code={r.code}
-                      hex={CATEGORY_META[r.session.category].hex}
+                      hex={CATEGORY_META[r.cat].hex}
                       self={r.self}
                       planned={r.planned}
                       done={r.done}
@@ -1600,7 +1578,7 @@ export default function SessionForm() {
             <Eyebrow className="mb-2.5 text-ink/50">— Banque d'exercices</Eyebrow>
             <ExercisePicker
               exercises={exercises}
-              category={category}
+              category={shownCat}
               counts={itemCounts}
               onAdd={appendItem}
               onCreate={(d) => void quickCreate(d)}
@@ -1613,13 +1591,13 @@ export default function SessionForm() {
       <Sheet
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        title={category === 'etirements' ? 'Ajouter des postures' : 'Ajouter des exercices'}
+        title="Ajouter des exercices"
       >
         {/* Hauteur bornée : la recherche reste en tête, seule la liste défile */}
         <div className="flex max-h-[62dvh] min-h-[45dvh] flex-col">
           <ExercisePicker
             exercises={exercises}
-            category={category}
+            category={shownCat}
             counts={itemCounts}
             onAdd={appendItem}
             onCreate={(d) => void quickCreate(d)}

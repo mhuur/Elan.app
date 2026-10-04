@@ -50,7 +50,7 @@ try {
   await page.waitForSelector(`${dlg} button:has-text("Pompes")`)
   await page.screenshot({ path: 'screenshots/mix-01-tous.png' })
 
-  // --- Filtre ÉTIR → un étirement rejoint la séance muscu, avec les réglages muscu (3 × 30 s)
+  // --- Filtre ÉTIR → un étirement rejoint la séance en séries, tenu 1 × 30 s, 5 s de transition
   await page.click(`${dlg} button[aria-label="Étirements"]`)
   await page.waitForSelector(`${dlg} button:has-text("Chat-vache (dos)")`)
   if ((await page.locator(`${dlg} button:has-text("Pompes")`).count()) > 0) throw new Error('Filtré sur ÉTIR, la muscu ne devrait pas apparaître')
@@ -82,24 +82,42 @@ try {
   if (full.category !== 'muscu') throw new Error('La séance devrait rester en muscu')
   const chatItem = full.items.find((it) => it.exerciseId === chat.id)
   if (!chatItem || !full.items.some((it) => it.exerciseId === corde.id)) throw new Error('La séance devrait contenir l\'étirement ET l\'exercice HIIT')
-  if (chatItem.sets !== 3 || chatItem.target !== 30) throw new Error(`L'étirement dans une séance muscu devrait avoir 3 × 30 s, trouvé : ${JSON.stringify(chatItem)}`)
+  if (chatItem.sets !== 1 || chatItem.target !== 30 || chatItem.restSec !== 5) throw new Error(`L'étirement dans une séance en séries devrait avoir 1 × 30 s · 5 s, trouvé : ${JSON.stringify(chatItem)}`)
 
-  // --- Changer la catégorie de la séance garde les exercices, réglages remis par défaut
+  // --- Passer en intervalles garde les exercices, réglages remis par défaut
   await page.click('p:has-text("Muscu — Full body")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
-  await page.click('div:has(> span:text-is("Catégorie")) button[title="Étirements"]')
-  await page.waitForSelector('text=Postures de la routine')
-  await page.waitForSelector('text=7 postures')
+  if ((await page.locator('div:has(> span:text-is("Format")) button').count()) !== 2) throw new Error('Le format devrait proposer exactement Séries et Intervalles')
+  await page.click('div:has(> span:text-is("Format")) button:has-text("Intervalles")')
+  await page.waitForSelector(`[aria-label="Secondes d'effort"]`)
+  await page.waitForSelector('text=7 exercices')
   await page.click('text=Enregistrer')
   await page.waitForSelector('text=Mes programmes')
   const d2 = await data()
   const full2 = d2.sessions.find((s) => s.name === 'Muscu — Full body')
-  if (full2.category !== 'etirements' || full2.items.length !== 7) throw new Error(`Après changement de catégorie : ${full2.category}, ${full2.items.length} exercices (7 attendus)`)
+  if (full2.category !== 'hiit' || full2.items.length !== 7) throw new Error(`Après passage en intervalles : ${full2.category}, ${full2.items.length} exercices (7 attendus)`)
   const pompes = full2.items.find((it) => it.exerciseId === d2.exercises.find((e) => e.name === 'Pompes').id)
-  if (pompes.sets !== undefined || pompes.target !== 10) throw new Error(`En routine, « Pompes » (reps) devrait passer en 10 reps sans séries, trouvé : ${JSON.stringify(pompes)}`)
+  if (pompes.sets !== undefined || pompes.target !== undefined) throw new Error(`En intervalles, « Pompes » ne devrait plus avoir de séries, trouvé : ${JSON.stringify(pompes)}`)
 
-  console.log('PICKER-MIX OK — filtre de catégorie dans la banque, séance mixte muscu + étirement + HIIT, création dans la catégorie filtrée, changement de catégorie sans perte')
+  // --- Ancienne routine d'étirements : s'ouvre en Séries, s'enregistre en séries, reste affichée ÉTIR
+  const rout0 = d2.sessions.find((s) => s.name === 'Routine matinale')
+  if (rout0.category !== 'etirements') throw new Error('Le seed devrait contenir une routine encore en etirements')
+  await page.click('p:has-text("Routine matinale")')
+  await page.getByRole('button', { name: 'Modifier', exact: true }).click()
+  await page.waitForSelector('text=Planification')
+  await page.waitForSelector('div:has(> span:text-is("Format")) button.bg-ink:has-text("Séries")')
+  await page.screenshot({ path: 'screenshots/mix-04-routine-series.png' })
+  await page.click('text=Enregistrer')
+  await page.waitForSelector('text=Mes programmes')
+  const d3 = await data()
+  const rout = d3.sessions.find((s) => s.name === 'Routine matinale')
+  if (rout.category !== 'muscu') throw new Error(`La routine devrait s'enregistrer en séries (muscu), trouvé : ${rout.category}`)
+  const r0 = rout.items[0]
+  if (!r0.sets || !r0.target || r0.restSec !== (rout0.restSec ?? 0) || r0.durationSec !== undefined) throw new Error(`Posture mal convertie : ${JSON.stringify(r0)} (avant : ${JSON.stringify(rout0.items[0])}, transition ${rout0.restSec})`)
+  if (!(await page.locator('text=ÉTIR').count())) throw new Error("La routine faite d'étirements devrait toujours s'afficher ÉTIR")
+
+  console.log('PICKER-MIX OK — filtre de catégorie dans la banque, séance mixte muscu + étirement + HIIT, création dans la catégorie filtrée, passage Séries → Intervalles sans perte, ancienne routine convertie en séries et affichée ÉTIR')
   if (errors.length) {
     console.error('ERREURS DÉTECTÉES :')
     for (const e of errors) console.error(' -', e)

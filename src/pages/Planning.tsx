@@ -5,7 +5,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-
 import { CSS } from '@dnd-kit/utilities'
 import { ArrowLeft, ArrowRight, GripVertical } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, type Session } from '../types'
+import { CATEGORY_META, displayCategory, type Session } from '../types'
 import { DAY_LETTER, DAY_NAMES, DAY_SHORT, addDays, formatShortFr, todayStr } from '../lib/dates'
 import { canonicalCycles, describeSchedule, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
 import { isPlanLog } from '../lib/planDay'
@@ -46,7 +46,8 @@ function Row({
   onEdit: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: session.id })
-  const meta = CATEGORY_META[session.category]
+  const { exercises } = useData()
+  const meta = CATEGORY_META[displayCategory(session, exercises)]
   return (
     <div
       ref={setNodeRef}

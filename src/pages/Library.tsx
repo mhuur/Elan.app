@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, ChevronRight, Repeat, SquarePen } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORIES, CATEGORY_META } from '../types'
+import { CATEGORIES, CATEGORY_META, displayCategory } from '../types'
 import { summarizeSession } from '../lib/format'
 import { canonicalCycles, describeSchedule, ownerOf } from '../lib/schedule'
 import { CodeTile, EmptyState, Eyebrow, Fab, PrimaryButton, iconSquare } from '../components/ui'
@@ -25,7 +25,7 @@ export default function Library() {
   const [openId, setOpenId] = useState<string | null>(null)
   const cycles = useMemo(() => canonicalCycles(sessions), [sessions])
   // Par sport (ordre des catégories), puis dans l'ordre du store
-  const ordered = CATEGORIES.flatMap((cat) => sessions.filter((s) => s.category === cat))
+  const ordered = CATEGORIES.flatMap((cat) => sessions.filter((s) => displayCategory(s, exercises) === cat))
   const exOf = (id: string) => exercises.find((e) => e.id === id)
 
   return (
@@ -52,7 +52,7 @@ export default function Library() {
           implicite est `auto` et les libellés `nowrap` élargissent les cartes hors de l'écran. */}
       <div className="grid grid-cols-1 gap-2 px-5 lg:grid-cols-2 lg:items-start lg:gap-3">
         {ordered.map((s) => {
-          const meta = CATEGORY_META[s.category]
+          const meta = CATEGORY_META[displayCategory(s, exercises)]
           const open = s.id === openId
           const when = describeSchedule(s, sessions, cycles)
           const planned = when !== 'Non planifié'

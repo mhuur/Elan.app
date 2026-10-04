@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Pencil, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, type Exercise, type GoalLevel, type ObjectiveLevel, type Session } from '../types'
+import { CATEGORY_META, displayCategory, type Exercise, type GoalLevel, type ObjectiveLevel, type Session } from '../types'
 import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { CategoryIcon, EmptyState, Fab, Field, NumInput, PageHeader, PrimaryButton, Seg, Select, Sheet } from '../components/ui'
 
@@ -253,7 +253,7 @@ export default function Goals() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="flex items-center gap-1.5 font-display text-xl leading-none font-bold uppercase">
-                    <CategoryIcon category={s.category} className={`h-4 w-4 shrink-0 ${CATEGORY_META[s.category].text}`} />
+                    <CategoryIcon category={displayCategory(s, exercises)} className={`h-4 w-4 shrink-0 ${CATEGORY_META[displayCategory(s, exercises)].text}`} />
                     <span className="min-w-0 truncate">{s.name}</span>
                   </p>
                   <p className="text-[11px] font-semibold text-ink-soft">

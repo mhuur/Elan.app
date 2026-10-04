@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, type Log } from '../types'
+import { CATEGORY_META, displayCategory, type Log } from '../types'
 import { buildTimeline, timelineFromLog, collectSets, type SetStatus } from '../lib/timeline'
 import { DEFAULT_VELO_METRICS, effectiveMetrics } from '../lib/metrics'
 import { CategoryIcon, Field, NumInput, PrimaryButton, Sheet, TextArea } from './ui'
@@ -13,6 +13,10 @@ const shortFr = (d: string) =>
 
 /** Fiche d'une séance terminée : consulter et corriger le réalisé, les mesures, la note ; supprimer */
 export default function LogSheet({ log, onClose }: { log: Log | null; onClose: () => void }) {
+  const { sessions, exercises } = useData()
+  // Couleur de la séance si elle existe encore (ÉTIR pour des séries d'étirements), sinon celle du log
+  const live = log ? sessions.find((s) => s.id === log.sessionId) : undefined
+  const cat = live ? displayCategory(live, exercises) : log?.category
   return (
     <Sheet
       open={!!log}
@@ -23,10 +27,10 @@ export default function LogSheet({ log, onClose }: { log: Log | null; onClose: (
             {/* Sur-titre « — MUSCU · 29.07 » de la maquette (écran « Journal de bord ») */}
             <span
               className="mb-2 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase"
-              style={{ color: CATEGORY_META[log.category].hex }}
+              style={{ color: CATEGORY_META[cat!].hex }}
             >
-              <CategoryIcon category={log.category} className="h-3.5 w-3.5 shrink-0" />—{' '}
-              {CATEGORY_META[log.category].label} · {log.date.slice(8, 10)}.{log.date.slice(5, 7)}
+              <CategoryIcon category={cat!} className="h-3.5 w-3.5 shrink-0" />—{' '}
+              {CATEGORY_META[cat!].label} · {log.date.slice(8, 10)}.{log.date.slice(5, 7)}
             </span>
             <span className="block min-w-0 truncate">{log.sessionName}</span>
           </>
