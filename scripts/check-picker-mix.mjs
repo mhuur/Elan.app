@@ -43,8 +43,8 @@ try {
   // --- Oct. 2026 : plus de catégorie d'exercice, le filtre de la banque est le sous-type.
   // Ouverture sur « Tous » : toute la banque, pas de tuile de catégorie
   await openPicker()
-  const chips = `${dlg} [aria-label="Filtrer par sous-type"]`
-  if ((await page.locator(`${chips} button:text-is("Tous")[aria-pressed="true"]`).count()) !== 1) throw new Error('Le sélecteur devrait s\'ouvrir sur « Tous »')
+  const filterSel = `${dlg} select[aria-label="Filtrer par sous-type"]`
+  if ((await page.locator(filterSel).inputValue()) !== '') throw new Error('Le sélecteur devrait s\'ouvrir sur « Tous les sous-types »')
   if ((await page.locator(`${dlg} [aria-label="Filtrer par catégorie"]`).count()) > 0) throw new Error('Les tuiles de catégorie devraient avoir disparu')
   await page.waitForSelector(`${dlg} button:has-text("Burpees")`)
   await page.waitForSelector(`${dlg} button:has-text("Chat-vache (dos)")`)
@@ -52,14 +52,14 @@ try {
   await page.screenshot({ path: 'screenshots/mix-01-tous.png' })
 
   // --- Filtre Mobilité → un étirement rejoint la séance en séries, tenu 1 × 30 s, 5 s de transition
-  await page.click(`${chips} button:text-is("Mobilité")`)
+  await page.selectOption(filterSel, 'Mobilité')
   await page.waitForSelector(`${dlg} button:has-text("Chat-vache (dos)")`)
   if ((await page.locator(`${dlg} button:has-text("Pompes")`).count()) > 0) throw new Error('Filtré sur Mobilité, « Pompes » ne devrait pas apparaître')
   await page.click(`${dlg} button:has-text("Chat-vache (dos)")`)
   await page.screenshot({ path: 'screenshots/mix-02-etirement-ajoute.png' })
 
   // --- « + Créer » : nom + sous-type + mesure, sans catégorie
-  await page.click(`${chips} button:text-is("Tous")`)
+  await page.selectOption(filterSel, '')
   await page.fill(`${dlg} input[aria-label="Rechercher un exercice"]`, 'Corde à sauter')
   await page.click('text=+ Créer « Corde à sauter »')
   await page.waitForSelector(`${dlg} >> text=Nouvel exercice`)

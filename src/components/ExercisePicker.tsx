@@ -35,8 +35,8 @@ const subtypeRank = (k: string) => {
 }
 
 /**
- * Panneau de composition : TOUTE la banque, cherchable, filtrable par sous-type (rangée
- * défilante « Tous · Abdominaux · Jambes · Souplesse… » — depuis oct. 2026 les exercices
+ * Panneau de composition : TOUTE la banque, cherchable, filtrable par sous-type (liste
+ * déroulante « Tous les sous-types · Abdominaux · Jambes… » — depuis oct. 2026 les exercices
  * n'ont plus de catégorie, le sous-type est le seul classement), qui RESTE ouverte — un tap ajoute l'exercice à la
  * séance sans rien fermer (remplace la Combobox qui se refermait après chaque ajout,
  * friction n° 1 de la création de séance). Affiché en volet latéral permanent sur
@@ -95,9 +95,6 @@ export default function ExercisePicker({
     setQuery('')
   }
 
-  const chip = (on: boolean) =>
-    'flex h-8 shrink-0 items-center rounded-xs border px-2.5 font-mono text-[9px] font-bold tracking-[0.1em] uppercase whitespace-nowrap ' +
-    (on ? 'border-ink bg-ink text-onaccent' : 'border-hairline-strong text-ink/60 active:bg-glass')
 
   return (
     <div className="flex min-h-0 flex-col">
@@ -113,21 +110,21 @@ export default function ExercisePicker({
           className="w-full rounded-sm border border-hairline bg-shoal py-2.5 pr-3 pl-9 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
         />
       </div>
-      {/* Pastilles de sous-type sur une rangée défilante (la liste dessous reste groupée par sous-type) */}
-      <div
-        className="-mx-1 mt-2 flex shrink-0 gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]"
-        role="group"
+      {/* Filtre de sous-type en liste déroulante (oct. 2026, retour utilisateur : la rangée de
+          pastilles obligeait à défiler pour trouver le sous-type). La liste dessous reste groupée. */}
+      <select
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
         aria-label="Filtrer par sous-type"
+        className="mt-2 w-full shrink-0 rounded-sm border border-hairline bg-shoal px-2.5 py-2 text-sm font-bold outline-none focus:border-sage-500"
       >
-        <button type="button" aria-pressed={!filter} onClick={() => setFilter('')} className={chip(!filter)}>
-          Tous
-        </button>
+        <option value="">Tous les sous-types</option>
         {filters.map((st) => (
-          <button key={st} type="button" aria-pressed={filter === st} onClick={() => setFilter(st)} className={chip(filter === st)}>
+          <option key={st} value={st}>
             {st}
-          </button>
+          </option>
         ))}
-      </div>
+      </select>
 
       <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto [scrollbar-color:rgb(255_255_255/0.2)_transparent] [scrollbar-width:thin]">
         {subtypeGroups(visible).map(([subtype, exos]) => (
