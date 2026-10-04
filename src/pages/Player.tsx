@@ -55,7 +55,7 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
     }
   } else if (session.category === 'muscu') {
     // Séries guidées : chrono pour les exercices en secondes, validation manuelle pour les reps,
-    // repos automatique entre les séries (sauté entre supersets).
+    // repos automatique entre les séries.
     const blocks = muscuBlocks(session)
     blocks.forEach((b, bi) => {
       for (let r = 0; r < b.rounds; r++) {
@@ -97,9 +97,8 @@ function buildSteps(session: Session, exercises: Exercise[]): Step[] {
             const lastSetOfItem = s === sets - 1
             const veryLast =
               bi === blocks.length - 1 && r === b.rounds - 1 && ii === b.items.length - 1 && lastSetOfItem
-            const superset = lastSetOfItem && !!it.linkNext && ii < b.items.length - 1
             const restSec = it.restSec ?? 60
-            if (!veryLast && !superset && restSec > 0) steps.push({ type: 'rest', label: 'Repos', sec: restSec })
+            if (!veryLast && restSec > 0) steps.push({ type: 'rest', label: 'Repos', sec: restSec })
           }
         })
       }

@@ -1,5 +1,5 @@
 // Vérifie : sous-types multiples + « + » de section, onglet Objectifs + célébration,
-// superset, suivis de Progrès, saisie rétroactive via la navigation de dates d'Aujourd'hui.
+// sans superset, suivis de Progrès, saisie rétroactive via la navigation de dates d'Aujourd'hui.
 import { chromium } from 'playwright'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
@@ -38,15 +38,15 @@ try {
   await page.click('text=Enregistrer')
   await page.waitForSelector('button:has-text("Crunch inversé")')
 
-  // --- Séance Full body : superset entre les 2 premiers exercices
+  // --- Séance Full body : ouverture de la fiche en modification
   // La banque est un sous-écran depuis août 2026 : on en sort par Retour, plus par un
   // segment « Mes séances » (le Seg moitié-moitié a disparu).
   await page.click('[aria-label="Retour"]')
   await page.click('text=Full body')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('[title="Tours du circuit"]')
-  await page.locator('button:has-text("superset")').first().click()
-  await page.waitForSelector('button[aria-pressed="true"]:has-text("superset")') // pastille sur le filet (sept. 2026)
+  // Superset supprimé (oct. 2026) : plus aucune pastille entre deux lignes
+  if (await page.locator('button:has-text("superset")').count()) throw new Error('pastille superset encore présente')
   await page.click('text=Enregistrer')
 
   // --- Onglet Objectifs : objectif Pompes à 2 paliers avec récompenses
@@ -125,7 +125,7 @@ try {
   await page.waitForSelector('text=Terminées')
   await page.screenshot({ path: 'screenshots/19-retro.png' })
 
-  console.log('V5 OK — sous-types multiples, + de section, Objectifs, superset, rétroactif par dates')
+  console.log('V5 OK — sous-types multiples, + de section, Objectifs, sans superset, rétroactif par dates')
   if (errors.length) {
     console.error('ERREURS :')
     for (const e of errors) console.error(' -', e)

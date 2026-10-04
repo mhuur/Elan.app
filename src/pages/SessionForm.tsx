@@ -19,7 +19,6 @@ import {
   FileText,
   GripVertical,
   LayoutGrid,
-  Link2,
   Merge,
   MessageSquarePlus,
   Play,
@@ -1196,25 +1195,6 @@ export default function SessionForm() {
                                       </div>
                                     </div>
                                   </div>
-
-                                  {/* Superset : une pastille posée sur le filet entre deux lignes */}
-                                  {category === 'muscu' && idx < items.length - 1 && !items[idx + 1].blockBreak && (
-                                    <div className="relative z-10 flex h-0 justify-center">
-                                      <button
-                                        type="button"
-                                        aria-pressed={!!it.linkNext}
-                                        title={it.linkNext ? 'Superset — enchaîné sans repos' : 'Enchaîner avec le suivant sans repos (superset)'}
-                                        onClick={() => setItem(idx, { linkNext: !it.linkNext })}
-                                        className={
-                                          'flex h-6 -translate-y-1/2 items-center gap-1 rounded-full px-3 font-mono text-[9px] font-bold tracking-[0.12em] uppercase transition-colors ' +
-                                          (it.linkNext ? 'bg-muscu text-onaccent shadow-sm' : 'border border-hairline-strong bg-shoal text-ink-soft')
-                                        }
-                                      >
-                                        <Link2 className="h-3 w-3" />
-                                        superset
-                                      </button>
-                                    </div>
-                                  )}
                                 </div>
                               )}
                             </SortableItem>
@@ -1269,7 +1249,6 @@ export default function SessionForm() {
                       onClick={() => {
                         const last = items.length - 1
                         setItem(last, { blockBreak: true, blockRounds: items[last].blockRounds ?? 1 })
-                        setItem(last - 1, { linkNext: false })
                       }}
                       className="ml-auto flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-ink/60 active:text-ink"
                     >

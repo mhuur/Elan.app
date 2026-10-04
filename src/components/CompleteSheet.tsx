@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, ClipboardList, Lightbulb, Link2, MoreVertical, Pencil, Play, Repeat, X } from 'lucide-react'
+import { Check, ClipboardList, Lightbulb, MoreVertical, Pencil, Play, Repeat, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CATEGORY_META, displayCategory, feelingOf, setTargetsOf, type Exercise, type Log, type MetricValue, type Session, type SessionItem } from '../types'
 import { formatShortFr, relativeDayFr, todayStr } from '../lib/dates'
@@ -164,7 +164,6 @@ export function ProgramView({ session, exOf }: { session: Session; exOf: (id: st
                   key={i}
                   name={ex?.name ?? 'Exercice'}
                   comment={it.comment}
-                  linkNext={it.linkNext}
                   videoUrl={ex?.videoUrl}
                   value={t.value}
                   unit={t.unit}
@@ -196,14 +195,12 @@ function itemTarget(it: SessionItem, ex: Exercise | undefined, isStretch: boolea
 function ProgramRow({
   name,
   comment,
-  linkNext,
   videoUrl,
   value,
   unit,
 }: {
   name: string
   comment?: string
-  linkNext?: boolean
   videoUrl?: string
   value: string
   unit: string
@@ -213,7 +210,6 @@ function ProgramRow({
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 text-sm font-bold">
           <span className="min-w-0 truncate">{name}</span>
-          {linkNext && <Link2 className="h-3 w-3 shrink-0 text-muscu" />}
         </p>
         {comment && (
           <p className="flex items-center gap-1 text-xs font-semibold text-ink-soft">

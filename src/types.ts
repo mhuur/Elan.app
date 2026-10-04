@@ -111,8 +111,6 @@ export interface SessionItem {
   durationSec?: number
   /** Muscu : repos entre les séries, en secondes */
   restSec?: number
-  /** Muscu : superset — enchaîner avec l'exercice suivant sans repos */
-  linkNext?: boolean
   /** Muscu : cet exercice démarre un nouveau bloc (chaque bloc se répète indépendamment) */
   blockBreak?: boolean
   /** Muscu : tours du bloc démarré par cet exercice */
