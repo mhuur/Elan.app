@@ -1,7 +1,6 @@
 // Vérifie : sous-types multiples + « + » de section, onglet Objectifs + célébration,
 // superset, suivis de Progrès, saisie rétroactive via la navigation de dates d'Aujourd'hui.
 import { chromium } from 'playwright'
-import { closeItem, openItem, saveFiche } from './lib/fiche.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
 
@@ -23,8 +22,9 @@ try {
   await page.getByRole('button', { name: "Banque d'exercices", exact: true }).click()
   await page.click('button:has-text("Pompes")')
   await page.waitForSelector("text=Modifier l'exercice")
-  // Muscle ajouté d'un tap sur sa pastille (fiche d'exercice commune, oct. 2026)
-  await page.locator('[aria-label="Muscle travaillé"] button:text-is("Bras")').click()
+  // Sous-type ajouté via la combobox filtrante (plus de mur de chips)
+  await page.getByPlaceholder('Ajouter un sous-type').fill('Bras')
+  await page.locator('button:has-text("Bras")').first().click()
   await page.click('text=Enregistrer')
   await page.waitForSelector('button:has-text("Pompes")')
   const count = await page.locator('button:has-text("Pompes")').count()
@@ -34,7 +34,6 @@ try {
   // --- « + » de sous-section : nouvel exercice prérempli Abdominaux
   await page.click('[aria-label="Nouvel exercice Abdominaux"]')
   await page.waitForSelector('text=Nouvel exercice')
-  await page.waitForSelector('[aria-label="Muscle travaillé"] button[aria-pressed="true"]:text-is("Abdominaux")')
   await page.getByPlaceholder('Ex. Pompes diamant').fill('Crunch inversé')
   await page.click('text=Enregistrer')
   await page.waitForSelector('button:has-text("Crunch inversé")')
@@ -46,12 +45,9 @@ try {
   await page.click('text=Full body')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('[title="Tours du circuit"]')
-  // Superset = « Enchaîner avec le précédent » dans la feuille du 2e exercice (oct. 2026)
-  await openItem(page, 'Squats')
-  await page.click('[role="switch"][aria-label="Enchaîner avec le précédent"]')
-  await closeItem(page)
-  await page.waitForSelector('[data-item="Pompes"]:has-text("superset")')
-  await saveFiche(page)
+  await page.locator('button:has-text("superset")').first().click()
+  await page.waitForSelector('button[aria-pressed="true"]:has-text("superset")') // pastille sur le filet (sept. 2026)
+  await page.click('text=Enregistrer')
 
   // --- Onglet Objectifs : objectif Pompes à 2 paliers avec récompenses
   await page.goto(BASE + '/goals') // onglet masqué : on atteint la page par URL

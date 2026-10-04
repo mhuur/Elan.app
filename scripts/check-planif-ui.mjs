@@ -1,6 +1,5 @@
-// Vérifie la feuille « Quand ? » de la fiche programme (refonte sept. 2026, passée en feuille
-// le 04/10/2026) : le « quand » à quatre choix (Pas de jour fixe, Jours choisis, Tous les X
-// jours, Avant une autre séance), la ligne « En alternance avec » (sélecteur « Aucune » → pastille), « Commencer par », et
+// Vérifie la section « Planification » de la fiche séance (refonte sept. 2026) : le « quand »
+// à trois positions, la ligne « En alternance avec » (sélecteur « Aucune » → pastille), « Commencer par », et
 // surtout l'APERÇU — la grille du Planning (une ligne par séance, un rond par jour, semaine
 // navigable ‹ ›), avec TOUT ce qui est déjà posé, calculée par la même fonction que le Planning :
 //  - la fiche en cours est la première ligne (teintée), les autres séances planifiées suivent
@@ -8,13 +7,11 @@
 //  - Jours choisis L/J/S → 3 anneaux sur la ligne de la fiche (et « Prochaine fois » s'affiche) ;
 //  - En alternance avec → HIIT (sélecteur « Aucune ») → pastille, une ligne HIIT apparaît, les anneaux se partagent ;
 //  - Commencer par HIIT (les noms, plus de lettres) → la prochaine occurrence passe au HIIT AVANT d'enregistrer ;
-//  - aucun jour coché → la ligne de la fiche dit « Pas de jour fixe » (plus d'avertissement
-//    rouge, oct. 2026), et l'enregistrement ne crée PAS de cadence cachée
+//  - aucun jour coché → avertissement, et l'enregistrement ne crée PAS de cadence cachée
 //    (bug du 05/09/2026 : « Alternance » sans jour enregistrait « Tous les 2 jours »).
 // Prérequis : `npm run dev:demo` lancé.
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
-import { openQuand, saveFiche } from './lib/fiche.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
 mkdirSync('screenshots', { recursive: true })
@@ -74,14 +71,10 @@ try {
   await page.waitForSelector('text=Mes programmes')
   await page.click('p:has-text("Muscu — Full body")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('#session-name')
-  // Programme sans jour : la ligne « Quand » le dit, sans rouge
-  await page.waitForSelector('[data-quand]:has-text("Pas de jour fixe")')
-  if ((await page.locator('text=Aucun jour choisi').count()) > 0) throw new Error('L\x27avertissement rouge « Aucun jour choisi » ne doit plus exister')
-  await openQuand(page)
+  await page.waitForSelector('text=Planification')
 
-  // Quatre choix, plus d'« Alternance » ni de « Rotation »
-  for (const lbl of ['Pas de jour fixe', 'Jours choisis', 'Tous les X jours', 'Avant une autre séance']) await page.getByRole('button', { name: lbl, exact: true }).waitFor()
+  // Trois positions, plus d'« Alternance » ni de « Rotation »
+  for (const lbl of ['Jours choisis', 'Tous les X jours', 'Avant une autre']) await page.getByRole('button', { name: lbl, exact: true }).waitFor()
   if ((await page.getByRole('button', { name: 'Alternance', exact: true }).count()) > 0) throw new Error('« Alternance » ne doit plus être une position du sélecteur')
   if ((await page.locator('text=Rotation').count()) > 0) throw new Error('Le mot « Rotation » ne doit plus apparaître')
 
@@ -94,19 +87,16 @@ try {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   if (overflow > 0) throw new Error(`Débordement horizontal de ${overflow}px avec l'aperçu`)
 
-  // Pas de jour fixe : aucun anneau sur la ligne de la fiche
+  // Aucun jour : avertissement, aucun anneau sur la ligne de la fiche
+  await page.waitForSelector('text=Aucun jour choisi')
   if ((await rings(selfRow())) !== 0) throw new Error('Sans jour coché, la ligne de la fiche ne devrait porter aucun anneau')
 
-  // Jours choisis L / J / S → l'aperçu suit (semaine complète affichée, passé compris : 3 anneaux)
-  await page.getByRole('button', { name: 'Jours choisis', exact: true }).click()
+  // L / J / S → l'aperçu suit (semaine complète affichée, passé compris : 3 anneaux)
   for (const t of ['Lundi', 'Jeudi', 'Samedi']) await page.click(`button[title="${t}"]`)
   await page.waitForSelector('text=Prochaine fois')
   const n1 = await rings(selfRow())
   if (n1 !== 3) throw new Error(`Jours choisis L/J/S : ${n1} anneau(x) sur la ligne de la fiche, 3 attendus`)
   await page.screenshot({ path: 'screenshots/planif-01-jours-fixes.png' })
-  // Le sélecteur « En alternance avec » reste dans la feuille (il débordait de 14 px à droite)
-  const selRight = await page.locator('select[aria-label="En alternance avec"]').evaluate((el) => el.getBoundingClientRect().right)
-  if (selRight > 390 - 16) throw new Error(`Le sélecteur « En alternance avec » déborde : bord droit à ${selRight}px`)
 
   // « En alternance avec » → HIIT : pastille avec sa croix, ligne HIIT dans l'aperçu, anneaux partagés + « Commencer par »
   await page.locator('select[aria-label="En alternance avec"]').selectOption({ label: 'HIIT — Cardio express' })
@@ -148,15 +138,16 @@ try {
   const other3 = await ringsTwoWeeks(rowOf('HIIT — Cardio express'))
   if (me3 + other3 < 3) throw new Error(`Tous les 2 jours : seulement ${me3 + other3} anneau(x) sur deux semaines`)
 
-  // Retour Jours choisis, tout décoché : « Pas de jour fixe », et l'enregistrement ne cache aucune cadence
+  // Retour Jours choisis, tout décoché : avertissement, et l'enregistrement ne cache aucune cadence
   await page.getByRole('button', { name: 'Jours choisis', exact: true }).click()
   for (const t of ['Lundi', 'Jeudi', 'Samedi']) await page.click(`button[title="${t}"]`)
-  await saveFiche(page)
+  await page.waitForSelector('text=Aucun jour choisi')
+  await page.click('text=Enregistrer')
   await page.waitForSelector('text=Mes programmes')
   const when = await page.locator('button:has(p:text-is("Muscu — Full body")) span.truncate').innerText()
   if (!/non planifié/i.test(when)) throw new Error(`Sans jour coché, la carte devrait dire « Non planifié », trouvé : ${JSON.stringify(when)}`)
 
-  console.log('PLANIF-UI OK — quatre choix dans la feuille « Quand ? », aperçu = grille du Planning avec tout le reste, alternance à partenaire unique, Commencer par avec les noms, aucune cadence cachée')
+  console.log('PLANIF-UI OK — trois positions, aperçu = grille du Planning avec tout le reste, alternance à partenaire unique, Commencer par avec les noms, aucune cadence cachée')
   if (errors.length) {
     console.error('ERREURS DÉTECTÉES :')
     for (const e of errors) console.error(' -', e)

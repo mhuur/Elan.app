@@ -56,7 +56,7 @@ try {
   // Modifier → fiche, Retour → liste
   await page.click('p:has-text("Muscu — Full body")')
   await modifier.click()
-  await page.waitForSelector('#session-name')
+  await page.waitForSelector('text=Planification')
   await page.click('[aria-label="Retour"]')
   await page.waitForSelector('text=Mes programmes')
 

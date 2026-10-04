@@ -3,7 +3,6 @@
 // enregistrer, et retrouver « Lun · Jeu · Sam » dans le Planning.
 // Prérequis : `npm run dev:demo` lancé.
 import { chromium } from 'playwright'
-import { openJoursChoisis, saveFiche } from './lib/fiche.mjs'
 import { mkdirSync } from 'node:fs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
@@ -28,12 +27,11 @@ try {
   await page.waitForSelector('text=Mes programmes')
   await page.click('text=appartement')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('#session-name')
+  await page.waitForSelector('text=Planification')
 
   // Jours choisis (défaut) + « En alternance avec » = cycle sur jours de semaine (repeat.onDays)
 
-  // Choisit lun / jeu / sam (feuille « Quand ? »)
-  await openJoursChoisis(page)
+  // Choisit lun / jeu / sam
   await page.click('[title="Lundi"]')
   await page.click('[title="Jeudi"]')
   await page.click('[title="Samedi"]')
@@ -45,7 +43,7 @@ try {
   await page.screenshot({ path: `${DIR}/49-form-jours-semaine.png` })
 
   // Enregistre, puis va au Planning : le libellé reflète les jours choisis
-  await saveFiche(page)
+  await page.click('text=Enregistrer')
   await page.waitForSelector('text=Mes programmes')
   await page.getByRole('link', { name: 'Planning', exact: true }).click()
   await page.waitForSelector('text=Cette semaine')

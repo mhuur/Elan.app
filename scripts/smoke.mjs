@@ -109,7 +109,7 @@ try {
   await shot('09-bibliotheque-seances')
   await page.click('text=appartement')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('#session-name')
+  await page.waitForSelector('text=Planification')
   await shot('10-seance-form')
   await page.click('[aria-label="Retour"]')
 

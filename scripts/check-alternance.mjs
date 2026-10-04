@@ -4,7 +4,6 @@
 // (plusieurs séances le même jour — la fiche ne les crée plus mais les affiche en texte et
 // les planifie toujours), et réparation des anciennes données « bidirectionnelles ».
 import { chromium } from 'playwright'
-import { openJoursChoisis, openQuand, saveFiche } from './lib/fiche.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5174'
 
@@ -28,7 +27,7 @@ const openForm = async (title) => {
   await page.waitForSelector('text=Mes programmes')
   await page.click(`p:has-text("${title}")`)
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
-  await page.waitForSelector('#session-name')
+  await page.waitForSelector('text=Planification')
 }
 // La rangée « En alternance avec » de la fiche
 const altRow = 'div:has(> span:text-is("En alternance avec"))'
@@ -39,16 +38,14 @@ try {
 
   // --- Donner des jours fixes au HIIT via sa fiche (ils devront être nettoyés par l'alternance)
   await openForm('HIIT — Cardio express')
-  await openJoursChoisis(page)
   await page.click('button[title="Lundi"]')
-  await saveFiche(page)
+  await page.click('text=Enregistrer')
   await page.waitForSelector('text=Mes programmes')
   const hiit0 = await sessionByName('HIIT')
   if (!(hiit0.days ?? []).includes(0)) throw new Error('Le HIIT devrait avoir le lundi en jour fixe')
 
   // --- Vélo : tous les 2 jours, en alternance avec le HIIT (sélecteur « Aucune » → pastille)
   await openForm('Vélo d’appartement')
-  await openQuand(page)
   await page.getByRole('button', { name: 'Tous les X jours', exact: true }).click()
   await page.waitForSelector('text=à partir du')
   if ((await page.getByRole('button', { name: 'Ajouter', exact: true }).count()) > 0) throw new Error('« + Ajouter » ne doit plus exister')
@@ -59,7 +56,7 @@ try {
   await page.getByRole('button', { name: 'Vélo d’appartement', exact: true }).waitFor()
   await page.getByRole('button', { name: 'HIIT — Cardio express', exact: true }).waitFor()
   await page.screenshot({ path: 'screenshots/24-alternance-partenaire.png' })
-  await saveFiche(page)
+  await page.click('text=Enregistrer')
   await page.waitForSelector('text=en alternance avec HIIT')
 
   // --- Données : vélo propriétaire de [Vélo | HIIT], membre nettoyé
@@ -79,10 +76,9 @@ try {
 
   // --- Côté membre : la fiche du HIIT montre la pastille Vélo, la re-sauvegarde préserve le cycle
   await openForm('HIIT — Cardio express')
-  await openQuand(page)
   await page.waitForSelector(`${altRow}:has-text("Vélo d’appartement")`)
   await page.screenshot({ path: 'screenshots/20-alternance-bidirectionnelle.png' })
-  await saveFiche(page)
+  await page.click('text=Enregistrer')
   await page.waitForSelector('text=Mes programmes')
   const velo2 = await sessionByName('appartement')
   if (stepsOf(velo2) !== expected) throw new Error(`Après sauvegarde du HIIT, la rotation devrait être intacte, trouvé : ${stepsOf(velo2)}`)
@@ -107,11 +103,10 @@ try {
   if ((await page.locator('main p:text-is("HIIT — Cardio express")').count()) > 0) throw new Error("Le HIIT ne devrait pas être planifié aujourd'hui (cycle complexe)")
   await page.screenshot({ path: 'screenshots/25-deux-seances-meme-jour.png' })
   await openForm('Muscu — Full body')
-  await openQuand(page)
   await page.waitForSelector(`${altRow}:has-text("Vélo d’appartement + Muscu — Full body → HIIT — Cardio express")`)
   if ((await page.locator('select[aria-label="En alternance avec"]').count()) > 0) throw new Error('Un cycle complexe ne doit pas proposer le sélecteur, seulement le texte et la croix')
   await page.screenshot({ path: 'screenshots/26-cycle-complexe-lu.png' })
-  await saveFiche(page)
+  await page.click('text=Enregistrer')
   await page.waitForSelector('text=Mes programmes')
   const velo3 = await sessionByName('appartement')
   const expectedComplex = `${velo.id},${full.id}|${hiit.id}`
@@ -136,7 +131,7 @@ try {
   if ((await page.locator('main p:text-is("HIIT — Cardio express")').count()) > 0) throw new Error("Le HIIT ne devrait pas être planifié aujourd'hui (doublon du cycle corrompu)")
   // À l'écriture : re-sauver le vélo répare les données (le repeat parasite disparaît)
   await openForm('Vélo d’appartement')
-  await saveFiche(page)
+  await page.click('text=Enregistrer')
   await page.waitForSelector('text=Mes programmes')
   const hiit3 = await sessionByName('HIIT')
   if (hiit3.repeat) throw new Error('La re-sauvegarde du vélo devrait retirer le repeat parasite du HIIT')
