@@ -32,6 +32,8 @@ const fail = (m) => {
 }
 
 try {
+  // Date figée pendant le plan semi (fini le 04/10/2026) : ses séances donnent les jours à 2 cartes
+  await page.clock.setFixedTime(new Date('2026-09-30T12:00:00'))
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
   // Cherche, dans les 14 prochains jours, un jour à au moins 2 cartes

@@ -49,6 +49,9 @@ try {
     { width: 1400, height: 900, tag: 'desk' },
   ]) {
     const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } })
+    // Date figée pendant le plan semi (fini le 04/10/2026) : sans la section Running du plan,
+    // la démo n'a qu'une section et le Planning n'affiche aucune poignée de section
+    await page.clock.setFixedTime(new Date('2026-09-30T12:00:00'))
     await page.goto(BASE)
     await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
     await probe(page, `today-${vp.tag}`, '[aria-label^="Déplacer "]')
