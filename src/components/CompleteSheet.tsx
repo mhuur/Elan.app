@@ -9,7 +9,6 @@ import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { muscuBlocks } from '../lib/blocks'
 import { buildTimeline, collectSets, stopPoint, type SetStatus } from '../lib/timeline'
 import { progressedSession } from '../lib/progression'
-import { veloSeanceOn } from '../data/planVelo'
 import { CategoryIcon, Eyebrow, Field, GhostButton, iconSquare, NumInput, PrimaryButton, Sheet, TextArea } from './ui'
 import FeelingPicker from './FeelingPicker'
 import ResultTimeline from './ResultTimeline'
@@ -265,20 +264,7 @@ function Inner({
     [planned, exercises, logs, logDate],
   )
 
-  // Jour de plan vélo : la durée et la résistance cibles viennent du plan (progression
-  // semaine par semaine), pas des cibles fixes de la fiche — même esprit que progressedSession
-  const veloPlanSeance = session.category === 'velo' ? veloSeanceOn(logDate) : undefined
-  const metrics = useMemo(() => {
-    const base = effectiveMetrics(session)
-    if (!veloPlanSeance) return base
-    return base.map((m) =>
-      m.key === 'duration'
-        ? { ...m, target: veloPlanSeance.durationMin }
-        : m.key === 'power'
-          ? { ...m, target: veloPlanSeance.resistance }
-          : m,
-    )
-  }, [session, veloPlanSeance])
+  const metrics = useMemo(() => effectiveMetrics(session), [session])
   const links = session.links ?? []
   const isMuscu = session.category === 'muscu'
   const isHiit = session.category === 'hiit'
