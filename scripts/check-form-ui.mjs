@@ -92,6 +92,10 @@ try {
   await page.waitForSelector('text=Planification')
   await page.waitForSelector('[title="Tours du circuit"]')
   await page.locator('button:has-text("nouveau bloc")').click()
+  // Nouveau bloc (oct. 2026) : ouvre la banque, l'exercice choisi démarre le bloc suivant
+  await page.waitForSelector('[role="dialog"] >> text=Exercice du nouveau bloc')
+  await page.locator('[role="dialog"] button:has-text("Gainage")').first().click()
+  await page.click('text=Terminé')
   await page.waitForSelector('text=Bloc 2')
   await page.click('text=Enregistrer')
   await page.waitForSelector('text=Mes programmes')

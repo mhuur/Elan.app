@@ -362,6 +362,13 @@ export default function SessionForm() {
   const [optionsOpen, setOptionsOpen] = useState(false)
   // Sur desktop, « + Ajouter un exercice » envoie le focus dans la recherche du volet
   const searchRef = useRef<HTMLInputElement | null>(null)
+  // « Nouveau bloc » : le prochain exercice ajouté ouvre un bloc (réf. pour les ajouts en rafale)
+  const [newBlockPending, setNewBlockPending] = useState(false)
+  const newBlockRef = useRef(false)
+  const armNewBlock = (on: boolean) => {
+    newBlockRef.current = on
+    setNewBlockPending(on)
+  }
 
   // Sections déjà utilisées dans le planning, proposées dans la combobox
   const groupSuggestions = [...new Set(sessions.map((s) => (s.group ?? '').trim()).filter(Boolean))].sort((a, b) =>
@@ -454,7 +461,9 @@ export default function SessionForm() {
    */
   const appendItem = (exId: string, measure?: Measure, stretch?: boolean) => {
     const ex = exOf(exId)
-    setItems((p) => [...p, { exerciseId: exId, uid: newUid(), ...itemDefaults(category, measure ?? ex?.measure, stretch ?? isStretch(ex)) }])
+    const brk: Partial<SessionItem> = newBlockRef.current ? { blockBreak: true, blockRounds: 1 } : {}
+    if (newBlockRef.current) armNewBlock(false)
+    setItems((p) => [...p, { exerciseId: exId, uid: newUid(), ...itemDefaults(category, measure ?? ex?.measure, stretch ?? isStretch(ex)), ...brk }])
   }
 
   /** Crée un exercice à la volée (mini-ligne du sélecteur) et l'ajoute */
@@ -1241,17 +1250,22 @@ export default function SessionForm() {
                   >
                     <Plus className="h-3.5 w-3.5" /> Ajouter un exercice
                   </button>
-                  {/* Un seul point de découpe, en bas : le dernier exercice démarre le nouveau bloc,
-                      le drag & drop fait le reste (remplace les pilules entre chaque paire d'exercices) */}
-                  {canBlocks && items.length >= 2 && !items[items.length - 1].blockBreak && (
+                  {/* Nouveau bloc (oct. 2026) : toujours visible, ouvre la banque ; l'exercice choisi
+                      démarre le bloc suivant. Un second clic annule tant que rien n'est ajouté. */}
+                  {canBlocks && items.length >= 1 && (
                     <button
                       type="button"
-                      title="Le dernier exercice démarre un nouveau bloc — glisses-y les autres"
+                      aria-pressed={newBlockPending}
+                      title={newBlockPending ? 'Annuler : le prochain exercice reste dans le dernier bloc' : "Choisir l'exercice qui démarre un nouveau bloc"}
                       onClick={() => {
-                        const last = items.length - 1
-                        setItem(last, { blockBreak: true, blockRounds: items[last].blockRounds ?? 1 })
+                        if (newBlockPending) return armNewBlock(false)
+                        armNewBlock(true)
+                        addFromList()
                       }}
-                      className="ml-auto flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-ink/60 active:text-ink"
+                      className={
+                        'ml-auto flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase ' +
+                        (newBlockPending ? 'text-muscu' : 'text-ink/60 active:text-ink')
+                      }
                     >
                       <LayoutGrid className="h-3.5 w-3.5" /> nouveau bloc
                     </button>
@@ -1552,8 +1566,11 @@ export default function SessionForm() {
 
       <Sheet
         open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        title="Ajouter des exercices"
+        onClose={() => {
+          setPickerOpen(false)
+          armNewBlock(false)
+        }}
+        title={newBlockPending ? 'Exercice du nouveau bloc' : 'Ajouter des exercices'}
       >
         {/* Hauteur bornée : la recherche reste en tête, seule la liste défile */}
         <div className="flex max-h-[62dvh] min-h-[45dvh] flex-col">
@@ -1566,7 +1583,10 @@ export default function SessionForm() {
         </div>
         <button
           type="button"
-          onClick={() => setPickerOpen(false)}
+          onClick={() => {
+            setPickerOpen(false)
+            armNewBlock(false)
+          }}
           className="mt-4 w-full rounded-sm bg-sage-500 py-3 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-onaccent"
         >
           Terminé

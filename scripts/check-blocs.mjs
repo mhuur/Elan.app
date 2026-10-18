@@ -17,13 +17,17 @@ try {
   await page.goto(BASE)
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
-  // --- Découper Full body : le bouton unique du bas isole le dernier exercice en bloc 2 × 2 tours
+  // --- Full body : « nouveau bloc » ajoute un exercice qui ouvre le bloc 2, réglé à 2 tours
   await page.getByRole('link', { name: 'Exercices', exact: true }).click()
   await page.waitForSelector('text=Mes programmes')
   await page.click('p:has-text("Muscu — Full body")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
   await page.locator('button:has-text("nouveau bloc")').click()
+  // Nouveau bloc (oct. 2026) : ouvre la banque, l'exercice choisi démarre le bloc suivant
+  await page.waitForSelector('[role="dialog"] >> text=Exercice du nouveau bloc')
+  await page.locator('[role="dialog"] button:has-text("Gainage")').first().click()
+  await page.click('text=Terminé')
   await page.waitForSelector('text=Bloc 2')
   await page.waitForSelector('text=Bloc 1')
   // Le bloc 2 fait 2 tours (saisie directe dans le stepper du séparateur)
@@ -32,7 +36,7 @@ try {
   await page.click('text=Enregistrer')
   await page.waitForSelector('text=Mes programmes')
 
-  // --- Données : flags posés sur le dernier exercice (Pont fessier, 5e du seed)
+  // --- Données : flags posés sur le dernier exercice (Gainage ajouté par « nouveau bloc »)
   const d = await page.evaluate(() => JSON.parse(localStorage.getItem('elan-data-v1')))
   const full = d.sessions.find((s) => s.name.includes('Full body'))
   const lastIt = full.items[full.items.length - 1]
