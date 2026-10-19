@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Check, ChevronRight, ChevronUp, Lightbulb, Pause, Play, SkipForward, Square, TriangleAlert, X } from 'lucide-react'
+import { Check, ListOrdered, Minus, Pause, Play, Plus, SkipForward, Square, TriangleAlert, X } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, displayCategory, setTargetsOf, type Category, type Exercise, type Session, type SessionItem } from '../types'
+import { CATEGORY_META, displayCategory, setTargetsOf, type Exercise, type Session, type SessionItem } from '../types'
 import { todayStr } from '../lib/dates'
 import { mmss } from '../lib/format'
 import { muscuBlocks } from '../lib/blocks'
 import { progressedSession } from '../lib/progression'
 import { tone as playTone } from '../lib/audio'
-import { CategoryIcon } from '../components/ui'
+import { CategoryRing } from '../components/ui'
 
 interface Step {
   type: 'prep' | 'work' | 'rest'
@@ -168,61 +168,56 @@ function itemLabel(session: Session, it: SessionItem, ex?: Exercise): string {
 }
 
 /**
- * Accents par catégorie de l'écran immersif. Depuis la charte bord de mer, les couleurs
- * de catégorie de l'app sont elles-mêmes claires : plus besoin d'une seconde palette
- * éclaircie, on lit directement les tokens partagés.
+ * Minuteur, charte 21KM (planche Minuteur) : lu posé au sol à 1–2 m. Fond Effort
+ * pendant un exercice, Repos (bleu-vert profond) pendant la récupération, Pause gris ;
+ * anneau Volt à l'effort, turquoise au repos, gris en pause.
  */
-const ACCENT: Record<Category, string> = {
-  running: CATEGORY_META.running.hex,
-  velo: CATEGORY_META.velo.hex,
-  muscu: CATEGORY_META.muscu.hex,
-  hiit: CATEGORY_META.hiit.hex,
-  etirements: CATEGORY_META.etirements.hex,
-}
-/** Repos et préparation : le lagon de l'app, apaisé (miroir de `--color-sage-600`) */
-const CALM = '#a3dcee'
+const VOLT = '#C5F23A'
+const CALM = '#5ED3C4'
+const TRACK = '#2A2F37'
 
-/** Anneau de progression : piste discrète + arc accent qui se vide avec le temps restant */
+/** Anneau de progression : piste + arc qui se vide avec le temps restant */
 function Ring({
   progress,
   accent,
-  size,
-  pulse,
+  track = TRACK,
   children,
 }: {
   /** Fraction restante (0..1), ou null pour une étape sans chrono (piste seule) */
   progress: number | null
   accent: string
-  size: number
-  pulse?: boolean
+  track?: string
   children: ReactNode
 }) {
-  const stroke = 10
-  const r = (size - stroke) / 2
-  const c = 2 * Math.PI * r
+  const c = 2 * Math.PI * 45
   return (
-    <div className={`relative ${pulse ? 'animate-pulse' : ''}`} style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#ffffff" strokeOpacity={0.08} strokeWidth={stroke} />
+    <div className="relative h-[272px] w-[272px] shrink-0 lg:h-[340px] lg:w-[340px]">
+      <svg viewBox="0 0 100 100" className="h-full w-full" aria-hidden="true">
+        <circle cx="50" cy="50" r="45" fill="none" stroke={track} strokeWidth="4" />
         {progress != null && (
           <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
+            cx="50"
+            cy="50"
+            r="45"
             fill="none"
             stroke={accent}
-            strokeWidth={stroke}
+            strokeWidth="4"
             strokeLinecap="round"
             strokeDasharray={c}
             strokeDashoffset={c * (1 - progress)}
+            transform="rotate(-90 50 50)"
             className="transition-[stroke-dashoffset] duration-150 ease-linear"
           />
         )}
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">{children}</div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">{children}</div>
     </div>
   )
 }
+
+/** Bouton XL du minuteur (« Série faite », « Reprendre ») : 88 px, Volt */
+const xlBtn =
+  'flex h-[88px] w-full max-w-[358px] shrink-0 items-center justify-center gap-3 rounded-full bg-sage-500 text-[26px] font-extrabold text-ink active:scale-[0.97] active:bg-sage-600 lg:h-24 lg:max-w-[520px] lg:text-[30px]'
 
 export default function Player() {
   const { id } = useParams()
@@ -453,7 +448,7 @@ export default function Player() {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-8 text-center">
         <p className="font-bold text-ink-soft">Séance introuvable.</p>
-        <button type="button" className="font-extrabold text-sage-600" onClick={() => navigate('/')}>
+        <button type="button" className="font-extrabold text-sage-700" onClick={() => navigate('/')}>
           ← Retour
         </button>
       </div>
@@ -470,8 +465,6 @@ export default function Player() {
   const curBlock = posStep?.block ?? 0
   const curRound = posStep?.round ?? 0
   const curItem = posStep?.item ?? 0
-  const elapsedSteps = steps.slice(0, stepIdx).reduce((a, s) => a + s.sec, 0)
-  const progress = totalSec ? Math.min(1, (elapsedSteps + (step ? step.sec - remaining : 0)) / totalSec) : 0
 
   const start = () => {
     audioRef.current = audioRef.current ?? new AudioContext()
@@ -528,312 +521,355 @@ export default function Player() {
 
   if (phase === 'ready') {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-abysse px-8 text-center text-white">
-        <div
-          className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white/10"
-          style={{ color: ACCENT[shownCat] }}
-        >
-          <CategoryIcon category={shownCat} className="h-10 w-10" />
-        </div>
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-abysse px-6 text-center text-white">
+        <CategoryRing category={shownCat} size={72} done />
         <div>
-          <h1 className=" text-3xl leading-none font-extrabold ">{session.name}</h1>
-          <p className="mt-1 text-sm font-semibold text-white/50">
-            {steps.filter((s) => s.type === 'work').length}{' '}
-            {session.category === 'muscu' ? 'séries' : 'exercices'} · ~{Math.max(1, Math.round(totalSec / 60))} min
+          <h1 className="text-[34px] leading-10 font-extrabold lg:text-5xl">{session.name}</h1>
+          <p className="mt-1 text-[17px] text-night-soft tabular-nums">
+            {meta.label} · {workCount} {session.category === 'muscu' ? 'séries' : 'exercices'} · {Math.max(1, Math.round(totalSec / 60))} min
           </p>
         </div>
-        <button
-          type="button"
-          onClick={start}
-          className="rounded-sm bg-ink px-10 py-5 text-2xl leading-none font-bold text-abysse shadow-lg shadow-black/40 active:bg-ink/90"
-        >
+        <button type="button" onClick={start} className={xlBtn}>
+          <Play className="h-8 w-8" fill="currentColor" />
           C'est parti !
         </button>
-        <button type="button" onClick={() => navigate(-1)} className="tabular-nums text-[13px] text-white/50">
-          ← Annuler
+        <button type="button" onClick={() => navigate(-1)} className="min-h-11 px-4 text-[17px] font-semibold text-night-soft">
+          Annuler
         </button>
       </div>
     )
   }
 
   if (phase === 'done') {
+    const setsDone = Object.values(doneRef.current).reduce((a, s) => a + s.length, 0)
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-abysse px-8 text-center text-white">
-        <div className="text-6xl">🎉</div>
-        <div>
-          <h1 className=" text-3xl leading-none font-extrabold ">Bravo !</h1>
-          <p className="mt-1 text-sm font-semibold text-white/50">
-            « {session.name} » terminée et enregistrée.
-          </p>
+      <div className="flex min-h-dvh flex-col bg-abysse px-4 pt-10 pb-8 text-white lg:items-center lg:px-12">
+        <div className="flex w-full max-w-[640px] flex-col gap-4">
+          <div>
+            <h1 className="text-5xl leading-[1.05] font-extrabold lg:text-[64px]">Bravo</h1>
+            <p className="mt-1.5 text-[17px] leading-6 text-night-soft">{session.name} terminée et enregistrée</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-0.5 rounded-sm bg-night p-3">
+              <span className="text-[13px] leading-[18px] font-medium text-night-soft">Séries</span>
+              <span className="text-2xl leading-[30px] font-extrabold tabular-nums">
+                {setsDone}/{workCount}
+              </span>
+            </div>
+            <div className="flex flex-col gap-0.5 rounded-sm bg-night p-3">
+              <span className="text-[13px] leading-[18px] font-medium text-night-soft">Durée prévue</span>
+              <span className="text-2xl leading-[30px] font-extrabold tabular-nums">{mmss(totalSec)}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/', { replace: true })}
+            className="mt-2 h-[52px] rounded-full bg-sage-500 text-[17px] font-bold text-ink active:bg-sage-600"
+          >
+            Retour à ma journée
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate('/', { replace: true })}
-          className="rounded-sm bg-ink px-10 py-4 text-xl leading-none font-bold text-abysse shadow-lg shadow-black/40"
-        >
-          Retour à ma journée
-        </button>
       </div>
     )
   }
 
-  // Mode immersif sombre : accent lumineux par catégorie, repos sur une teinte apaisée
-  const accent = step.type === 'work' ? ACCENT[shownCat] : CALM
-  const bgByType = step.type === 'work' ? 'bg-abysse' : 'bg-[#08202e]'
+  // Fond par phase (planche Main, « Minuteur, fond sombre ») et couleur de l'anneau
+  const resting = step.type !== 'work'
+  const bg = paused ? 'bg-pause' : resting ? 'bg-repos' : 'bg-abysse'
+  const accent = paused ? '#8A919C' : step.type === 'rest' ? CALM : step.type === 'prep' ? '#FFFFFF' : VOLT
+  const track = step.type === 'rest' && !paused ? 'rgba(255,255,255,0.18)' : TRACK
+  const workSteps = steps.filter((s) => s.type === 'work')
+
+  /** Liste du programme : blocs, tours, exercices (volet sur téléphone, colonne sur bureau) */
+  const programList = (
+    <ol className="flex flex-col gap-2 px-5 pb-5">
+      {panelBlocks.map((b, bi) => {
+        const bState = bi < curBlock ? 'done' : bi === curBlock ? 'current' : 'todo'
+        const head = [
+          panelBlocks.length > 1 ? `Bloc ${bi + 1}` : '',
+          b.rounds > 1 ? (bState === 'current' ? `Tour ${curRound + 1} sur ${b.rounds}` : `${b.rounds} tours`) : '',
+        ]
+          .filter(Boolean)
+          .join(' · ')
+        return (
+          <li key={bi} className="flex flex-col gap-2">
+            {head && <p className={`mt-1 text-sm font-semibold ${bState === 'done' ? 'text-ink-soft' : 'text-night-soft'}`}>{head}</p>}
+            <ul className="flex flex-col gap-2">
+              {b.items.map((it, ii) => {
+                const ex = exercises.find((e) => e.id === it.exerciseId)
+                const st = bState !== 'current' ? bState : ii < curItem ? 'done' : ii === curItem ? 'current' : 'todo'
+                const recorded = doneRef.current[it.exerciseId]?.length ?? 0
+                const exFlagged =
+                  recorded > 0 && (doneRef.current[it.exerciseId] ?? []).some((_, i) => flagged.has(`${it.exerciseId}:${i}`))
+                return (
+                  <li key={ii} ref={st === 'current' ? curRowRef : undefined}>
+                    {/* Tap sur une ligne déjà travaillée = basculer « mal réalisé » */}
+                    <button
+                      type="button"
+                      onClick={() => toggleFlagAll(it.exerciseId)}
+                      className={
+                        'flex w-full flex-col gap-1 rounded-sm px-3.5 py-3 text-left ' +
+                        (st === 'current' ? 'bg-night-line' : 'ring-1 ring-night-line ring-inset')
+                      }
+                    >
+                      <span className="flex items-baseline gap-3">
+                        <span className={`min-w-0 flex-1 text-[17px] leading-[22px] font-bold ${st === 'done' ? 'text-night-soft' : ''}`}>
+                          {ex?.name ?? 'Exercice'}
+                        </span>
+                        <span className={`shrink-0 text-[15px] font-semibold tabular-nums ${st === 'done' ? 'text-night-soft' : ''}`}>
+                          {itemLabel(session, it, ex)}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-2 text-sm text-night-soft">
+                        {exFlagged ? (
+                          <TriangleAlert className="h-4 w-4 text-amber-300" />
+                        ) : st === 'done' ? (
+                          <Check className="h-4 w-4" style={{ color: VOLT }} />
+                        ) : null}
+                        {exFlagged ? 'mal réalisé' : st === 'done' ? 'fait' : st === 'current' ? 'en cours' : 'à venir'}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </li>
+        )
+      })}
+    </ol>
+  )
+
+  const ctrlBtn = 'flex h-16 w-16 items-center justify-center rounded-full bg-night active:scale-95 active:bg-night-line lg:h-[76px] lg:w-[76px]'
 
   return (
-    <div className={`relative flex min-h-dvh flex-col ${bgByType} text-white transition-colors duration-700`}>
-      <header className="flex items-center justify-between px-5 pt-6">
-        <button type="button" onClick={quit} aria-label="Quitter" className="rounded-full bg-white/10 p-2.5 active:bg-white/20">
-          <X className="h-5 w-5" />
-        </button>
-        <div className="text-right">
-          <p className=" text-xl leading-none font-bold ">
-            {workIdx + 1}/{workCount}
-          </p>
-          <p className="mt-1 tabular-nums text-[13px] text-white/50">
-            ~{Math.max(1, Math.ceil(remainTotalSec / 60))} min restantes
-          </p>
-        </div>
-      </header>
-
-      {/* Progression globale de la séance */}
-      <div className="mx-5 mt-4 h-1 overflow-hidden rounded-full bg-white/10">
-        <div className="h-full rounded-full transition-all" style={{ width: `${progress * 100}%`, backgroundColor: accent }} />
-      </div>
-
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-        <p
-          className="tabular-nums text-[13px]  "
-          style={{ color: paused ? 'rgba(255,255,255,0.5)' : accent }}
-        >
-          — {paused ? 'En pause' : step.type === 'work' ? meta.label : step.type === 'rest' ? 'Récupération' : 'Préparation'}
-        </p>
-        <h1 className=" text-[46px] leading-[0.9] font-extrabold ">{step.label}</h1>
-        {step.detail && <p className="tabular-nums text-[13px] text-white/60">{step.detail}</p>}
-        {step.comment && (
-          <p className="flex items-center gap-1.5 text-sm font-semibold text-white/60">
-            <Lightbulb className="h-3.5 w-3.5 shrink-0" /> {step.comment}
-          </p>
-        )}
-        {stepExercise?.videoUrl && (
-          <a
-            href={stepExercise.videoUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-sm font-extrabold text-white/80 active:bg-white/20"
+    <div className={`relative flex min-h-dvh text-white transition-colors duration-700 ${bg}`}>
+      <div className="flex min-h-dvh min-w-0 flex-1 flex-col gap-3 px-4 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] lg:gap-3.5 lg:px-12 lg:pt-7 lg:pb-8">
+        <header className="flex items-center gap-3">
+          <button type="button" onClick={quit} aria-label="Quitter" className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-night active:bg-night-line">
+            <X className="h-[22px] w-[22px]" />
+          </button>
+          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-3">
+            <span className="text-2xl leading-[1.1] font-extrabold tabular-nums lg:text-[30px]">
+              {workIdx + 1}/{workCount}
+            </span>
+            <span className="text-[17px] text-night-soft tabular-nums lg:text-xl">reste {mmss(remainTotalSec)}</span>
+          </div>
+          <button
+            type="button"
+            aria-label="Programme"
+            onClick={() => setDrawerOpen((o) => !o)}
+            className="inline-flex h-[52px] shrink-0 items-center gap-2 rounded-full bg-night pr-[18px] pl-3.5 text-base font-bold active:bg-night-line lg:hidden"
           >
-            <Play className="h-3.5 w-3.5" /> démo
-          </a>
-        )}
-        {step.manual ? (
-          <>
-            <div className="my-2 flex items-center gap-3">
-              <button
-                type="button"
-                aria-label="Une répétition de moins"
-                onClick={() => setActualReps((v) => Math.max(0, v - 1))}
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-3xl font-extrabold text-white/80 active:bg-white/20"
-              >
-                −
-              </button>
-              <Ring progress={null} accent={accent} size={196}>
-                <p className=" text-7xl leading-none font-extrabold tabular-nums">{actualReps}</p>
-                <p className="tabular-nums text-[13px] text-white/50">
-                  répétitions
-                  {actualReps !== (step.reps ?? 0) && <span className="text-white/35"> · objectif {step.reps}</span>}
-                </p>
-              </Ring>
-              <button
-                type="button"
-                aria-label="Une répétition de plus"
-                onClick={() => setActualReps((v) => v + 1)}
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-3xl font-extrabold text-white/80 active:bg-white/20"
-              >
-                +
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                recordSet(step.exerciseId, actualReps)
-                tone(520, 0.2)
-                goTo(stepIdx + 1)
-              }}
-              className="rounded-sm bg-ink px-10 py-4 text-2xl leading-none font-bold text-abysse shadow-lg shadow-black/30 active:bg-ink/90"
-            >
-              {session.category === 'muscu' ? 'Série faite ✓' : 'Fait ✓'}
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="my-2">
-              <Ring progress={frac} accent={accent} size={236} pulse={paused}>
-                <p
-                  className={` text-7xl leading-none font-extrabold tabular-nums transition-opacity ${paused ? 'opacity-40' : ''}`}
-                >
-                  {mmss(remaining)}
-                </p>
-              </Ring>
-            </div>
-            {step.type !== 'work' && next && (
-              <div className="rounded-2xl bg-white/5 px-5 py-3">
-                <p className="tabular-nums text-[13px] text-white/40">
-                  {next.manual ? 'Prochaine série' : 'Ensuite'}
-                </p>
-                <p className="mt-0.5 text-xl leading-none font-bold ">
-                  {next.label}
-                  {next.detail ? <span className="font-bold text-white/50"> · {next.detail}</span> : null}
-                </p>
-                <p className="tabular-nums text-[13px] text-white/50">
-                  {next.manual ? `objectif ${next.reps} reps` : `${next.sec} s`}
-                </p>
-              </div>
-            )}
-            {/* Juste après l'effort : marquer la série qu'on vient de finir comme mal réalisée */}
-            {step.type === 'rest' && lastSet && (
-              <button
-                type="button"
-                onClick={() => toggleFlag(lastSet.exId, lastSet.idx)}
-                className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-extrabold transition-colors ${
-                  lastSetFlagged ? 'bg-amber-400/15 text-amber-300' : 'bg-white/5 text-white/40 active:bg-white/10'
-                }`}
-              >
-                <TriangleAlert className="h-3.5 w-3.5" />
-                {lastSetFlagged ? 'Mal réalisée — annuler' : 'Série ratée ?'}
-              </button>
-            )}
-          </>
-        )}
-      </main>
+            <ListOrdered className="h-[22px] w-[22px]" />
+            Programme
+          </button>
+        </header>
 
-      <footer className="px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2">
-        <div className="mb-3 flex items-center justify-center gap-4">
+        {/* Une barre par série : faites en Volt, en cours en blanc */}
+        <div aria-hidden="true" className="flex gap-[3px]">
+          {workSteps.map((_, i) => (
+            <span
+              key={i}
+              className="h-1.5 flex-1 rounded-full"
+              style={{ backgroundColor: i < workIdx + (step.type === 'work' ? 0 : 1) ? VOLT : i === workIdx && step.type === 'work' ? '#FFFFFF' : track }}
+            />
+          ))}
+        </div>
+        <p className="text-[15px] leading-[1.35] text-night-soft lg:text-lg">
+          {meta.label} · {session.name}
+          {drawerTitle !== 'Programme' ? ` · ${drawerTitle.toLowerCase()}` : ''}
+        </p>
+
+        <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 text-center">
+          {paused ? (
+            <p className="text-[34px] leading-[1.15] font-extrabold lg:text-5xl">En pause</p>
+          ) : step.type === 'rest' ? (
+            <p className="text-[34px] leading-[1.15] font-extrabold lg:text-5xl" style={{ color: CALM }}>
+              {step.label}
+            </p>
+          ) : step.type === 'prep' ? (
+            <p className="text-[34px] leading-[1.15] font-extrabold lg:text-5xl">Préparez-vous…</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <h1 className="text-[34px] leading-[1.15] font-extrabold lg:text-5xl">{step.label}</h1>
+              {step.detail && <p className="text-[19px] leading-[1.3] text-night-soft tabular-nums lg:text-2xl">{step.detail}</p>}
+            </div>
+          )}
+
+          {step.manual ? (
+            <>
+              <div className="flex items-center justify-center gap-2 lg:gap-8">
+                <button
+                  type="button"
+                  aria-label="Une répétition de moins"
+                  onClick={() => setActualReps((v) => Math.max(0, v - 1))}
+                  className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-night active:bg-night-line lg:h-24 lg:w-24"
+                >
+                  <Minus className="h-9 w-9" strokeWidth={2.5} />
+                </button>
+                <span className="min-w-[170px] text-center text-[160px] leading-none font-extrabold tracking-[-0.03em] tabular-nums lg:min-w-[300px] lg:text-[240px]">
+                  {actualReps}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Une répétition de plus"
+                  onClick={() => setActualReps((v) => v + 1)}
+                  className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-night active:bg-night-line lg:h-24 lg:w-24"
+                >
+                  <Plus className="h-9 w-9" strokeWidth={2.5} />
+                </button>
+              </div>
+              <p className="text-[19px] text-night-soft tabular-nums lg:text-2xl">
+                répétitions{actualReps !== (step.reps ?? 0) ? ` · objectif ${step.reps}` : ''}
+              </p>
+              {step.comment && <p className="max-w-[640px] text-[21px] leading-[1.3] font-medium lg:text-[30px]">{step.comment}</p>}
+              <button
+                type="button"
+                onClick={() => {
+                  recordSet(step.exerciseId, actualReps)
+                  tone(520, 0.2)
+                  goTo(stepIdx + 1)
+                }}
+                className={xlBtn}
+              >
+                {session.category === 'muscu' ? 'Série faite ✓' : 'Fait ✓'}
+              </button>
+            </>
+          ) : (
+            <>
+              <Ring progress={frac} accent={accent} track={track}>
+                <span
+                  className={
+                    'leading-none font-extrabold tracking-[-0.03em] tabular-nums ' +
+                    (step.type === 'prep' ? 'text-[150px] lg:text-[200px] ' : 'text-[88px] lg:text-[116px] ') +
+                    (paused ? 'text-night-soft' : '')
+                  }
+                >
+                  {step.type === 'prep' ? remaining : mmss(remaining)}
+                </span>
+                {step.type !== 'prep' && <span className="text-[15px] text-night-soft tabular-nums lg:text-lg">sur {mmss(step.sec)}</span>}
+              </Ring>
+              {step.type === 'work' && step.comment && !paused && (
+                <p className="max-w-[640px] text-[21px] leading-[1.3] font-medium lg:text-[30px]">{step.comment}</p>
+              )}
+              {paused && (
+                <button type="button" onClick={() => setPaused(false)} className={xlBtn}>
+                  <Play className="h-[30px] w-[30px]" fill="currentColor" />
+                  Reprendre
+                </button>
+              )}
+              {!paused && step.type !== 'work' && next && (
+                <div className="text-center">
+                  <p className="text-[15px] text-night-soft lg:text-lg">{step.type === 'prep' ? 'Premier exercice' : 'Ensuite'}</p>
+                  <p className="text-xl leading-[1.25] font-bold lg:text-[28px]">
+                    {next.label}
+                    {next.manual ? ` · ${next.reps} répétitions` : ` · ${next.sec} s`}
+                  </p>
+                </div>
+              )}
+              {/* Juste après l'effort : marquer la série qu'on vient de finir comme mal réalisée */}
+              {!paused && step.type === 'rest' && lastSet && (
+                <button
+                  type="button"
+                  onClick={() => toggleFlag(lastSet.exId, lastSet.idx)}
+                  className={
+                    'inline-flex h-11 items-center gap-2 rounded-full px-4 text-[15px] font-bold ' +
+                    (lastSetFlagged ? 'bg-amber-300/15 text-amber-300' : 'text-white ring-[1.5px] ring-white/40 ring-inset')
+                  }
+                >
+                  <TriangleAlert className="h-4 w-4" />
+                  {lastSetFlagged ? 'Mal réalisée — annuler' : 'Série ratée ?'}
+                </button>
+              )}
+            </>
+          )}
+          {stepExercise?.videoUrl && !paused && (
+            <a
+              href={stepExercise.videoUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-night px-4 text-[15px] font-bold active:bg-night-line"
+            >
+              <Play className="h-4 w-4" /> Vidéo
+            </a>
+          )}
+        </main>
+
+        <div className="flex justify-center gap-7 lg:gap-10">
           <button
             type="button"
             aria-label="Arrêter et enregistrer"
             title="Arrêter la séance ici (le réalisé est enregistré)"
             onClick={stopAndSave}
-            className="flex h-13 w-13 items-center justify-center rounded-full bg-white/10 text-hiit active:bg-white/20"
+            className="flex flex-col items-center gap-1.5 text-[15px] font-semibold"
           >
-            <Square className="h-5 w-5" fill="currentColor" />
+            <span className={ctrlBtn}>
+              <Square className="h-7 w-7" strokeWidth={2.2} />
+            </span>
+            Arrêter
           </button>
           <button
             type="button"
             aria-label={paused ? 'Reprendre' : 'Pause'}
             title={paused ? 'Reprendre (espace)' : 'Mettre en pause (espace)'}
             onClick={() => setPaused((p) => !p)}
-            className="flex h-16 w-16 items-center justify-center rounded-full bg-ink text-abysse shadow-lg shadow-black/40 active:bg-ink/90"
+            className="flex flex-col items-center gap-1.5 text-[15px] font-semibold"
           >
-            {paused ? <Play className="h-7 w-7" /> : <Pause className="h-7 w-7" />}
+            <span className={ctrlBtn}>{paused ? <Play className="h-7 w-7" fill="currentColor" /> : <Pause className="h-7 w-7" strokeWidth={2.2} />}</span>
+            {paused ? 'Reprendre' : 'Pause'}
           </button>
           <button
             type="button"
             aria-label="Passer"
             title="Passer cette étape"
             onClick={skip}
-            className="flex h-13 w-13 items-center justify-center rounded-full bg-white/10 text-white/80 active:bg-white/20"
+            className="flex flex-col items-center gap-1.5 text-[15px] font-semibold"
           >
-            <SkipForward className="h-5 w-5" />
+            <span className={ctrlBtn}>
+              <SkipForward className="h-7 w-7" strokeWidth={2.2} />
+            </span>
+            Passer
           </button>
         </div>
+      </div>
 
-        {/* Tiroir programme : résumé permanent (bloc · tour · suivant), liste complète au tap */}
-        <section className="rounded-3xl bg-white/5 ring-1 ring-white/10">
-          <button
-            type="button"
-            aria-label="Programme"
-            onClick={() => setDrawerOpen((o) => !o)}
-            className="flex w-full items-center gap-2.5 px-5 py-3.5 text-left"
-          >
-            <ChevronUp
-              className={`h-4 w-4 shrink-0 text-white/40 transition-transform duration-300 ${drawerOpen ? 'rotate-180' : ''}`}
-            />
-            <span className="shrink-0 text-lg leading-none font-bold ">{drawerTitle}</span>
-            <span className="ml-auto min-w-0 truncate pl-3 tabular-nums text-[13px] text-white/40">
-              {next ? `Ensuite : ${next.label}` : 'Dernier effort'}
-            </span>
-          </button>
-          <div
-            className={`grid transition-[grid-template-rows] duration-300 ease-out ${drawerOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
-          >
-            <div className="overflow-hidden">
-              <aside className="max-h-[42dvh] overflow-y-auto px-5 pb-4">
-                {panelBlocks.map((b, bi) => {
-                  const bState = bi < curBlock ? 'done' : bi === curBlock ? 'current' : 'todo'
-                  const head = [
-                    panelBlocks.length > 1 ? `Bloc ${bi + 1}` : '',
-                    b.rounds > 1 ? (bState === 'current' ? `Tour ${curRound + 1}/${b.rounds}` : `×${b.rounds}`) : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')
-                  return (
-                    <div key={bi} className={bi > 0 ? 'mt-3' : ''}>
-                      {head && (
-                        <p
-                          className={`text-sm font-extrabold   ${
-                            bState === 'current' ? 'text-white/80' : bState === 'done' ? 'text-white/25' : 'text-white/40'
-                          }`}
-                        >
-                          {head}
-                        </p>
-                      )}
-                      <ul className="mt-0.5">
-                        {b.items.map((it, ii) => {
-                          const ex = exercises.find((e) => e.id === it.exerciseId)
-                          const st =
-                            bState !== 'current' ? bState : ii < curItem ? 'done' : ii === curItem ? 'current' : 'todo'
-                          const recorded = doneRef.current[it.exerciseId]?.length ?? 0
-                          const exFlagged =
-                            recorded > 0 &&
-                            (doneRef.current[it.exerciseId] ?? []).some((_, i) => flagged.has(`${it.exerciseId}:${i}`))
-                          return (
-                            <li key={ii} ref={st === 'current' ? curRowRef : undefined}>
-                              {/* Tap sur une ligne déjà travaillée = basculer « mal réalisé » */}
-                              <button
-                                type="button"
-                                onClick={() => toggleFlagAll(it.exerciseId)}
-                                className="flex w-full items-center gap-2 py-1.5 text-left"
-                              >
-                                {exFlagged && st !== 'current' ? (
-                                  <TriangleAlert className="h-3.5 w-3.5 shrink-0 text-amber-400" />
-                                ) : st === 'done' ? (
-                                  <Check className="h-3.5 w-3.5 shrink-0 text-sage-400" />
-                                ) : st === 'current' ? (
-                                  <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: accent }} />
-                                ) : (
-                                  <span className="h-3.5 w-3.5 shrink-0" />
-                                )}
-                                <span
-                                  className={`min-w-0 flex-1 truncate text-sm ${
-                                    st === 'current'
-                                      ? 'font-extrabold'
-                                      : st === 'done'
-                                        ? 'font-semibold text-white/30'
-                                        : 'font-semibold text-white/60'
-                                  }`}
-                                >
-                                  {ex?.name ?? 'Exercice'}
-                                </span>
-                                {exFlagged && st === 'current' && (
-                                  <TriangleAlert className="h-3.5 w-3.5 shrink-0 text-amber-400" />
-                                )}
-                                <span className={`shrink-0 text-xs font-bold ${st === 'current' ? 'text-white/60' : 'text-white/30'}`}>
-                                  {itemLabel(session, it, ex)}
-                                </span>
-                              </button>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </div>
-                  )
-                })}
-              </aside>
+      {/* Programme : colonne de 400 px sur bureau, volet du bas sur téléphone */}
+      <aside aria-label="Programme de la séance" className="hidden w-[400px] shrink-0 flex-col border-l border-night-line bg-[#13161b] pt-5 lg:flex">
+        <header className="px-5 pt-4 pb-2">
+          <h2 className="text-[22px] leading-7 font-extrabold">Programme</h2>
+          <p className="text-sm text-night-soft tabular-nums">
+            {workIdx + 1}/{workCount} · reste {mmss(remainTotalSec)}
+          </p>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto">{programList}</div>
+      </aside>
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/55" onClick={() => setDrawerOpen(false)} />
+          <div className="absolute inset-x-0 bottom-0 flex max-h-[75dvh] flex-col rounded-t-xl bg-night">
+            <div className="flex justify-center pt-2">
+              <span className="h-[5px] w-10 rounded-full bg-ink-soft" />
             </div>
+            <header className="flex items-center gap-3 px-5 pt-4 pb-2">
+              <div className="min-w-0 flex-1">
+                <h2 className="text-[22px] leading-7 font-extrabold">Programme</h2>
+                <p className="text-sm text-night-soft tabular-nums">
+                  {workIdx + 1}/{workCount} · {next ? `ensuite : ${next.label}` : 'dernier effort'}
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Fermer le programme"
+                onClick={() => setDrawerOpen(false)}
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-night-line"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+            <div className="min-h-0 flex-1 overflow-y-auto">{programList}</div>
           </div>
-        </section>
-      </footer>
+        </div>
+      )}
     </div>
   )
 }

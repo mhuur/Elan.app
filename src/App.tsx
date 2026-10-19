@@ -46,7 +46,7 @@ function Shell() {
           // Bureau (≥ lg) : la barre latérale de 232 px occupe la gauche
           'mx-auto w-full ' +
           (fullScreen ? '' : 'lg:ml-[232px] lg:mr-0 ') +
-          (wideScreen ? 'max-w-lg lg:max-w-[62rem] ' : 'max-w-lg lg:max-w-[760px] ') +
+          (fullScreen ? '' : wideScreen ? 'max-w-lg lg:max-w-[62rem] ' : 'max-w-lg lg:max-w-[760px] ') +
           (fullScreen ? '' : formScreen ? 'min-h-dvh pb-24' : 'min-h-dvh pb-28')
         }
       >
