@@ -23,7 +23,7 @@ function ProgressBar({ ratio, reached }: { ratio: number; reached: boolean }) {
 function ReachedLevel({ label, reward }: { label: string; reward?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-2 rounded-xl bg-sage-50 px-3 py-1.5">
-      <span className="text-xs font-extrabold text-sage-600">✓ {label}</span>
+      <span className="text-xs font-extrabold text-sage-700">✓ {label}</span>
       {reward && <span className="truncate text-xs font-bold text-sage-700">🎁 {reward} — débloquée !</span>}
     </div>
   )
@@ -184,10 +184,10 @@ export default function Goals() {
           const unit = e.measure === 'sec' ? 's' : 'reps'
           const next = levels.find((l) => cur < l.value)
           return (
-            <div key={e.id} className="rounded-md border border-hairline bg-glass p-4 backdrop-blur-lg">
+            <div key={e.id} className="rounded-md border border-hairline bg-glass p-4 ">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 font-display text-xl leading-none font-bold uppercase">
+                  <p className="flex items-center gap-1.5 text-xl leading-none font-bold ">
                     <CategoryIcon category="muscu" className="h-4 w-4 shrink-0 text-muscu" />
                     <span className="min-w-0 truncate">{e.name}</span>
                   </p>
@@ -230,12 +230,12 @@ export default function Goals() {
                     </p>
                   </div>
                 ) : (
-                  <p className="text-xs font-extrabold text-sage-600">🎉 Tous les paliers atteints — record {cur} {unit}</p>
+                  <p className="text-xs font-extrabold text-sage-700">🎉 Tous les paliers atteints — record {cur} {unit}</p>
                 )}
                 {levels
                   .filter((l) => cur < l.value && l !== next)
                   .map((l) => (
-                    <p key={l.value} className="text-[11px] font-semibold text-ink-soft/70">
+                    <p key={l.value} className="text-sm font-semibold text-ink-soft/70">
                       Puis {l.value} {unit}
                       {l.reward ? ` · 🎁 ${l.reward}` : ''}
                     </p>
@@ -249,14 +249,14 @@ export default function Goals() {
           const levels = objectiveLevels(s)
           const next = levels.find((lv) => !sessionLevelReached(s, lv))
           return (
-            <div key={s.id} className="rounded-md border border-hairline bg-glass p-4 backdrop-blur-lg">
+            <div key={s.id} className="rounded-md border border-hairline bg-glass p-4 ">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 font-display text-xl leading-none font-bold uppercase">
+                  <p className="flex items-center gap-1.5 text-xl leading-none font-bold ">
                     <CategoryIcon category={displayCategory(s, exercises)} className={`h-4 w-4 shrink-0 ${CATEGORY_META[displayCategory(s, exercises)].text}`} />
                     <span className="min-w-0 truncate">{s.name}</span>
                   </p>
-                  <p className="text-[11px] font-semibold text-ink-soft">
+                  <p className="text-sm font-semibold text-ink-soft">
                     {levels.length > 1 ? `${levels.length} paliers — ` : ''}
                     {(next ?? levels[0]).targets.length > 1 ? 'à réussir dans une même séance' : 'objectif de séance'}
                   </p>
@@ -297,7 +297,7 @@ export default function Goals() {
                         <div key={t.key}>
                           <div className="mb-1 flex items-baseline justify-between">
                             <span className="text-xs font-bold text-ink-soft">{t.label}</span>
-                            <span className={'text-xs font-extrabold ' + (ok ? 'text-sage-600' : 'text-ink-soft')}>
+                            <span className={'text-xs font-extrabold ' + (ok ? 'text-sage-700' : 'text-ink-soft')}>
                               {cur} / {t.value} {t.unit} {ok && '✓'}
                             </span>
                           </div>
@@ -313,12 +313,12 @@ export default function Goals() {
                 {levels
                   .filter((lv) => !sessionLevelReached(s, lv) && lv !== next)
                   .map((lv, i) => (
-                    <p key={i} className="text-[11px] font-semibold text-ink-soft/70">
+                    <p key={i} className="text-sm font-semibold text-ink-soft/70">
                       Puis {targetsLabel(lv)}
                       {lv.reward ? ` · 🎁 ${lv.reward}` : ''}
                     </p>
                   ))}
-                {!next && <p className="text-xs font-extrabold text-sage-600">🎉 Tous les paliers atteints !</p>}
+                {!next && <p className="text-xs font-extrabold text-sage-700">🎉 Tous les paliers atteints !</p>}
               </div>
             </div>
           )
@@ -372,7 +372,7 @@ export default function Goals() {
                   {exDrafts.map((d, i) => (
                     <div key={i} className="space-y-2 rounded-sm bg-sage-50 p-3">
                       <div className="flex items-center justify-between">
-                        <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
+                        <p className="tabular-nums text-[13px] text-ink-soft">
                           Palier {i + 1}
                         </p>
                         {exDrafts.length > 1 && (
@@ -421,7 +421,7 @@ export default function Goals() {
                   return (
                     <div key={i} className="space-y-2 rounded-sm bg-sage-50 p-3">
                       <div className="flex items-center justify-between">
-                        <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
+                        <p className="tabular-nums text-[13px] text-ink-soft">
                           Palier {i + 1}
                         </p>
                         {sessDrafts.length > 1 && (

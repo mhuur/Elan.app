@@ -316,16 +316,19 @@ export interface CategoryMeta {
   text: string
   bg: string
   soft: string
+  /** Trait de l'anneau, disque d'une séance faite */
   hex: string
+  /** Fond de l'anneau d'une séance prévue */
+  tint: string
 }
 
-/** L'icône Lucide de chaque catégorie vit dans `components/ui.tsx` (CategoryIcon) */
-/** `hex` doit rester le miroir exact des tokens `--color-{catégorie}` de index.css
- *  (charte bord de mer) : il sert aux graphes Recharts et aux aplats en style inline. */
+/** Le pictogramme de chaque catégorie vit dans `components/ui.tsx` (CategoryRing).
+ *  `hex`/`tint` sont le miroir des tokens `--color-{catégorie}` de index.css (charte 21KM,
+ *  planche Main). `code` ne s'affiche plus : il reste pour les sous-libellés du Planning. */
 export const CATEGORY_META: Record<Category, CategoryMeta> = {
-  running: { label: 'Running', code: 'RUN', text: 'text-running', bg: 'bg-running', soft: 'bg-running/10', hex: '#f09a72' },
-  velo: { label: 'Vélo', code: 'VÉLO', text: 'text-velo', bg: 'bg-velo', soft: 'bg-velo/10', hex: '#7ec8e3' },
-  muscu: { label: 'Muscu', code: 'MUS', text: 'text-muscu', bg: 'bg-muscu', soft: 'bg-muscu/10', hex: '#9faeda' },
-  hiit: { label: 'HIIT', code: 'HIIT', text: 'text-hiit', bg: 'bg-hiit', soft: 'bg-hiit/10', hex: '#f07b68' },
-  etirements: { label: 'Étirements', code: 'ÉTIR', text: 'text-etirements', bg: 'bg-etirements', soft: 'bg-etirements/10', hex: '#6bd0c2' },
+  running: { label: 'Course à pied', code: 'RUN', text: 'text-running', bg: 'bg-running', soft: 'bg-running/10', hex: '#e5483a', tint: '#fde7e4' },
+  velo: { label: "Vélo d'appartement", code: 'VÉLO', text: 'text-velo', bg: 'bg-velo', soft: 'bg-velo/10', hex: '#c27c00', tint: '#fdf0d5' },
+  muscu: { label: 'Musculation', code: 'MUS', text: 'text-muscu', bg: 'bg-muscu', soft: 'bg-muscu/10', hex: '#6b4fd8', tint: '#ece8fb' },
+  hiit: { label: 'HIIT', code: 'HIIT', text: 'text-hiit', bg: 'bg-hiit', soft: 'bg-hiit/10', hex: '#d93b8c', tint: '#fbe3ef' },
+  etirements: { label: 'Étirements', code: 'ÉTIR', text: 'text-etirements', bg: 'bg-etirements', soft: 'bg-etirements/10', hex: '#0f9d7a', tint: '#ddf4ec' },
 }

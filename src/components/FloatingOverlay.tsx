@@ -28,5 +28,5 @@ export default function FloatingOverlay({ children }: { children: ReactNode }) {
   )
 }
 
-/** Habillage « soulevé » de la copie : fond opaque (la photo ne doit pas traverser), ombre portée */
-export const liftedClass = 'cursor-grabbing border border-sage-500/50 bg-shoal shadow-2xl shadow-black/60'
+/** Habillage « saisie au glisser » (planche Composants) : ombre de niveau 1, légère inclinaison */
+export const liftedClass = 'cursor-grabbing border border-hairline bg-surface shadow-lg -rotate-[1.5deg] scale-[1.02]'

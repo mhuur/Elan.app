@@ -26,7 +26,7 @@ export default function LogSheet({ log, onClose }: { log: Log | null; onClose: (
           <>
             {/* Sur-titre « — MUSCU · 29.07 » de la maquette (écran « Journal de bord ») */}
             <span
-              className="mb-2 flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase"
+              className="mb-2 flex items-center gap-1.5 tabular-nums text-[13px]  "
               style={{ color: CATEGORY_META[cat!].hex }}
             >
               <CategoryIcon category={cat!} className="h-3.5 w-3.5 shrink-0" />—{' '}

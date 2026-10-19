@@ -7,15 +7,15 @@ import { DAY_NAMES, addDays, formatShortFr, toDateStr } from '../lib/dates'
 import { isRepeat, stepSeconds, workoutStats, type PlanSeance, type Pace, type WorkoutStep, type WorkoutPart } from '../data/plan'
 import type { Activity } from '../types'
 
-// Couleurs façon COROS Campus, calées sur la charte bord de mer : échauffement/EF vert
-// écume, travail orange, récup rose. Barre et libellé partagent la teinte — sur l'ardoise,
-// un libellé assombri (l'ancien vert olive) devenait illisible.
+// Charte 21KM : le dégradé du rouge course des zones (plan.ts) — pâle pour l'échauffement
+// et la récupération, plein pour le travail. Libellés en encre : un rouge pâle sur blanc
+// ne se lirait pas.
 const KIND: Record<WorkoutStep['kind'], { bar: string; label: string }> = {
-  warmup: { bar: '#86c48e', label: 'text-[#86c48e]' },
-  steady: { bar: '#86c48e', label: 'text-[#86c48e]' },
-  work: { bar: '#f4956a', label: 'text-[#f4956a]' },
-  recovery: { bar: '#e9a2bd', label: 'text-[#e9a2bd]' },
-  cooldown: { bar: '#e9a2bd', label: 'text-[#e9a2bd]' },
+  warmup: { bar: '#f0a096', label: 'text-ink-soft' },
+  steady: { bar: '#f0a096', label: 'text-ink-soft' },
+  work: { bar: '#e5483a', label: 'text-running' },
+  recovery: { bar: '#f6c9c3', label: 'text-ink-soft' },
+  cooldown: { bar: '#f6c9c3', label: 'text-ink-soft' },
 }
 const HEIGHT: Record<WorkoutStep['kind'], number> = { warmup: 0.62, steady: 0.55, work: 0.96, recovery: 0.4, cooldown: 0.55 }
 
@@ -55,7 +55,7 @@ function StepRow({ s, hideLabel }: { s: WorkoutStep; hideLabel?: boolean }) {
     <div className="flex items-stretch gap-3">
       <span className="w-1 shrink-0 self-stretch rounded-full" style={{ backgroundColor: k.bar }} />
       <div className="min-w-0 flex-1 py-0.5">
-        {!hideLabel && <p className={`text-xs font-extrabold uppercase tracking-wide ${k.label}`}>{s.label}</p>}
+        {!hideLabel && <p className={`text-xs font-extrabold ${k.label}`}>{s.label}</p>}
         <StepAmount s={s} />
         {s.note && <p className="mt-0.5 text-xs font-semibold text-ink-soft">{s.note}</p>}
       </div>
@@ -95,7 +95,7 @@ function Part({ part }: { part: WorkoutPart }) {
         </div>
         <div className="absolute right-3 top-1/2 flex -translate-y-1/2 flex-col items-center text-ink-soft">
           <Repeat className="h-4 w-4" strokeWidth={2.5} />
-          <span className="font-display text-2xl leading-none font-bold uppercase leading-none">{part.repeat}</span>
+          <span className=" text-2xl leading-none font-bold leading-none">{part.repeat}</span>
         </div>
       </div>
     )
@@ -104,7 +104,7 @@ function Part({ part }: { part: WorkoutPart }) {
   return (
     <div className="relative rounded-2xl border border-sand bg-shoal px-3 py-2.5">
       {pill && (
-        <span className="absolute -top-2 left-3 rounded-full border border-sand bg-shoal px-2 py-0.5 font-mono text-[9px] tracking-[0.16em] uppercase tracking-wider text-ink-soft">
+        <span className="absolute -top-2 left-3 rounded-full border border-sand bg-shoal px-2 py-0.5 tabular-nums text-[13px] text-ink-soft">
           {pill}
         </span>
       )}
@@ -204,7 +204,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
         <button
           type="button"
           onClick={validate}
-          className="w-full rounded-sm bg-ink px-5 py-3.5 font-mono text-[11px] font-bold tracking-[0.16em] uppercase text-onaccent active:bg-sage-700"
+          className="w-full rounded-sm bg-ink px-5 py-3.5 tabular-nums text-sm font-bold text-onaccent active:bg-sage-700"
         >
           Valider ✓
         </button>
@@ -252,7 +252,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
         <button
           type="button"
           onClick={() => pick(null)}
-          className="w-full rounded-sm border border-hairline-strong bg-glass-soft px-4 py-2.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-ink backdrop-blur-lg active:bg-glass"
+          className="w-full rounded-sm border border-hairline-strong bg-glass-soft px-4 py-2.5 tabular-nums text-[13px] font-bold text-ink active:bg-glass"
         >
           Valider sans associer de sortie
         </button>
@@ -267,7 +267,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
     <button
       type="button"
       onClick={() => setStep('picking')}
-      className="w-full rounded-sm bg-ink px-5 py-3.5 font-mono text-[11px] font-bold tracking-[0.16em] uppercase text-onaccent active:bg-sage-700"
+      className="w-full rounded-sm bg-ink px-5 py-3.5 tabular-nums text-sm font-bold text-onaccent active:bg-sage-700"
     >
       Valider ma séance ✓
     </button>
@@ -295,13 +295,13 @@ export default function WorkoutSheet({
         seance ? (
           <div className="flex items-start justify-between gap-3 pr-6">
             <div className="min-w-0">
-              <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-sage-500">
+              <p className="tabular-nums text-[13px] text-sage-700">
                 {DAY_NAMES[seance.day]} · Semaine {weekIdx + 1}
               </p>
-              <p className="mt-0.5 truncate font-display text-2xl leading-none font-bold uppercase">{seance.title}</p>
+              <p className="mt-0.5 truncate text-2xl leading-none font-bold ">{seance.title}</p>
             </div>
             {seance.workout.surface && (
-              <span className="mt-0.5 flex shrink-0 items-center gap-1 rounded-full bg-sage-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-sage-700">
+              <span className="mt-0.5 flex shrink-0 items-center gap-1 rounded-full bg-sage-100 px-2.5 py-1 text-sm font-extrabold text-sage-700">
                 {seance.workout.surface === 'piste' ? <Footprints className="h-3 w-3" /> : <Route className="h-3 w-3" />}
                 {seance.workout.surface}
               </span>

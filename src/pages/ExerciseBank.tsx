@@ -55,13 +55,13 @@ export default function ExerciseBank() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Rechercher un exercice ou un sous-type…"
-          className="w-full rounded-sm border border-hairline bg-glass-sunken px-4 py-3 text-sm font-semibold outline-none backdrop-blur-lg placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
+          className="w-full rounded-sm border border-hairline bg-glass-sunken px-4 py-3 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
         />
         <div className="space-y-2.5">
           {subtypeGroups(visibleExercises).map(([subtype, exos]) => (
             <div key={subtype || '—'}>
               <div className="mb-1 flex items-center justify-between px-1">
-                <p className="font-mono text-[9px] tracking-[0.18em] uppercase text-ink/50">{subtype || 'Autres'}</p>
+                <p className="tabular-nums text-[13px] text-ink/50">{subtype || 'Autres'}</p>
                 {subtype && (
                   <button
                     type="button"
@@ -84,11 +84,11 @@ export default function ExerciseBank() {
                       (i > 0 ? 'border-t border-hairline' : '')
                     }
                   >
-                    <span className="min-w-0 flex-1 truncate font-display text-lg leading-none font-bold uppercase">
+                    <span className="min-w-0 flex-1 truncate text-lg leading-none font-bold ">
                       {e.name}
                     </span>
                     {e.measure === 'sec' && (
-                      <span className="shrink-0 rounded-full border border-hairline px-2 py-[3px] font-mono text-[8px] tracking-[0.1em] uppercase text-ink/60">
+                      <span className="shrink-0 rounded-full border border-hairline px-2 py-[3px] tabular-nums text-[13px] text-ink/60">
                         sec
                       </span>
                     )}
@@ -98,12 +98,12 @@ export default function ExerciseBank() {
                         target="_blank"
                         rel="noreferrer"
                         onClick={(ev) => ev.stopPropagation()}
-                        className="flex shrink-0 items-center gap-1 rounded-full border border-velo/40 px-2 py-[3px] font-mono text-[8px] tracking-[0.1em] uppercase text-velo"
+                        className="flex shrink-0 items-center gap-1 rounded-full border border-velo/40 px-2 py-[3px] tabular-nums text-[13px] text-velo"
                       >
                         <Play className="h-2.5 w-2.5" /> démo
                       </a>
                     )}
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-sage-500">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-sage-700">
                       <path d="m9 18 6-6-6-6" />
                     </svg>
                   </button>

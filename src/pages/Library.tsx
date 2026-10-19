@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, ChevronRight, Repeat, SquarePen } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORIES, CATEGORY_META, displayCategory } from '../types'
+import { CATEGORIES, displayCategory } from '../types'
 import { summarizeSession } from '../lib/format'
 import { canonicalCycles, describeSchedule, ownerOf } from '../lib/schedule'
-import { CodeTile, EmptyState, Eyebrow, Fab, PrimaryButton, iconSquare } from '../components/ui'
+import { CategoryRing, EmptyState, Eyebrow, Fab, PrimaryButton, iconSquare } from '../components/ui'
 import { ProgramView } from '../components/CompleteSheet'
 
 /**
@@ -36,13 +36,13 @@ export default function Library() {
           <button
             type="button"
             onClick={() => navigate('/library/exercices')}
-            className="flex items-center gap-1.5 rounded-sm border border-hairline px-3 py-1.5 font-mono text-[10px] tracking-[0.14em] uppercase text-ink/60 active:bg-glass"
+            className="flex items-center gap-1.5 rounded-sm border border-hairline px-3 py-1.5 tabular-nums text-[13px] text-ink/60 active:bg-glass"
           >
             Banque d'exercices
             <ChevronRight className="h-3.5 w-3.5" strokeWidth={1.5} />
           </button>
         </div>
-        <h1 className="mt-2.5 font-display text-[min(13vw,52px)] leading-[0.86] font-black uppercase tracking-tight text-ink">
+        <h1 className="mt-2.5 text-[min(13vw,52px)] leading-[0.86] font-extrabold tracking-tight text-ink">
           Exercices
         </h1>
       </header>
@@ -52,7 +52,7 @@ export default function Library() {
           implicite est `auto` et les libellés `nowrap` élargissent les cartes hors de l'écran. */}
       <div className="grid grid-cols-1 gap-2 px-5 lg:grid-cols-2 lg:items-start lg:gap-3">
         {ordered.map((s) => {
-          const meta = CATEGORY_META[displayCategory(s, exercises)]
+          const cat = displayCategory(s, exercises)
           const open = s.id === openId
           const when = describeSchedule(s, sessions, cycles)
           const planned = when !== 'Non planifié'
@@ -64,7 +64,7 @@ export default function Library() {
             <div
               key={s.id}
               className={
-                'rounded-md border backdrop-blur-lg ' +
+                'rounded-md border  ' +
                 (open ? 'border-hairline-strong bg-glass-raised' : 'border-hairline bg-glass')
               }
             >
@@ -74,10 +74,10 @@ export default function Library() {
                 onClick={() => setOpenId(open ? null : s.id)}
                 className="flex w-full items-center gap-3.5 p-4 text-left"
               >
-                <CodeTile code={meta.code} hex={meta.hex} />
+                <CategoryRing category={cat} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-display text-2xl leading-none font-bold uppercase">{s.name}</p>
-                  <p className="mt-1 truncate font-mono text-[10px] tracking-[0.12em] uppercase text-ink/65">
+                  <p className="truncate text-2xl leading-none font-bold ">{s.name}</p>
+                  <p className="mt-1 truncate tabular-nums text-[13px] text-ink/65">
                     {summarizeSession(s)}
                   </p>
                   {/* Un <div>, pas un <p> : cette ligne peut citer d'autres séances (« en alternance
@@ -85,15 +85,15 @@ export default function Library() {
                       carte par `p:has-text("…")` */}
                   <div
                     className={
-                      'mt-[3px] flex items-center gap-1.5 font-mono text-[10px] tracking-[0.12em] uppercase ' +
-                      (planned ? 'text-sage-500' : 'text-ink/40')
+                      'mt-[3px] flex items-center gap-1.5 tabular-nums text-[13px]   ' +
+                      (planned ? 'text-sage-700' : 'text-ink/40')
                     }
                   >
                     <WhenIcon className="h-3 w-3 shrink-0" />
                     <span className="truncate">{when}</span>
                   </div>
                 </div>
-                <span className={iconSquare + ' text-sage-500'}>
+                <span className={iconSquare + ' text-sage-700'}>
                   <ChevronRight className={'h-4 w-4 transition-transform ' + (open ? 'rotate-90' : '')} />
                 </span>
               </button>

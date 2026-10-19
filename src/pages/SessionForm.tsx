@@ -58,17 +58,17 @@ import FloatingOverlay, { liftedClass } from '../components/FloatingOverlay'
  */
 const card = glassCard
 const row = 'flex min-h-12 items-center gap-3 border-t border-hairline px-4'
-const rowLabel = 'shrink-0 font-mono text-[10px] tracking-[0.14em] uppercase text-ink-soft'
+const rowLabel = 'shrink-0 tabular-nums text-[13px] text-ink-soft'
 const iconBtn =
   'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-hairline-strong bg-glass-soft text-ink/70 active:bg-glass'
 const iconBtnOn = 'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-ink bg-ink text-onaccent'
 const iconBtnDanger =
   'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-hiit/40 text-hiit active:bg-hiit/10'
 const miniInput =
-  'h-[30px] rounded-sm border border-hairline bg-glass-sunken text-center font-mono text-xs font-bold tabular-nums text-ink outline-none focus:border-sage-500'
+  'h-[30px] rounded-sm border border-hairline bg-glass-sunken text-center tabular-nums text-xs font-bold tabular-nums text-ink outline-none focus:border-sage-500'
 /** Bascule reps / secondes : une valeur, pas une action — d'où la pilule texte */
 const togglePill =
-  'h-[30px] rounded-sm border border-hairline-strong px-2 font-mono text-[10px] font-bold tracking-[0.12em] uppercase text-ink/70 active:bg-glass'
+  'h-[30px] rounded-sm border border-hairline-strong px-2 tabular-nums text-[13px] font-bold text-ink/70 active:bg-glass'
 
 /** Petit champ numérique à saisie directe (plus compact que le Stepper dans les listes) */
 function MiniNum({ value, onChange, min = 0, max = 990, label }: { value: number; onChange: (v: number) => void; min?: number; max?: number; label?: string }) {
@@ -113,7 +113,7 @@ function DayButton({ d, on, onClick }: { d: number; on: boolean; onClick: () => 
       aria-pressed={on}
       onClick={onClick}
       className={
-        'flex h-9 w-9 items-center justify-center rounded-sm border font-mono text-[11px] font-bold transition-colors ' +
+        'flex h-9 w-9 items-center justify-center rounded-sm border tabular-nums text-sm font-bold transition-colors ' +
         (on ? 'border-ink bg-ink text-onaccent' : 'border-hairline-strong text-ink/60 active:bg-glass')
       }
     >
@@ -155,8 +155,8 @@ function PreviewRow({
       }
     >
       <div className="min-w-0 pl-1">
-        <span className="block truncate font-display text-[15px] leading-[1.05] font-bold uppercase">{title}</span>
-        <span className="block truncate font-mono text-[9px] tracking-[0.1em] uppercase" style={{ color: hex }}>
+        <span className="block truncate text-[15px] leading-[1.05] font-bold ">{title}</span>
+        <span className="block truncate tabular-nums text-[13px]  " style={{ color: hex }}>
           {code}
         </span>
       </div>
@@ -895,7 +895,7 @@ export default function SessionForm() {
                 </div>
               ) : (
                 <span
-                  className="ml-auto flex h-8 items-center rounded-xs border px-2 font-mono text-[9px] font-bold tracking-[0.08em] uppercase"
+                  className="ml-auto flex h-8 items-center rounded-xs border px-2 tabular-nums text-[13px] font-bold  "
                   style={{ backgroundColor: catMeta.hex + '29', borderColor: catMeta.hex + '66', color: catMeta.hex }}
                 >
                   {catMeta.label}
@@ -986,7 +986,7 @@ export default function SessionForm() {
                                 >
                                   <GripVertical className="h-4 w-4" />
                                 </button>
-                                <span className={`font-mono text-[10px] font-bold tracking-[0.16em] uppercase ${catMeta.text}`}>
+                                <span className={`tabular-nums text-[13px] font-bold ${catMeta.text}`}>
                                   Bloc {bi + 1}
                                 </span>
                                 <div className="ml-auto flex items-center gap-2">
@@ -1054,7 +1054,7 @@ export default function SessionForm() {
                                       )}
                                     </div>
                                     {summary && (
-                                      <span className="shrink-0 font-mono text-[11px] tracking-[0.06em] uppercase tabular-nums text-ink-soft">
+                                      <span className="shrink-0 tabular-nums text-sm tabular-nums text-ink-soft">
                                         {summary}
                                       </span>
                                     )}
@@ -1223,7 +1223,7 @@ export default function SessionForm() {
                           return (
                             <div className={`flex min-h-10 items-center gap-2.5 rounded-sm px-4 ${liftedClass}`}>
                               <GripVertical className="h-4 w-4 text-ink-soft/40" />
-                              <span className={`font-mono text-[10px] font-bold tracking-[0.16em] uppercase ${catMeta.text}`}>
+                              <span className={`tabular-nums text-[13px] font-bold ${catMeta.text}`}>
                                 Bloc {bi + 1} · {blocksArr[bi].length} exo{blocksArr[bi].length > 1 ? 's' : ''}
                               </span>
                             </div>
@@ -1246,7 +1246,7 @@ export default function SessionForm() {
                   <button
                     type="button"
                     onClick={addFromList}
-                    className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.14em] uppercase text-sage-600 active:text-sage-700"
+                    className="flex items-center gap-2 tabular-nums text-[13px] font-bold text-sage-700 active:text-sage-700"
                   >
                     <Plus className="h-3.5 w-3.5" /> Ajouter un exercice
                   </button>
@@ -1263,7 +1263,7 @@ export default function SessionForm() {
                         addFromList()
                       }}
                       className={
-                        'ml-auto flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase ' +
+                        'ml-auto flex items-center gap-1.5 tabular-nums text-[13px] font-bold   ' +
                         (newBlockPending ? 'text-muscu' : 'text-ink/60 active:text-ink')
                       }
                     >
@@ -1272,7 +1272,7 @@ export default function SessionForm() {
                   )}
                 </div>
                 {category === 'hiit' && items.length > 0 && (
-                  <p className="border-t border-hairline bg-glass-sunken px-4 py-2.5 text-center font-mono text-[10px] tracking-[0.12em] uppercase text-ink/45">
+                  <p className="border-t border-hairline bg-glass-sunken px-4 py-2.5 text-center tabular-nums text-[13px] text-ink/45">
                     {items.length} exercice{items.length > 1 ? 's' : ''} × {rounds} tour{rounds > 1 ? 's' : ''} · {workSec} s
                     d'effort / {restSec} s de repos
                   </p>
@@ -1365,7 +1365,7 @@ export default function SessionForm() {
                         className={`flex h-[30px] items-center justify-between rounded-full border pl-3 pr-1 ${CATEGORY_META[partnerCat].soft} ${CATEGORY_META[partnerCat].text}`}
                         style={{ borderColor: CATEGORY_META[partnerCat].hex + '73' }}
                       >
-                        <span className="flex min-w-0 items-center gap-2 font-mono text-[10px] font-bold tracking-[0.08em] uppercase">
+                        <span className="flex min-w-0 items-center gap-2 tabular-nums text-[13px] font-bold  ">
                           <CategoryIcon category={partnerCat} className="h-3 w-3 shrink-0" />
                           <span className="truncate">{partner.name}</span>
                         </span>
@@ -1383,7 +1383,7 @@ export default function SessionForm() {
                     <div className={row + ' flex-col items-stretch gap-2 py-3'}>
                       <span className={rowLabel}>En alternance avec</span>
                       <div className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 font-mono text-[10px] leading-relaxed font-bold tracking-[0.08em] uppercase text-ink/85">
+                        <span className="min-w-0 flex-1 tabular-nums text-[13px] leading-relaxed font-bold text-ink/85">
                           {steps.map((st) => st.map(nameOf).join(' + ')).join(' → ')}
                         </span>
                         <button type="button" aria-label="Retirer l'alternance" onClick={() => setPartner('')} className={iconBtn}>
@@ -1399,7 +1399,7 @@ export default function SessionForm() {
                           aria-label="En alternance avec"
                           value=""
                           onChange={(e) => setPartner(e.target.value)}
-                          className="h-[30px] appearance-none rounded-sm border border-hairline bg-glass-sunken pl-3 pr-7 font-mono text-[10px] tracking-[0.14em] uppercase text-ink/70 outline-none focus:border-sage-500"
+                          className="h-[30px] appearance-none rounded-sm border border-hairline bg-glass-sunken pl-3 pr-7 tabular-nums text-[13px] text-ink/70 outline-none focus:border-sage-500"
                         >
                           <option value="">Aucune</option>
                           {sessions
@@ -1436,7 +1436,7 @@ export default function SessionForm() {
                     <button type="button" aria-label="Semaine précédente" onClick={() => setWeekOffset((o) => o - 1)} className={iconBtn}>
                       <ChevronLeft className="h-4 w-4" />
                     </button>
-                    <span className="min-w-[7.5rem] text-center font-mono text-[10px] tracking-[0.14em] uppercase text-ink/85">
+                    <span className="min-w-[7.5rem] text-center tabular-nums text-[13px] text-ink/85">
                       {weekOffset === 0 ? 'Cette semaine' : `Sem. du ${formatShortFr(weekDates[0])}`}
                     </span>
                     <button type="button" aria-label="Semaine suivante" onClick={() => setWeekOffset((o) => o + 1)} className={iconBtn}>
@@ -1451,12 +1451,12 @@ export default function SessionForm() {
                     const isToday = d === todayIdx
                     return (
                       <div key={d} title={DAY_NAMES[d]} className="mx-auto flex flex-col items-center gap-0.5">
-                        <span className={'font-mono text-[10px] tracking-[0.1em] ' + (isToday ? 'text-sage-500' : 'text-ink/55')}>
+                        <span className={'tabular-nums text-[13px]  ' + (isToday ? 'text-sage-700' : 'text-ink/55')}>
                           {letter}
                         </span>
                         <span
                           className={
-                            'flex h-5 w-5 items-center justify-center rounded-full font-mono text-[10px] tabular-nums ' +
+                            'flex h-5 w-5 items-center justify-center rounded-full tabular-nums text-[13px] tabular-nums ' +
                             (isToday ? 'bg-sage-500 text-onaccent' : 'text-ink/55')
                           }
                         >
@@ -1501,11 +1501,11 @@ export default function SessionForm() {
                   })}
                 </div>
                 {noDays ? (
-                  <p className="mt-2.5 pl-1 font-mono text-[9px] leading-relaxed tracking-[0.12em] uppercase text-hiit">
+                  <p className="mt-2.5 pl-1 tabular-nums text-[13px] leading-relaxed text-hiit">
                     Aucun jour choisi : ce programme n'apparaîtra ni dans le Planning ni dans Aujourd'hui.
                   </p>
                 ) : (
-                  <p className="mt-2.5 pl-1 font-mono text-[9px] tracking-[0.12em] uppercase text-ink/85">
+                  <p className="mt-2.5 pl-1 tabular-nums text-[13px] text-ink/85">
                     Prochaine fois : {preview.nextLabel}
                   </p>
                 )}
@@ -1587,7 +1587,7 @@ export default function SessionForm() {
             setPickerOpen(false)
             armNewBlock(false)
           }}
-          className="mt-4 w-full rounded-sm bg-sage-500 py-3 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-onaccent"
+          className="mt-4 w-full rounded-sm bg-sage-500 py-3 tabular-nums text-sm font-bold text-onaccent"
         >
           Terminé
         </button>
@@ -1602,7 +1602,7 @@ export default function SessionForm() {
             <button
               type="button"
               onClick={undoRemove}
-              className="shrink-0 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-sage-600"
+              className="shrink-0 tabular-nums text-sm font-bold text-sage-700"
             >
               Annuler
             </button>

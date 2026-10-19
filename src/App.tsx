@@ -1,7 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { DataProvider, useData } from './data/DataContext'
 import BottomNav from './components/BottomNav'
-import SeaBackdrop from './components/SeaBackdrop'
+import { Logo } from './components/icons'
 import Today from './pages/Today'
 import Planning from './pages/Planning'
 import Library from './pages/Library'
@@ -15,10 +15,11 @@ import Login from './pages/Login'
 
 function Splash() {
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-abysse">
-      {/* L'ogive écume, ombre douce de la charte, sur l'abysse du manifest */}
-      <img src="/icon.svg" alt="" className="h-16 w-16 animate-pulse drop-shadow-[0_18px_34px_rgba(2,10,16,0.55)]" />
-      <p className="font-display text-2xl leading-none font-bold tracking-[0.2em] text-ink-soft uppercase">Avel</p>
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-cream">
+      <div className="animate-pulse">
+        <Logo size={64} label={false} />
+      </div>
+      <p className="text-2xl font-extrabold">21KM</p>
     </div>
   )
 }
@@ -40,13 +41,12 @@ function Shell() {
 
   return (
     <>
-      {/* Pas de fond photo sous le Player : il est immersif, opaque, et ses animations
-          tournent déjà — inutile d'en faire tourner deux de plus derrière lui. */}
-      {!fullScreen && <SeaBackdrop />}
       <main
         className={
+          // Bureau (≥ lg) : la barre latérale de 232 px occupe la gauche
           'mx-auto w-full ' +
-          (wideScreen ? 'max-w-lg lg:max-w-[62rem] ' : 'max-w-lg ') +
+          (fullScreen ? '' : 'lg:ml-[232px] lg:mr-0 ') +
+          (wideScreen ? 'max-w-lg lg:max-w-[62rem] ' : 'max-w-lg lg:max-w-[760px] ') +
           (fullScreen ? '' : formScreen ? 'min-h-dvh pb-24' : 'min-h-dvh pb-28')
         }
       >

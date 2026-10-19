@@ -43,7 +43,7 @@ function Metric({ label, value, unit }: { label: string; value: string; unit?: s
   return (
     <div>
       <p className="text-xs font-semibold text-ink-soft">{label}</p>
-      <p className="mt-0.5 font-display text-2xl leading-none font-bold uppercase tabular-nums leading-none">
+      <p className="mt-0.5 text-2xl leading-none font-bold tabular-nums leading-none">
         {value}
         {unit && <span className="ml-0.5 text-xs font-bold text-ink-soft">{unit}</span>}
       </p>
@@ -91,20 +91,20 @@ function SeanceCard({
   const diff = TYPE_DIFFICULTY[s.type]
   const t = TYPE_META[s.type]
   return (
-    <button type="button" onClick={onOpen} className="w-full rounded-md border border-hairline bg-glass text-left backdrop-blur-lg active:bg-glass-raised">
+    <button type="button" onClick={onOpen} className="w-full rounded-md border border-hairline bg-glass text-left active:bg-glass-raised">
       <div className="flex items-center gap-3 px-4 pt-3.5">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: t.hex + '22', color: t.hex }}>
           <Footprints className="h-6 w-6" strokeWidth={2.25} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className={'rounded-full px-2 py-0.5 font-mono text-[9px] tracking-[0.16em] uppercase tracking-wide ' + st.cls}>{st.label}</span>
+            <span className={'rounded-full px-2 py-0.5 tabular-nums text-[13px]    ' + st.cls}>{st.label}</span>
             <span className="text-xs font-bold text-ink-soft">
               Séance {idx + 1}/{total} · {DAY_NAMES[s.day]}
             </span>
           </div>
-          <p className="mt-0.5 truncate font-display text-xl leading-none font-bold uppercase">{s.title}</p>
-          <p className="text-[11px] font-bold" style={{ color: t.hex }}>{t.short}</p>
+          <p className="mt-0.5 truncate text-xl leading-none font-bold ">{s.title}</p>
+          <p className="text-sm font-bold" style={{ color: t.hex }}>{t.short}</p>
         </div>
         <ChevronRight className="h-5 w-5 shrink-0 text-ink-soft/40" />
       </div>
@@ -133,13 +133,13 @@ function DoneSeanceRow({
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-center gap-3 rounded-md border border-hairline bg-glass-soft px-4 py-3 text-left backdrop-blur-lg active:bg-glass"
+      className="flex w-full items-center gap-3 rounded-md border border-hairline bg-glass-soft px-4 py-3 text-left active:bg-glass"
     >
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage-500 text-onaccent">
         <Check className="h-4 w-4" strokeWidth={3} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-bold text-ink-soft">
+        <p className="text-sm font-bold text-ink-soft">
           Séance {idx + 1}/{total} · {DAY_NAMES[s.day]}
         </p>
         <p className="truncate text-sm font-extrabold">{s.title}</p>
@@ -198,8 +198,8 @@ export default function Plan() {
         right={
           dtr >= 0 ? (
             <div className="text-right">
-              <p className="font-display text-3xl leading-none font-black uppercase text-ink">J-{dtr}</p>
-              <p className="text-[11px] font-bold text-ink-soft">dim. {formatShortFr(PLAN_SEMI.raceDate)}</p>
+              <p className=" text-3xl leading-none font-extrabold text-ink">J-{dtr}</p>
+              <p className="text-sm font-bold text-ink-soft">dim. {formatShortFr(PLAN_SEMI.raceDate)}</p>
             </div>
           ) : undefined
         }
@@ -217,7 +217,7 @@ export default function Plan() {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="text-center">
-          <p className="font-display text-xl leading-none font-bold uppercase">
+          <p className=" text-xl leading-none font-bold ">
             {weekIdx === cur ? 'Cette semaine' : weekIdx >= planStart ? `Semaine ${weekIdx - planStart + 1}` : 'Préparation juin'}
           </p>
           <p className="text-xs font-bold text-ink-soft">
@@ -236,10 +236,10 @@ export default function Plan() {
       </div>
 
       {/* Aperçu hebdomadaire */}
-      <section className="rounded-md border border-hairline bg-glass px-4 py-3.5 backdrop-blur-lg">
+      <section className="rounded-md border border-hairline bg-glass px-4 py-3.5 ">
         <div className="flex items-center justify-between gap-2">
-          <p className="font-display text-xl leading-none font-bold uppercase">Ton aperçu hebdomadaire</p>
-          <span className="shrink-0 rounded-full bg-sage-50 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-sage-700">
+          <p className=" text-xl leading-none font-bold ">Ton aperçu hebdomadaire</p>
+          <span className="shrink-0 rounded-full bg-sage-50 px-2.5 py-1 text-sm font-extrabold text-sage-700">
             {week.phase}
           </span>
         </div>
@@ -270,7 +270,7 @@ export default function Plan() {
           />
         ))}
         {todo.length === 0 && (
-          <div className="rounded-md border border-hairline bg-glass px-6 py-5 text-center backdrop-blur-lg">
+          <div className="rounded-md border border-hairline bg-glass px-6 py-5 text-center ">
             <p className="text-sm font-extrabold text-sage-700">Semaine bouclée, bravo ! 🎉</p>
           </div>
         )}
@@ -278,7 +278,7 @@ export default function Plan() {
 
       {done.length > 0 && (
         <section className="mt-5">
-          <h2 className="mb-2 px-1 font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">Terminées</h2>
+          <h2 className="mb-2 px-1 tabular-nums text-[13px] text-ink-soft">Terminées</h2>
           <div className="space-y-2">
             {done.map(({ s, i }) => (
               <DoneSeanceRow key={s.day} s={s} idx={i} total={week.seances.length} onOpen={() => setSheet(s)} />
@@ -294,8 +294,8 @@ export default function Plan() {
           onClick={() => setZonesOpen((o) => !o)}
           className="flex w-full items-center justify-between px-4 py-3 active:bg-sage-100/50"
         >
-          <span className="font-mono text-[10px] tracking-[0.22em] uppercase text-sage-600">Mes allures &amp; zones</span>
-          <ChevronDown className={'h-4 w-4 text-sage-600 transition-transform ' + (zonesOpen ? 'rotate-180' : '')} />
+          <span className="tabular-nums text-[13px] text-sage-700">Mes allures &amp; zones</span>
+          <ChevronDown className={'h-4 w-4 text-sage-700 transition-transform ' + (zonesOpen ? 'rotate-180' : '')} />
         </button>
         {zonesOpen && (
           <div className="px-4 pb-3.5">
@@ -306,9 +306,9 @@ export default function Plan() {
             </div>
             <div className="mt-3.5 flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 shrink-0" />
-              <span className="flex-1 text-[10px] font-bold uppercase tracking-wide text-ink-soft/60">Zone</span>
-              <span className="w-[4.5rem] text-right text-[10px] font-bold uppercase tracking-wide text-ink-soft/60">Allure</span>
-              <span className="w-14 text-right text-[10px] font-bold uppercase tracking-wide text-ink-soft/60">FC bpm</span>
+              <span className="flex-1 text-[13px] font-bold text-ink-soft/60">Zone</span>
+              <span className="w-[4.5rem] text-right text-[13px] font-bold text-ink-soft/60">Allure</span>
+              <span className="w-14 text-right text-[13px] font-bold text-ink-soft/60">FC bpm</span>
             </div>
             <div className="mt-1.5 space-y-2">
               {PLAN_ZONES.map((z) => (
@@ -320,7 +320,7 @@ export default function Plan() {
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-[11px] leading-snug text-ink-soft/80">
+            <p className="mt-3 text-sm leading-snug text-ink-soft/80">
               La <strong>FC</strong> définit la zone (contiguë, méthode Réserve FC comme ta montre) ; l'<strong>allure</strong> en face est celle visée dans ce type de séance. FC max confirmée (pic réel 183 bpm).
             </p>
           </div>

@@ -24,7 +24,7 @@ import { TYPE_META, seanceDateStr, type PlanSeance } from '../data/plan'
 const GRID = 'grid grid-cols-[0.875rem_minmax(0,1fr)_repeat(7,1.75rem)] items-center gap-x-0.5'
 
 /** Ligne de séance, en verre dépoli sur la photo (charte bord de mer) */
-const ROW = GRID + ' rounded-md border border-hairline bg-glass p-1 backdrop-blur-lg'
+const ROW = GRID + ' rounded-md border border-hairline bg-glass p-1 '
 /** Copie flottante d'une ligne : même grille, habillage « soulevé » (`liftedClass`) */
 const ROW_FACE = GRID
 
@@ -79,12 +79,12 @@ function RowFace({
         <GripVertical className="h-3 w-3" />
       </button>
       <button type="button" onClick={onEdit} className="min-w-0 pl-1 text-left">
-        <span className="block truncate font-display text-[17px] leading-[1.05] font-bold uppercase">
+        <span className="block truncate text-[17px] leading-[1.05] font-bold ">
           {session.name}
         </span>
         {/* « MUS · ↻ TOUS LES 2 JOURS » — le code porte la couleur, la cadence suit.
             Le ↻ est dans la maquette, et `check-interval` le cherche tel quel. */}
-        <span className="block truncate font-mono text-[9px] tracking-[0.1em] uppercase" style={{ color: meta.hex }}>
+        <span className="block truncate tabular-nums text-[13px]  " style={{ color: meta.hex }}>
           {meta.code}
           {sublabel && ` · ↻ ${sublabel}`}
         </span>
@@ -134,8 +134,8 @@ function PlanRow({
       <button type="button" onClick={onOpen} className="min-w-0 pl-1 text-left">
         {/* Pas d'icône ici : la colonne du nom est la plus étroite de la grille, et le
             trait coloré + le code disent déjà la discipline. */}
-        <span className="block truncate font-display text-[17px] leading-[1.05] font-bold uppercase">{s.title}</span>
-        <span className="block truncate font-mono text-[9px] tracking-[0.1em] uppercase" style={{ color: t.hex }}>
+        <span className="block truncate text-[17px] leading-[1.05] font-bold ">{s.title}</span>
+        <span className="block truncate tabular-nums text-[13px]  " style={{ color: t.hex }}>
           {t.code} · {DAY_SHORT[s.day]}
         </span>
       </button>
@@ -293,10 +293,10 @@ export default function Planning() {
               <ArrowLeft className="h-[18px] w-[18px]" />
             </button>
             <div className="text-center">
-              <p className="font-display text-xl leading-none font-bold uppercase">
+              <p className=" text-xl leading-none font-bold ">
                 {weekOffset === 0 ? 'Cette semaine' : `Semaine du ${formatShortFr(weekDates[0])}`}
               </p>
-              <p className="mt-1 font-mono text-[9px] tracking-[0.14em] uppercase text-ink/60">
+              <p className="mt-1 tabular-nums text-[13px] text-ink/60">
                 {formatShortFr(weekDates[0])} – {formatShortFr(weekDates[6])}
               </p>
             </div>
@@ -314,7 +314,7 @@ export default function Planning() {
             <button
               type="button"
               onClick={() => setWeekOffset(planStartOffset)}
-              className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-sage-500/40 bg-glass-soft px-4 py-2.5 font-mono text-[10px] tracking-[0.14em] uppercase text-sage-700 backdrop-blur-lg active:bg-glass"
+              className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-sage-500/40 bg-glass-soft px-4 py-2.5 tabular-nums text-[13px] text-sage-700 active:bg-glass"
             >
               Le plan semi démarre {formatShortFr(firstStart)}
               <ArrowRight className="h-3.5 w-3.5" />
@@ -331,14 +331,14 @@ export default function Planning() {
                 <div key={d} title={DAY_NAMES[d]} className="mx-auto flex flex-col items-center gap-0.5">
                   <span
                     className={
-                      'font-mono text-[10px] tracking-[0.1em] ' + (isToday ? 'text-sage-500' : 'text-ink/55')
+                      'tabular-nums text-[13px]  ' + (isToday ? 'text-sage-700' : 'text-ink/55')
                     }
                   >
                     {letter}
                   </span>
                   <span
                     className={
-                      'flex h-6 w-6 items-center justify-center rounded-full font-mono text-[10px] tabular-nums ' +
+                      'flex h-6 w-6 items-center justify-center rounded-full tabular-nums text-[13px] tabular-nums ' +
                       (isToday ? 'bg-sage-500 text-onaccent' : 'text-ink/55')
                     }
                   >
@@ -372,7 +372,7 @@ export default function Planning() {
                 const body = (handle?: ReactNode) => (
                   <div>
                     {showHeaders && (
-                      <h2 className="flex items-center gap-1.5 px-1.5 pt-2.5 pb-1 font-mono text-[10px] tracking-[0.2em] uppercase text-ink/50">
+                      <h2 className="flex items-center gap-1.5 px-1.5 pt-2.5 pb-1 tabular-nums text-[13px] text-ink/50">
                         {handle}—&nbsp;{g || emptyLabel}
                         {isRun && planWeek && <span className="text-ink/40">· plan sem. {planWeekIdx + 1}</span>}
                       </h2>
@@ -430,7 +430,7 @@ export default function Planning() {
               )}
               {dragSection && (
                 <div className={'rounded-md px-1.5 py-2.5 ' + liftedClass}>
-                  <p className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.2em] uppercase text-ink/80">
+                  <p className="flex items-center gap-1.5 tabular-nums text-[13px] text-ink/80">
                     <GripVertical className="h-3.5 w-3.5 text-ink-soft/60" />—&nbsp;{dragSection.group || emptyLabel}
                     <span className="text-ink/45">
                       · {dragSection.sessions.filter(visibleInWeek).length + (dragSection.plan ? planStates.length : 0)} séances

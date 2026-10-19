@@ -536,7 +536,7 @@ export default function Player() {
           <CategoryIcon category={shownCat} className="h-10 w-10" />
         </div>
         <div>
-          <h1 className="font-display text-3xl leading-none font-black uppercase">{session.name}</h1>
+          <h1 className=" text-3xl leading-none font-extrabold ">{session.name}</h1>
           <p className="mt-1 text-sm font-semibold text-white/50">
             {steps.filter((s) => s.type === 'work').length}{' '}
             {session.category === 'muscu' ? 'séries' : 'exercices'} · ~{Math.max(1, Math.round(totalSec / 60))} min
@@ -545,11 +545,11 @@ export default function Player() {
         <button
           type="button"
           onClick={start}
-          className="rounded-sm bg-ink px-10 py-5 font-display text-2xl leading-none font-bold uppercase text-abysse shadow-lg shadow-black/40 active:bg-ink/90"
+          className="rounded-sm bg-ink px-10 py-5 text-2xl leading-none font-bold text-abysse shadow-lg shadow-black/40 active:bg-ink/90"
         >
           C'est parti !
         </button>
-        <button type="button" onClick={() => navigate(-1)} className="font-mono text-[9px] tracking-[0.16em] uppercase text-white/50">
+        <button type="button" onClick={() => navigate(-1)} className="tabular-nums text-[13px] text-white/50">
           ← Annuler
         </button>
       </div>
@@ -561,7 +561,7 @@ export default function Player() {
       <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-abysse px-8 text-center text-white">
         <div className="text-6xl">🎉</div>
         <div>
-          <h1 className="font-display text-3xl leading-none font-black uppercase">Bravo !</h1>
+          <h1 className=" text-3xl leading-none font-extrabold ">Bravo !</h1>
           <p className="mt-1 text-sm font-semibold text-white/50">
             « {session.name} » terminée et enregistrée.
           </p>
@@ -569,7 +569,7 @@ export default function Player() {
         <button
           type="button"
           onClick={() => navigate('/', { replace: true })}
-          className="rounded-sm bg-ink px-10 py-4 font-display text-xl leading-none font-bold uppercase text-abysse shadow-lg shadow-black/40"
+          className="rounded-sm bg-ink px-10 py-4 text-xl leading-none font-bold text-abysse shadow-lg shadow-black/40"
         >
           Retour à ma journée
         </button>
@@ -588,10 +588,10 @@ export default function Player() {
           <X className="h-5 w-5" />
         </button>
         <div className="text-right">
-          <p className="font-display text-xl leading-none font-bold uppercase">
+          <p className=" text-xl leading-none font-bold ">
             {workIdx + 1}/{workCount}
           </p>
-          <p className="mt-1 font-mono text-[9px] tracking-[0.14em] uppercase text-white/50">
+          <p className="mt-1 tabular-nums text-[13px] text-white/50">
             ~{Math.max(1, Math.ceil(remainTotalSec / 60))} min restantes
           </p>
         </div>
@@ -604,13 +604,13 @@ export default function Player() {
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
         <p
-          className="font-mono text-[10px] tracking-[0.24em] uppercase"
+          className="tabular-nums text-[13px]  "
           style={{ color: paused ? 'rgba(255,255,255,0.5)' : accent }}
         >
           — {paused ? 'En pause' : step.type === 'work' ? meta.label : step.type === 'rest' ? 'Récupération' : 'Préparation'}
         </p>
-        <h1 className="font-display text-[46px] leading-[0.9] font-black uppercase">{step.label}</h1>
-        {step.detail && <p className="font-mono text-[10px] tracking-[0.14em] uppercase text-white/60">{step.detail}</p>}
+        <h1 className=" text-[46px] leading-[0.9] font-extrabold ">{step.label}</h1>
+        {step.detail && <p className="tabular-nums text-[13px] text-white/60">{step.detail}</p>}
         {step.comment && (
           <p className="flex items-center gap-1.5 text-sm font-semibold text-white/60">
             <Lightbulb className="h-3.5 w-3.5 shrink-0" /> {step.comment}
@@ -638,8 +638,8 @@ export default function Player() {
                 −
               </button>
               <Ring progress={null} accent={accent} size={196}>
-                <p className="font-display text-7xl leading-none font-black tabular-nums">{actualReps}</p>
-                <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-white/50">
+                <p className=" text-7xl leading-none font-extrabold tabular-nums">{actualReps}</p>
+                <p className="tabular-nums text-[13px] text-white/50">
                   répétitions
                   {actualReps !== (step.reps ?? 0) && <span className="text-white/35"> · objectif {step.reps}</span>}
                 </p>
@@ -660,7 +660,7 @@ export default function Player() {
                 tone(520, 0.2)
                 goTo(stepIdx + 1)
               }}
-              className="rounded-sm bg-ink px-10 py-4 font-display text-2xl leading-none font-bold uppercase text-abysse shadow-lg shadow-black/30 active:bg-ink/90"
+              className="rounded-sm bg-ink px-10 py-4 text-2xl leading-none font-bold text-abysse shadow-lg shadow-black/30 active:bg-ink/90"
             >
               {session.category === 'muscu' ? 'Série faite ✓' : 'Fait ✓'}
             </button>
@@ -670,7 +670,7 @@ export default function Player() {
             <div className="my-2">
               <Ring progress={frac} accent={accent} size={236} pulse={paused}>
                 <p
-                  className={`font-display text-7xl leading-none font-black tabular-nums transition-opacity ${paused ? 'opacity-40' : ''}`}
+                  className={` text-7xl leading-none font-extrabold tabular-nums transition-opacity ${paused ? 'opacity-40' : ''}`}
                 >
                   {mmss(remaining)}
                 </p>
@@ -678,14 +678,14 @@ export default function Player() {
             </div>
             {step.type !== 'work' && next && (
               <div className="rounded-2xl bg-white/5 px-5 py-3">
-                <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-white/40">
+                <p className="tabular-nums text-[13px] text-white/40">
                   {next.manual ? 'Prochaine série' : 'Ensuite'}
                 </p>
-                <p className="mt-0.5 font-display text-xl leading-none font-bold uppercase">
+                <p className="mt-0.5 text-xl leading-none font-bold ">
                   {next.label}
                   {next.detail ? <span className="font-bold text-white/50"> · {next.detail}</span> : null}
                 </p>
-                <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-white/50">
+                <p className="tabular-nums text-[13px] text-white/50">
                   {next.manual ? `objectif ${next.reps} reps` : `${next.sec} s`}
                 </p>
               </div>
@@ -749,8 +749,8 @@ export default function Player() {
             <ChevronUp
               className={`h-4 w-4 shrink-0 text-white/40 transition-transform duration-300 ${drawerOpen ? 'rotate-180' : ''}`}
             />
-            <span className="shrink-0 font-display text-lg leading-none font-bold uppercase">{drawerTitle}</span>
-            <span className="ml-auto min-w-0 truncate pl-3 font-mono text-[9px] tracking-[0.12em] uppercase text-white/40">
+            <span className="shrink-0 text-lg leading-none font-bold ">{drawerTitle}</span>
+            <span className="ml-auto min-w-0 truncate pl-3 tabular-nums text-[13px] text-white/40">
               {next ? `Ensuite : ${next.label}` : 'Dernier effort'}
             </span>
           </button>
@@ -771,7 +771,7 @@ export default function Player() {
                     <div key={bi} className={bi > 0 ? 'mt-3' : ''}>
                       {head && (
                         <p
-                          className={`text-[11px] font-extrabold uppercase tracking-wide ${
+                          className={`text-sm font-extrabold   ${
                             bState === 'current' ? 'text-white/80' : bState === 'done' ? 'text-white/25' : 'text-white/40'
                           }`}
                         >

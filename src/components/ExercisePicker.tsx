@@ -117,7 +117,7 @@ export default function ExercisePicker({
       <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto [scrollbar-color:rgb(255_255_255/0.2)_transparent] [scrollbar-width:thin]">
         {subtypeGroups(visible).map(([subtype, exos]) => (
           <section key={subtype || '—'}>
-            <p className="mb-1 px-1 font-mono text-[9px] tracking-[0.18em] uppercase text-sage-500">
+            <p className="mb-1 px-1 tabular-nums text-[13px] text-sage-700">
               {subtype || 'Autres'}
             </p>
             <div>
@@ -136,12 +136,12 @@ export default function ExercisePicker({
                     {/* Même police que la liste de la séance : un exercice a une seule tête, des deux côtés */}
                     <span className="min-w-0 flex-1 truncate text-[15px] font-bold text-ink">{e.name}</span>
                     {e.measure === 'sec' && (
-                      <span className="shrink-0 rounded-full border border-hairline px-2 py-[3px] font-mono text-[8px] tracking-[0.1em] uppercase text-ink/60">
+                      <span className="shrink-0 rounded-full border border-hairline px-2 py-[3px] tabular-nums text-[13px] text-ink/60">
                         sec
                       </span>
                     )}
                     {n > 0 ? (
-                      <span className="flex shrink-0 items-center gap-1 font-mono text-[9px] tracking-[0.1em] uppercase text-sage-500">
+                      <span className="flex shrink-0 items-center gap-1 tabular-nums text-[13px] text-sage-700">
                         <Check className="h-3.5 w-3.5" />
                         {n > 1 ? `×${n}` : ''}
                       </span>
@@ -163,7 +163,7 @@ export default function ExercisePicker({
           <button
             type="button"
             onClick={startCreate}
-            className="w-full px-1 py-2.5 text-left text-sm font-extrabold text-sage-600 active:bg-glass"
+            className="w-full px-1 py-2.5 text-left text-sm font-extrabold text-sage-700 active:bg-glass"
           >
             + Créer « {query.trim()} »
           </button>
@@ -172,7 +172,7 @@ export default function ExercisePicker({
 
       {creating && (
         <div className="mt-3 shrink-0 space-y-2 border-t border-hairline-strong pt-3">
-          <p className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink/60">
+          <p className="tabular-nums text-[13px] text-ink/60">
             Nouvel exercice
           </p>
           <input
@@ -220,14 +220,14 @@ export default function ExercisePicker({
               type="button"
               onClick={submitCreate}
               disabled={!newName.trim()}
-              className="flex-1 rounded-sm bg-sage-500 px-3 py-2.5 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-onaccent disabled:opacity-40"
+              className="flex-1 rounded-sm bg-sage-500 px-3 py-2.5 tabular-nums text-sm font-bold text-onaccent disabled:opacity-40"
             >
               Créer et ajouter
             </button>
             <button
               type="button"
               onClick={() => setCreating(false)}
-              className="rounded-sm border border-hairline px-3 py-2.5 font-mono text-[11px] font-bold tracking-[0.14em] uppercase text-ink/60"
+              className="rounded-sm border border-hairline px-3 py-2.5 tabular-nums text-sm font-bold text-ink/60"
             >
               Annuler
             </button>

@@ -77,7 +77,7 @@ export default function CompleteSheet({
                         }}
                         className="flex w-full items-center gap-3 border-b border-hairline px-4 py-3 text-left text-sm font-bold active:bg-glass"
                       >
-                        <Check className="h-4 w-4 shrink-0 text-sage-500" /> Entrer le résultat
+                        <Check className="h-4 w-4 shrink-0 text-sage-700" /> Entrer le résultat
                       </button>
                     )}
                     <button
@@ -89,7 +89,7 @@ export default function CompleteSheet({
                       }}
                       className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold active:bg-glass"
                     >
-                      <Pencil className="h-4 w-4 shrink-0 text-sage-500" /> Modifier la séance
+                      <Pencil className="h-4 w-4 shrink-0 text-sage-700" /> Modifier la séance
                     </button>
                   </div>
                 </>
@@ -133,7 +133,7 @@ export function ProgramView({ session, exOf }: { session: Session; exOf: (id: st
             )
           })}
         </div>
-        <p className="border-t border-hairline pt-2 font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
+        <p className="border-t border-hairline pt-2 tabular-nums text-[13px] text-ink-soft">
           × {session.rounds ?? 1} tour{(session.rounds ?? 1) > 1 ? 's' : ''} · {session.restSec ?? 15} s de repos
         </p>
       </div>
@@ -147,7 +147,7 @@ export function ProgramView({ session, exOf }: { session: Session; exOf: (id: st
         <div key={bi}>
           {(blocks.length > 1 || b.rounds > 1) && (
             <p
-              className={`flex items-center gap-1.5 pt-2.5 font-mono text-[10px] tracking-[0.2em] uppercase ${CATEGORY_META[displayCategory(session, exercises)].text}`}
+              className={`flex items-center gap-1.5 pt-2.5 tabular-nums text-[13px] ${CATEGORY_META[displayCategory(session, exercises)].text}`}
             >
               <Repeat className="h-3 w-3" />
               {blocks.length > 1 ? `Bloc ${bi + 1}` : 'Circuit'}
@@ -223,12 +223,12 @@ function ProgramRow({
           target="_blank"
           rel="noreferrer"
           aria-label={`Démo ${name}`}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm text-sage-500 active:bg-glass"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm text-sage-700 active:bg-glass"
         >
           <Play className="h-4 w-4" fill="currentColor" />
         </a>
       )}
-      <p className="shrink-0 font-display text-2xl leading-none font-black text-ink">
+      <p className="shrink-0 text-2xl leading-none font-extrabold text-ink">
         {value} <span className="font-sans text-[13px] font-bold text-ink-soft">{unit}</span>
       </p>
     </div>
@@ -411,7 +411,7 @@ function Inner({
     return (
       <div className="flex flex-col items-center gap-4 py-6 text-center">
         <div className="text-6xl">{rewards.length ? '🎁' : '🎉'}</div>
-        <h3 className="font-display text-2xl leading-none font-bold uppercase">{rewards.length ? 'Palier franchi, bravo !' : 'Objectif atteint, bravo !'}</h3>
+        <h3 className=" text-2xl leading-none font-bold ">{rewards.length ? 'Palier franchi, bravo !' : 'Objectif atteint, bravo !'}</h3>
         <div className="space-y-1.5">
           {celebrate.map((a, i) => (
             <div key={i}>
@@ -442,7 +442,7 @@ function Inner({
 
       {program.length > 0 && (
         <p className="flex items-center gap-2 rounded-sm bg-sage-50 px-4 py-2.5 text-sm font-bold">
-          <ClipboardList className="h-4 w-4 shrink-0 text-sage-600" />
+          <ClipboardList className="h-4 w-4 shrink-0 text-sage-700" />
           <span>Programme : {program.map((m) => `${m.label} ${m.target}${m.unit ? ' ' + m.unit : ''}`).join(' · ')}</span>
         </p>
       )}
@@ -487,7 +487,7 @@ function Inner({
       {lastLog && (
         <div className="border-t border-hairline pt-3.5">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-ink-soft">
+            <p className="tabular-nums text-[13px] text-ink-soft">
               Dernière fois · {relativeDayFr(lastLog.date)}
             </p>
             {feelingOf(lastLog.feeling) && (

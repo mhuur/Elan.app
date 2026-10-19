@@ -89,13 +89,12 @@ export interface PlanZone {
 // Zones définies par la FC (méthode Réserve FC) : bornes FC contiguës, aucun trou.
 // L'allure est l'allure VISÉE dans ce type de séance (indicative), pas une frontière stricte.
 export const PLAN_ZONES: PlanZone[] = [
-  // Teintes de la charte bord de mer : remontées en clarté pour tenir sur l'ardoise,
-  // et étagées du calme (vert/bleu) vers l'intense (ambre → orange → corail).
-  { label: 'Endurance fondamentale', pace: '5:45–6:05', hr: '140–152', hex: '#86c48e' },
-  { label: 'Endurance active', pace: '5:25–5:45', hr: '152–162', hex: '#7fb6dc' },
-  { label: 'Seuil', pace: '5:12–5:20', hr: '162–170', hex: '#f0c060' },
-  { label: 'Allure semi (cible)', pace: '5:20–5:24', hr: '170–173', hex: '#f4956a' },
-  { label: 'VMA', pace: '4:35–4:50', hr: '173–186', hex: '#ef7d86' },
+  // Charte 21KM (planche Plan) : dégradé du rouge course, du plus calme au plus intense.
+  { label: 'Endurance fondamentale', pace: '5:45–6:05', hr: '140–152', hex: '#f6c9c3' },
+  { label: 'Endurance active', pace: '5:25–5:45', hr: '152–162', hex: '#f0a096' },
+  { label: 'Seuil', pace: '5:12–5:20', hr: '162–170', hex: '#ea7668' },
+  { label: 'Allure semi (cible)', pace: '5:20–5:24', hr: '170–173', hex: '#e5483a' },
+  { label: 'VMA', pace: '4:35–4:50', hr: '173–186', hex: '#a82a1f' },
 ]
 
 // ----- Allures & FC de référence -----
@@ -178,12 +177,14 @@ export interface PlanTypeMeta {
   hex: string
 }
 export const TYPE_META: Record<PlanType, PlanTypeMeta> = {
-  ef: { short: 'Footing', code: 'EF', hex: '#86c48e' }, // endurance — vert écume
-  sl: { short: 'Sortie longue', code: 'SL', hex: '#7fb6dc' }, // long & régulier — bleu
-  seuil: { short: 'Seuil', code: 'SEUIL', hex: '#f0c060' }, // tempo — ambre
-  as: { short: 'Allure semi', code: 'AS', hex: '#f4956a' }, // spécifique — orange
-  vma: { short: 'Fractionné', code: 'VMA', hex: '#ef7d86' }, // intervalles — corail
-  course: { short: 'Course', code: 'COURSE', hex: '#b99ad4' }, // jour J — violet
+  // Charte 21KM : toutes les séances du plan portent l'anneau Course à pied ; le type
+  // se lit dans le texte (« Seuil », « Fractionné »), plus dans la couleur.
+  ef: { short: 'Footing', code: 'EF', hex: '#e5483a' },
+  sl: { short: 'Sortie longue', code: 'SL', hex: '#e5483a' },
+  seuil: { short: 'Seuil', code: 'SEUIL', hex: '#e5483a' },
+  as: { short: 'Allure semi', code: 'AS', hex: '#e5483a' },
+  vma: { short: 'Fractionné', code: 'VMA', hex: '#e5483a' },
+  course: { short: 'Course', code: 'COURSE', hex: '#e5483a' },
 }
 
 /** Allure « m:ss » → secondes par km */
