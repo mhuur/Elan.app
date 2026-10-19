@@ -31,7 +31,9 @@ export function CategoryRing({
   done,
   progress,
   muted,
+  missed,
   stroke = 3,
+  className,
 }: {
   category?: Category
   picto?: PictoName
@@ -41,7 +43,11 @@ export function CategoryRing({
   done?: boolean
   progress?: number
   muted?: boolean
+  /** Jour passé, prévue mais non faite : anneau gris en pointillés */
+  missed?: boolean
   stroke?: number
+  /** Taille par classes (ex. `h-[30px] w-[30px] lg:h-10 lg:w-10`) au lieu de `size` */
+  className?: string
 }) {
   const meta = category ? CATEGORY_META[category] : undefined
   const c = hex ?? meta?.hex ?? '#0E1116'
@@ -49,12 +55,28 @@ export function CategoryRing({
   const name = picto ?? (category ? CATEGORY_PICTO[category] : 'grille')
   const r = 24 - stroke / 2 - 0.5
   const len = 2 * Math.PI * r
-  const disc = muted ? '#F4F5F7' : done ? c : t
-  const ic = muted ? '#A3AAB6' : done ? '#FFFFFF' : c
+  const disc = missed ? '#FFFFFF' : muted ? '#F4F5F7' : done ? c : t
+  const ic = missed ? '#626A78' : muted ? '#A3AAB6' : done ? '#FFFFFF' : c
+  const line = missed ? '#8A919C' : muted ? '#DDE1E7' : c
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" className="shrink-0">
-      <circle cx="24" cy="24" r={r} fill={disc} stroke={muted ? '#DDE1E7' : c} strokeWidth={stroke} strokeOpacity={done || muted ? 1 : 0.35} />
-      {!done && !muted && progress != null && progress > 0 && (
+    <svg
+      width={className ? undefined : size}
+      height={className ? undefined : size}
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+      className={'shrink-0 ' + (className ?? '')}
+    >
+      <circle
+        cx="24"
+        cy="24"
+        r={r}
+        fill={disc}
+        stroke={line}
+        strokeWidth={stroke}
+        strokeOpacity={done || muted || missed ? 1 : 0.35}
+        strokeDasharray={missed ? '6 5' : undefined}
+      />
+      {!done && !muted && !missed && progress != null && progress > 0 && (
         <circle
           cx="24"
           cy="24"
@@ -68,7 +90,7 @@ export function CategoryRing({
           transform="rotate(-90 24 24)"
         />
       )}
-      <g transform="translate(12 12)" fill="none" stroke={ic} strokeWidth={size <= 36 ? 2.6 : 2} strokeLinecap="round" strokeLinejoin="round">
+      <g transform="translate(12 12)" fill="none" stroke={ic} strokeWidth={size <= 36 || className ? 2.6 : 2} strokeLinecap="round" strokeLinejoin="round">
         <path d={PICTO[name]} />
       </g>
     </svg>

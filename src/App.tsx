@@ -37,6 +37,7 @@ function Shell() {
   const formScreen = location.pathname.startsWith('/session/') || location.pathname.startsWith('/exercise/')
   // Écrans élargis sur desktop : la fiche séance (volet banque d'exercices à droite du
   // formulaire) et la liste des programmes (cartes sur deux colonnes)
+  const asideScreen = location.pathname === '/planning' || location.pathname === '/plan'
   const wideScreen = location.pathname.startsWith('/session/') || location.pathname === '/library'
 
   return (
@@ -47,6 +48,8 @@ function Shell() {
           'mx-auto w-full ' +
           (fullScreen ? '' : 'lg:ml-[232px] lg:mr-0 ') +
           (fullScreen ? '' : wideScreen ? 'max-w-lg lg:max-w-[62rem] ' : 'max-w-lg lg:max-w-[760px] ') +
+          // Planning et Plan : colonne de 520 px à droite sur grand écran (≥ xl)
+          (asideScreen ? 'xl:max-w-[calc(100vw-232px-520px)] ' : '') +
           (fullScreen ? '' : formScreen ? 'min-h-dvh pb-24' : 'min-h-dvh pb-28')
         }
       >

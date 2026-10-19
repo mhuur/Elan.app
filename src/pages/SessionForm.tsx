@@ -162,7 +162,7 @@ function PreviewRow({
       </div>
       {Array.from({ length: 7 }, (_, d) => (
         <span key={d} className={dayCell(d === todayIdx)}>
-          <DayDot state={done[d] ? 'done' : planned[d] ? 'planned' : 'none'} hex={hex} />
+          <DayDot state={done[d] ? 'done' : planned[d] ? 'planned' : 'none'} hex={hex} small />
         </span>
       ))}
     </div>
