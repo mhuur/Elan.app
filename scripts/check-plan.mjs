@@ -25,16 +25,16 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // --- Onglet Plan : en-tête, navigateur de semaines, aperçu hebdo, cartes de séance
-  await page.getByRole('link', { name: '21K', exact: true }).click()
+  await page.getByRole('link', { name: 'Plan', exact: true }).click()
   await page.waitForSelector('text=Tout Rennes Court')
-  await page.waitForSelector('text=Ton aperçu hebdomadaire')
+  await page.waitForSelector('text=Aperçu de la semaine')
   await page.waitForSelector('text=Cette semaine') // 14 juin = semaine en cours (départ 14 juin)
   await page.waitForSelector('text=historique') // juin = conservé comme historique (avant la reprise du 6 juil.)
-  await page.waitForSelector('text=Séance 1/1') // S1 = reprise : une seule sortie longue
+  await page.waitForSelector('text=Séance 1 sur 1') // S1 = reprise : une seule sortie longue
   await page.waitForSelector('text=Sortie longue 8 km')
-  // Panneau « Mes allures & zones » : replié par défaut, déplié au tap (constantes + 5 zones)
-  await page.waitForSelector('text=Mes allures & zones')
-  await page.click('text=Mes allures & zones')
+  // Panneau « Mes allures et zones » : replié par défaut, déplié au tap (constantes + 5 zones)
+  await page.waitForSelector('text=Mes allures et zones')
+  await page.click('text=Mes allures et zones')
   await page.waitForSelector('text=VO2max')
   await page.waitForSelector('text=Endurance fondamentale')
   await page.screenshot({ path: `${DIR}/40-plan.png` })

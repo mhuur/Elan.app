@@ -59,13 +59,14 @@ try {
   await page.click('text=Démarrer')
   await page.waitForSelector("text=C'est parti")
   await page.click("text=C'est parti")
-  await page.waitForSelector('text=Préparation')
+  await page.waitForSelector('text=Préparez-vous')
   await page.click('[aria-label="Passer"]')
   await page.waitForSelector('text=Série 1/3')
   await page.click('[aria-label="Programme"]') // déplie le tiroir programme
-  await page.waitForSelector('aside >> text=Bloc 1') // tiroir : bloc courant
-  await page.waitForSelector('aside >> text=×2') // tiroir : tours du bloc 2 à venir
-  await page.waitForSelector('aside >> text=Pont fessier') // tiroir : l'exo du bloc 2 listé
+  await page.waitForSelector('[role="dialog"] >> text=Bloc 1') // tiroir : bloc courant
+  await page.waitForSelector('[role="dialog"] >> text=2 tours') // tiroir : tours du bloc 2 à venir
+  await page.waitForSelector('[role="dialog"] >> text=Pont fessier') // tiroir : l'exo du bloc 2 listé
+  await page.click('[aria-label="Fermer le programme"]') // le programme est un volet sur téléphone
   await page.waitForSelector('text=Série faite ✓')
   await page.click('[aria-label="Quitter"]')
   await page.waitForSelector('text=Séance libre')

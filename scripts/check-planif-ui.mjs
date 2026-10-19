@@ -27,11 +27,11 @@ page.on('dialog', (d) => d.accept())
 
 // Lignes de l'aperçu : la fiche en cours est la première ; les autres se retrouvent par leur titre
 const selfRow = () => page.locator('[data-preview] [data-session]').first()
-const rowOf = (name) => page.locator(`[data-preview] [data-session]:has(span.font-display:text-is("${name}"))`)
+const rowOf = (name) => page.locator(`[data-preview] [data-session]:has(span[data-title]:text-is("${name}"))`)
 // Anneaux « prévu » d'une ligne (DayDot planned = border-2) : les 7 cellules après le nom
-const rings = (loc) => loc.locator(':scope > span > span.border-2').count()
+const rings = (loc) => loc.locator(':scope > span[data-state="planned"]').count()
 const firstRing = (loc) =>
-  loc.locator(':scope > span').evaluateAll((els) => els.findIndex((e) => e.firstElementChild?.classList.contains('border-2')))
+  loc.locator(':scope > span').evaluateAll((els) => els.findIndex((e) => e.dataset.state === 'planned'))
 const nextWeek = async () => {
   await page.getByRole('button', { name: 'Semaine suivante', exact: true }).click()
   await page.waitForSelector('text=Sem. du')
@@ -80,8 +80,8 @@ try {
 
   // L'aperçu est la grille du Planning : la fiche en tête, les autres séances planifiées, le plan
   await page.waitForSelector('text=Cette semaine')
-  const firstTitle = await selfRow().locator('span.font-display').innerText()
-  if (firstTitle !== 'MUSCU — FULL BODY') throw new Error(`La première ligne de l'aperçu doit être la fiche en cours, trouvé : ${JSON.stringify(firstTitle)}`)
+  const firstTitle = await selfRow().locator('span[data-title]').innerText()
+  if (firstTitle !== 'Muscu — Full body') throw new Error(`La première ligne de l'aperçu doit être la fiche en cours, trouvé : ${JSON.stringify(firstTitle)}`)
   if ((await rings(rowOf('Routine matinale'))) !== 7) throw new Error('« Routine matinale » (tous les jours) doit montrer 7 anneaux dans l\'aperçu')
   if (inPlanSemi && (await page.locator('[data-preview] [data-session^="plan-"]').count()) === 0) throw new Error('Les courses du plan semi de la semaine doivent figurer dans l\'aperçu')
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
@@ -121,9 +121,9 @@ try {
   await page.waitForFunction(
     (i) => {
       const rows = [...document.querySelectorAll('[data-preview] [data-session]')]
-      const hiit = rows.find((r) => r.querySelector('span.font-display')?.textContent === 'HIIT — Cardio express')
+      const hiit = rows.find((r) => r.querySelector('span[data-title]')?.textContent === 'HIIT — Cardio express')
       const cell = hiit?.querySelectorAll(':scope > span')[i]
-      return !!cell?.firstElementChild?.classList.contains('border-2')
+      return cell?.dataset.state === 'planned'
     },
     idx,
   )
@@ -144,7 +144,7 @@ try {
   await page.waitForSelector('text=Aucun jour choisi')
   await page.click('text=Enregistrer')
   await page.waitForSelector('text=Mes programmes')
-  const when = await page.locator('button:has(p:text-is("Muscu — Full body")) span.truncate').innerText()
+  const when = await page.locator('button:has(p:text-is("Muscu — Full body")) div span.truncate').innerText()
   if (!/non planifié/i.test(when)) throw new Error(`Sans jour coché, la carte devrait dire « Non planifié », trouvé : ${JSON.stringify(when)}`)
 
   console.log('PLANIF-UI OK — trois positions, aperçu = grille du Planning avec tout le reste, alternance à partenaire unique, Commencer par avec les noms, aucune cadence cachée')

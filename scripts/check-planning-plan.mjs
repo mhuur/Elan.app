@@ -77,7 +77,7 @@ try {
 
   // === 2) Navigation vers la semaine du plan : dates + section « Running » alignée ===
   await gotoPlanWeek()
-  await page.waitForSelector('text=15 juin') // semaine du 15 au 21 juin
+  await page.waitForSelector('text=15 – 21 juin') // semaine du 15 au 21 juin
   await page.waitForSelector('text=Footing 6 km')
   await page.waitForSelector('text=Sortie longue')
   await page.screenshot({ path: `${DIR}/45-planning-plan.png`, fullPage: true })

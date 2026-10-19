@@ -29,11 +29,12 @@ try {
 
   // Onglet Plan, zones d'allure (couleurs par type d'effort) et fiche COROS
   await page.goto(BASE + '/plan')
-  await page.waitForSelector('text=Ton aperçu hebdomadaire')
+  await page.waitForSelector('text=Mes allures et zones')
   await shot('plan')
-  await page.click('text=Mes allures & zones')
+  await page.click('text=Mes allures et zones')
   await page.waitForSelector('text=VO2max')
   await shot('plan-zones')
+  await page.click('text=Revoir') // course passée : rouvrir les semaines du plan
   await page.locator('button:has-text("Séance")').first().click()
   await page.waitForSelector('text=Valider ma séance')
   await shot('workout-sheet')

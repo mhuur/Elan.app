@@ -25,7 +25,7 @@ try {
   // grille du Planning masque les séances non planifiées, le vélo du seed en est une)
   await page.getByRole('link', { name: 'Exercices', exact: true }).click()
   await page.waitForSelector('text=Mes programmes')
-  await page.click('text=appartement')
+  await page.click('p:has-text("Vélo d’appartement")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
 

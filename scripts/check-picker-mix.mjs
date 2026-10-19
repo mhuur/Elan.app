@@ -109,7 +109,7 @@ try {
   await page.click('p:has-text("Routine matinale")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
-  await page.waitForSelector('div:has(> span:text-is("Format")) button.bg-ink:has-text("Séries")')
+  await page.waitForSelector('div:has(> span:text-is("Format")) button[aria-pressed="true"]:has-text("Séries")')
   await page.screenshot({ path: 'screenshots/mix-04-routine-series.png' })
   await page.click('text=Enregistrer')
   await page.waitForSelector('text=Mes programmes')
@@ -118,7 +118,7 @@ try {
   if (rout.category !== 'muscu') throw new Error(`La routine devrait s'enregistrer en séries (muscu), trouvé : ${rout.category}`)
   const r0 = rout.items[0]
   if (!r0.sets || !r0.target || r0.restSec !== (rout0.restSec ?? 0) || r0.durationSec !== undefined) throw new Error(`Posture mal convertie : ${JSON.stringify(r0)} (avant : ${JSON.stringify(rout0.items[0])}, transition ${rout0.restSec})`)
-  if (!(await page.locator('text=ÉTIR').count())) throw new Error("La routine faite d'étirements devrait toujours s'afficher ÉTIR")
+  if (!(await page.locator('[aria-expanded]:has(p:text-is("Routine matinale")) circle[stroke="#0f9d7a"]').count())) throw new Error("La routine faite d'étirements devrait toujours s'afficher en Étirements (anneau vert)")
 
   console.log('PICKER-MIX OK — filtre par sous-type dans la banque, séance mixte muscu + étirement + cardio, création sans catégorie, passage Séries → Intervalles sans perte, ancienne routine convertie en séries et affichée ÉTIR')
   if (errors.length) {

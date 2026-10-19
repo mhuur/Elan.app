@@ -37,7 +37,7 @@ try {
   // --- Séance libre : vélo avec saisie des perfs (vitesse auto-calculée)
   await page.click('text=Séance libre')
   await page.waitForSelector('text=Choisir une séance')
-  await page.click('text=appartement')
+  await page.click('[role="dialog"] button:has-text("appartement")')
   await page.waitForSelector('text=Puissance')
   const nums = page.locator('input[type="number"]')
   await nums.nth(1).fill('30') // durée min
@@ -69,7 +69,7 @@ try {
   await page.waitForSelector("text=C'est parti")
   await shot('06-player-pret')
   await page.click("text=C'est parti")
-  await page.waitForSelector('text=Préparation')
+  await page.waitForSelector('text=Préparez-vous')
   await page.waitForTimeout(1500)
   await shot('07-player-en-cours')
   await page.click('[aria-label="Quitter"]') // confirm auto-accepté
@@ -82,7 +82,7 @@ try {
   await page.click('text=Démarrer')
   await page.waitForSelector("text=C'est parti")
   await page.click("text=C'est parti")
-  await page.waitForSelector('text=Préparation')
+  await page.waitForSelector('text=Préparez-vous')
   await page.click('[aria-label="Passer"]')
   await page.waitForSelector('text=Série faite ✓')
   await page.waitForSelector('text=répétitions')
@@ -107,7 +107,7 @@ try {
   await page.getByRole('link', { name: 'Exercices', exact: true }).click()
   await page.waitForSelector('text=Mes programmes')
   await shot('09-bibliotheque-seances')
-  await page.click('text=appartement')
+  await page.click('p:has-text("Vélo d’appartement")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
   await shot('10-seance-form')
@@ -116,7 +116,7 @@ try {
   // --- Banque d'exercices (groupée par sous-type) + recherche + fiche
   await page.getByRole('button', { name: "Banque d'exercices", exact: true }).click()
   await page.waitForSelector('button:has-text("Pompes")')
-  await page.waitForSelector('text=Abdominaux') // en-tête de sous-type
+  await page.waitForSelector('h2:has-text("Abdominaux")') // en-tête de sous-type
   await shot('11-bibliotheque-exos')
   await page.click('button:has-text("Pompes")')
   await page.waitForSelector("text=Modifier l'exercice")

@@ -32,7 +32,7 @@ async function probe(page, name, handleSel, nth = 0) {
       (e) => getComputedStyle(e).position === 'fixed' && e.style.transform?.includes('translate3d'),
     )
     if (!el) return null
-    const q = (el.querySelector('svg.lucide-grip-vertical') ?? el).getBoundingClientRect()
+    const q = (el.querySelector('svg.lucide-grip-vertical, svg.grip') ?? el).getBoundingClientRect()
     return { x: q.x + q.width / 2, y: q.y + q.height / 2 }
   })
   await page.screenshot({ path: `screenshots/dnd-${name}.png` })

@@ -1,6 +1,6 @@
 // Vérifie l'écran « Exercices » (la liste des programmes, refonte sept. 2026) : cartes
 // dépliables SUR PLACE — un tap montre les exercices et « Modifier », un seul programme
-// déplié à la fois, un second tap replie, « Modifier » ouvre la fiche ; sur desktop la
+// déplié à la fois, un second tap replie, « Modifier » ouvre la fiche ; sur grand écran la
 // liste passe en deux colonnes. Prérequis : `npm run dev:demo` lancé.
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
@@ -30,8 +30,8 @@ try {
   // Les cartes tiennent dans l'écran : la 1re s'arrête avant la marge droite (libellés
   // `nowrap` + grille sans `grid-cols-1` = débordement silencieux, vu le 03/09/2026)
   const first = await page.locator('[aria-expanded]').first().boundingBox()
-  if (!first || first.x + first.width > 390 - 19)
-    throw new Error(`La carte déborde de l'écran : droite à ${first ? Math.round(first.x + first.width) : '?'} px pour 370 attendus`)
+  if (!first || first.x + first.width > 390 - 16)
+    throw new Error(`La carte déborde de l'écran : droite à ${first ? Math.round(first.x + first.width) : '?'} px pour 374 attendus`)
   await page.screenshot({ path: 'screenshots/exercices-01-replie.png' })
 
   // Un tap déplie sur place : exercices lisibles + Modifier
@@ -67,14 +67,16 @@ try {
   await desk.waitForSelector('text=Routine matinale', { timeout: 20000 })
   await desk.getByRole('link', { name: 'Exercices', exact: true }).click()
   await desk.waitForSelector('text=Mes programmes')
-  const cards = desk.locator('[aria-expanded]')
-  const a = await cards.nth(0).boundingBox()
-  const b = await cards.nth(1).boundingBox()
-  if (!a || !b || Math.abs(a.y - b.y) > 2 || b.x <= a.x + a.width)
-    throw new Error(`Sur desktop, les deux premières cartes devraient être côte à côte (${JSON.stringify(a)} / ${JSON.stringify(b)})`)
+  // Grand écran (≥ xl, charte 21KM) : liste en une colonne, le programme choisi s'ouvre dans
+  // une colonne de 520 px à droite (aside) au lieu de se déplier sur place
+  await desk.click('p:has-text("Muscu — Full body")')
+  await desk.waitForSelector('aside[aria-label="Muscu — Full body"] >> text=Pont fessier')
+  const aside = await desk.locator('aside[aria-label="Muscu — Full body"]').boundingBox()
+  if (!aside || Math.round(aside.width) !== 520 || Math.round(aside.x + aside.width) !== 1440)
+    throw new Error(`Sur grand écran, le détail devrait occuper une colonne de 520 px à droite (${JSON.stringify(aside)})`)
   await desk.screenshot({ path: 'screenshots/exercices-03-desktop.png' })
 
-  console.log('LIBRARY-UI OK — cartes dépliables, un seul programme ouvert, Modifier → fiche, desktop en deux colonnes')
+  console.log('LIBRARY-UI OK — cartes dépliables, un seul programme ouvert, Modifier → fiche, détail en colonne de 520 px sur grand écran')
   if (errors.length) {
     console.error('ERREURS DÉTECTÉES :')
     for (const e of errors) console.error(' -', e)

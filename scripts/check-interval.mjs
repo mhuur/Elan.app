@@ -21,7 +21,7 @@ try {
   // Passer « Vélo d'appartement » en intervalle (tous les 2 jours) + alternance avec HIIT
   await page.getByRole('link', { name: 'Exercices', exact: true }).click()
   await page.waitForSelector('text=Mes programmes')
-  await page.click('text=appartement')
+  await page.click('p:has-text("Vélo d’appartement")')
   await page.getByRole('button', { name: 'Modifier', exact: true }).click()
   await page.waitForSelector('text=Planification')
   await page.getByRole('button', { name: 'Tous les X jours', exact: true }).click()
@@ -50,7 +50,7 @@ try {
 
   // Et la séance apparaît dans Aujourd'hui
   await page.getByRole('link', { name: "Aujourd'hui" }).click()
-  await page.waitForSelector('text=appartement')
+  await page.waitForSelector('text=Vélo d’appartement')
   console.log("INTERVALLE OK — alternance multiple bidirectionnelle, planning et Aujourd'hui")
 
   if (errors.length) {

@@ -32,7 +32,7 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // Onglet 21K (plan semi), semaine des footings (semaine en cours avec l'horloge figée)
-  await page.getByRole('link', { name: '21K', exact: true }).click()
+  await page.getByRole('link', { name: 'Plan', exact: true }).click()
   await page.waitForSelector('text=Tout Rennes Court')
   await page.waitForSelector('text=Footing 5 km')
 

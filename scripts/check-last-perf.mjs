@@ -21,7 +21,7 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // --- Ouvrir la séance Vélo via « + Séance libre » et saisir des perfs + smiley + note
-  await page.click('text=+ Séance libre')
+  await page.click('text=Séance libre')
   await page.locator('[role="dialog"] button:has-text("appartement")').click()
   await page.waitForSelector('text=Difficulté ressentie') // notre nouveau sélecteur de ressenti
   const nums = page.locator('[role="dialog"] input')
@@ -38,7 +38,7 @@ try {
   await page.screenshot({ path: `${DIR}/50-terminee-smiley.png` })
 
   // --- Ré-ouvrir la séance → bloc « Dernière fois » : perf + smiley + note
-  await page.click('text=+ Séance libre')
+  await page.click('text=Séance libre')
   await page.locator('[role="dialog"] button:has-text("appartement")').click()
   await page.waitForSelector('text=Dernière fois')
   await page.waitForSelector('[role="dialog"] >> text=45 min')

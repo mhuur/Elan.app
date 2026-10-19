@@ -114,7 +114,7 @@ try {
 
   // --- Nouvelle séance : écran épuré
   await page.click('text=+ Programme')
-  await page.waitForSelector('text=Nouvelle séance')
+  await page.waitForSelector('text=Nouveau programme')
   await page.screenshot({ path: 'screenshots/35-form-nouvelle-seance.png' })
   await page.click('[aria-label="Retour"]')
 
@@ -123,7 +123,7 @@ try {
   await page.click('button:has-text("Pompes")')
   await page.waitForSelector("text=Modifier l'exercice")
   await page.screenshot({ path: 'screenshots/36-form-exercice.png' })
-  await page.getByPlaceholder('Ajouter un sous-type').fill('tri')
+  await page.getByPlaceholder('Autre sous-type').fill('tri')
   await page.waitForSelector('text=+ Créer « tri »')
   await page.screenshot({ path: 'screenshots/37-form-exercice-combobox.png' })
 

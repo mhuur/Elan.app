@@ -41,7 +41,7 @@ try {
   await page.waitForSelector('text=Routine matinale', { timeout: 20000 })
 
   // Ouvrir la séance vélo aujourd'hui (17 juin) — rien fait entre le 10 et le 17
-  await page.click('text=+ Séance libre')
+  await page.click('text=Séance libre')
   await page.locator('[role="dialog"] button:has-text("appartement")').click()
   await page.waitForSelector('text=Dernière fois')
 

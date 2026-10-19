@@ -60,7 +60,7 @@ try {
   await page.screenshot({ path: `${DIR}/strava-sync-picker.png` })
 
   // Fermer le volet (clic sur le fond, en haut hors du panneau) puis ouvrir les Réglages
-  await page.locator('div.bg-ink\\/35').first().click({ position: { x: 10, y: 10 } })
+  await page.locator('div.bg-ink\\/45').first().click({ position: { x: 10, y: 10 } })
   await page.waitForSelector('[role="dialog"]', { state: 'detached' }).catch(() => {})
   await page.click('[aria-label="Réglages"]')
   await page.waitForSelector('text=Courses Strava')

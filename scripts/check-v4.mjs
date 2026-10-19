@@ -23,8 +23,7 @@ try {
   await page.click('button:has-text("Pompes")')
   await page.waitForSelector("text=Modifier l'exercice")
   // Sous-type ajouté via la combobox filtrante (plus de mur de chips)
-  await page.getByPlaceholder('Ajouter un sous-type').fill('Bras')
-  await page.locator('button:has-text("Bras")').first().click()
+  await page.locator('[role="group"][aria-label="Sous-types"] button:has-text("Bras")').click()
   await page.click('text=Enregistrer')
   await page.waitForSelector('button:has-text("Pompes")')
   const count = await page.locator('button:has-text("Pompes")').count()
@@ -100,7 +99,7 @@ try {
   // Une séance vélo qui remplit les deux cibles déclenche la célébration
   await page.getByRole('link', { name: "Aujourd'hui" }).click()
   await page.click('text=Séance libre')
-  await page.click('text=appartement')
+  await page.click('[role="dialog"] button:has-text("appartement")')
   await page.waitForSelector('text=Puissance')
   const veloNums = page.locator('input[type="number"]')
   await veloNums.nth(1).fill('30') // durée
@@ -116,7 +115,7 @@ try {
   await page.getByRole('link', { name: "Aujourd'hui" }).click()
   await page.waitForSelector('text=Séance libre')
   await page.click('[aria-label="Jour précédent"]')
-  await page.waitForSelector('text=Saisie passée')
+  await page.waitForSelector('text=Hier')
   await page.waitForSelector("text=Revenir à aujourd'hui")
   await page.click('text=Séance libre')
   await page.click('text=Sortie courte')
