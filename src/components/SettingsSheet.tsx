@@ -169,7 +169,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
               </>
             ) : (
               <p className="text-xs font-semibold text-ink-soft">
-                Ce navigateur ne gère pas les notifications. Installe Avel sur ton écran d'accueil depuis Chrome.
+                Ce navigateur ne gère pas les notifications. Installe 21KM sur ton écran d'accueil depuis Chrome.
               </p>
             )}
           </div>
@@ -264,7 +264,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
           </GhostButton>
         )}
 
-        <p className="pt-2 text-center text-xs text-ink-soft/60">Avel v1.0 — fait avec 💨</p>
+        <p className="pt-2 text-center text-xs text-ink-soft/60">21KM v2.0</p>
       </div>
     </Sheet>
   )

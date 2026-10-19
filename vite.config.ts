@@ -20,18 +20,18 @@ export default defineConfig({
         // Le bundle (Firebase + Recharts) dépasse la limite par défaut de 2 Mio par fichier.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
-      includeAssets: ['icon.svg', 'icons/*.png', 'icons/*.svg'],
+      includeAssets: ['icons/*.png', 'icons/*.svg'],
       manifest: {
-        name: 'Avel — séances & progrès',
-        short_name: 'Avel',
+        name: '21KM — entraînement',
+        short_name: '21KM',
         description: 'Planifiez vos séances, enregistrez vos performances, suivez vos progrès.',
         lang: 'fr',
         dir: 'ltr',
         start_url: '/',
         scope: '/',
         // Charte « bord de mer » : ardoise en barre système, abysse au démarrage.
-        theme_color: '#071A26',
-        background_color: '#04121B',
+        theme_color: '#F4F5F7',
+        background_color: '#F4F5F7',
         display: 'standalone',
         orientation: 'portrait',
         icons: [

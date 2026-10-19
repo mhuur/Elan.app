@@ -30,7 +30,7 @@ clientsClaim()
 // --- Rappels de séance ---
 
 const FALLBACK: ReminderPayload = {
-  title: 'Avel',
+  title: '21KM',
   body: 'Ta séance du jour t’attend.',
 }
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Logo } from '../components/icons'
 import { useData } from '../data/DataContext'
 
 export default function Login() {
@@ -19,10 +20,10 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-abysse px-8 text-center">
-      <img src="/icon.svg" alt="" className="h-20 w-20 drop-shadow-[0_18px_34px_rgba(2,10,16,0.55)]" />
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-cream px-8 text-center">
+      <Logo size={80} label={false} />
       <div>
-        <h1 className="text-3xl font-extrabold text-ink">Avel</h1>
+        <h1 className="text-3xl font-extrabold text-ink">21KM</h1>
         <p className="mt-2 text-sm font-semibold text-ink-soft">
           Planifiez vos séances, enregistrez vos performances,
           <br />
