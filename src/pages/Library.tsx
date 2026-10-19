@@ -1,23 +1,20 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarDays, ChevronRight, Repeat, SquarePen } from 'lucide-react'
+import { CalendarDays, Plus, Repeat, SquarePen } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORIES, displayCategory } from '../types'
+import { CATEGORIES, displayCategory, type Session } from '../types'
 import { summarizeSession } from '../lib/format'
 import { canonicalCycles, describeSchedule, ownerOf } from '../lib/schedule'
-import { CategoryRing, EmptyState, Eyebrow, Fab, PrimaryButton, iconSquare } from '../components/ui'
+import { CategoryRing, DisplayTitle, Eyebrow, Fab, glassCard, primaryCls, secondaryCls } from '../components/ui'
+import { Picto } from '../components/icons'
 import { ProgramView } from '../components/CompleteSheet'
 
 /**
- * Exercices — la liste des programmes de l'utilisateur (onglet « Exercices », ex-« Séries »,
- * refonte de sept. 2026 sur la direction « aperçu déplié » choisie sur maquette). Une carte de
- * verre par programme, la même que sur Aujourd'hui ; un tap la déplie SUR PLACE — exercices
- * en lecture seule + bouton « Modifier » vers la fiche — et un seul programme est déplié à la
- * fois. Plus de section par sport : la tuile colorée le porte déjà.
- *
- * La banque d'exercices n'est PLUS un segment de même poids (`Seg` moitié-moitié, jusqu'en
- * août 2026) : c'est un sous-écran (`/library/exercices`, `ExerciseBank`) atteint par le
- * bouton de l'en-tête, parce qu'on ne s'y rend qu'occasionnellement pour de la maintenance.
+ * Exercices — la liste des programmes (charte 21KM, planche Exercices). Une carte de 88 px
+ * par programme : anneau de catégorie, nom, résumé, planification. Un tap la déplie SUR
+ * PLACE (exercices en lecture seule + « Modifier ») ; un seul programme déplié à la fois.
+ * Sur grand écran (≥ xl), le détail s'ouvre dans une colonne de 520 px à droite.
+ * La banque d'exercices est un sous-écran (`/library/exercices`) atteint par l'en-tête.
  */
 export default function Library() {
   const { sessions, exercises } = useData()
@@ -27,30 +24,40 @@ export default function Library() {
   // Par sport (ordre des catégories), puis dans l'ordre du store
   const ordered = CATEGORIES.flatMap((cat) => sessions.filter((s) => displayCategory(s, exercises) === cat))
   const exOf = (id: string) => exercises.find((e) => e.id === id)
+  const opened = ordered.find((s) => s.id === openId)
+
+  const detail = (s: Session) => (
+    <>
+      {/* Vélo et course n'ont pas d'exercices : le résumé de la carte suffit */}
+      {s.items.length > 0 && (
+        <div className="border-t border-hairline">
+          <ProgramView session={s} exOf={exOf} />
+        </div>
+      )}
+      <button type="button" onClick={() => navigate(`/session/${s.id}`)} className={'w-full ' + primaryCls}>
+        <SquarePen className="h-5 w-5" /> Modifier
+      </button>
+    </>
+  )
 
   return (
-    <div>
-      <header className="px-5 pt-8 pb-4">
-        <div className="flex items-center justify-between gap-3">
-          <Eyebrow>— Mes programmes</Eyebrow>
-          <button
-            type="button"
-            onClick={() => navigate('/library/exercices')}
-            className="flex items-center gap-1.5 rounded-sm border border-hairline px-3 py-1.5 tabular-nums text-[13px] text-ink/60 active:bg-glass"
-          >
-            Banque d'exercices
-            <ChevronRight className="h-3.5 w-3.5" strokeWidth={1.5} />
-          </button>
+    <div className="flex flex-col gap-3 px-4 pt-4 lg:gap-4 lg:px-10 lg:pt-8">
+      <header className="flex items-end gap-3">
+        <div className="min-w-0 flex-1">
+          <Eyebrow>Mes programmes{sessions.length ? ` · ${sessions.length}` : ''}</Eyebrow>
+          <DisplayTitle>Exercices</DisplayTitle>
         </div>
-        <h1 className="mt-2.5 text-[min(13vw,52px)] leading-[0.86] font-extrabold tracking-tight text-ink">
-          Exercices
-        </h1>
+        <button type="button" onClick={() => navigate('/library/exercices')} className={secondaryCls + ' !min-h-11 shrink-0 !px-4 !text-[15px]'}>
+          Banque d'exercices
+        </button>
+        <button type="button" onClick={() => navigate('/session/new')} className={primaryCls + ' !hidden !min-h-11 shrink-0 !pr-[18px] !pl-3.5 !text-[15px] lg:!inline-flex'}>
+          <Plus className="h-5 w-5" /> Programme
+        </button>
       </header>
 
-      {/* Deux colonnes sur desktop (`main` élargi par App.tsx) ; `items-start` pour qu'une carte
-          dépliée n'étire pas sa voisine. `grid-cols-1` n'est PAS redondant : sans lui la colonne
-          implicite est `auto` et les libellés `nowrap` élargissent les cartes hors de l'écran. */}
-      <div className="grid grid-cols-1 gap-2 px-5 lg:grid-cols-2 lg:items-start lg:gap-3">
+      {/* `grid-cols-1` n'est PAS redondant : sans lui la colonne implicite est `auto` et les
+          libellés `nowrap` élargissent les cartes hors de l'écran. */}
+      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2 lg:items-start xl:grid-cols-1">
         {ordered.map((s) => {
           const cat = displayCategory(s, exercises)
           const open = s.id === openId
@@ -61,66 +68,72 @@ export default function Library() {
           const owner = ownerOf(s.id, sessions, cycles)
           const WhenIcon = s.days.length || owner?.repeat?.onDays?.length ? CalendarDays : Repeat
           return (
-            <div
-              key={s.id}
-              className={
-                'rounded-md border  ' +
-                (open ? 'border-hairline-strong bg-glass-raised' : 'border-hairline bg-glass')
-              }
-            >
+            <div key={s.id} className={'flex flex-col rounded-md bg-surface ' + (open ? 'ring-2 ring-ink' : 'ring-1 ring-hairline')}>
               <button
                 type="button"
                 aria-expanded={open}
                 onClick={() => setOpenId(open ? null : s.id)}
-                className="flex w-full items-center gap-3.5 p-4 text-left"
+                className="flex min-h-[88px] w-full items-center gap-3 py-3 pr-3.5 pl-4 text-left"
               >
                 <CategoryRing category={cat} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-2xl leading-none font-bold ">{s.name}</p>
-                  <p className="mt-1 truncate tabular-nums text-[13px] text-ink/65">
-                    {summarizeSession(s)}
-                  </p>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <p className="truncate text-[17px] leading-[22px] font-bold">{s.name}</p>
+                  <span className="truncate text-sm leading-5 text-ink-soft">{summarizeSession(s)}</span>
                   {/* Un <div>, pas un <p> : cette ligne peut citer d'autres séances (« en alternance
-                      avec HIIT — Cardio express ») et les vérifs Playwright ciblent le titre d'une
-                      carte par `p:has-text("…")` */}
-                  <div
-                    className={
-                      'mt-[3px] flex items-center gap-1.5 tabular-nums text-[13px]   ' +
-                      (planned ? 'text-sage-700' : 'text-ink/40')
-                    }
-                  >
-                    <WhenIcon className="h-3 w-3 shrink-0" />
+                      avec HIIT — Cardio express ») et les vérifs ciblent le titre par `p:has-text("…")` */}
+                  <div className={'flex items-center gap-1.5 text-sm leading-5 font-semibold ' + (planned ? 'text-sage-700' : 'text-ink-mute')}>
+                    <WhenIcon className="h-4 w-4 shrink-0" />
                     <span className="truncate">{when}</span>
                   </div>
-                </div>
-                <span className={iconSquare + ' text-sage-700'}>
-                  <ChevronRight className={'h-4 w-4 transition-transform ' + (open ? 'rotate-90' : '')} />
                 </span>
               </button>
-              {open && (
-                <div className="border-t border-hairline px-4 pt-2.5 pb-4">
-                  {/* Vélo et running n'ont pas d'exercices : le résumé de la carte suffit */}
-                  {s.items.length > 0 && <ProgramView session={s} exOf={exOf} />}
-                  <div className="mt-3.5">
-                    <PrimaryButton onClick={() => navigate(`/session/${s.id}`)}>
-                      <span className="flex items-center justify-center gap-2">
-                        <SquarePen className="h-4 w-4" /> Modifier
-                      </span>
-                    </PrimaryButton>
-                  </div>
-                </div>
-              )}
+              {open && <div className="flex flex-col gap-3 px-4 pb-4 xl:hidden">{detail(s)}</div>}
             </div>
           )
         })}
       </div>
+
       {sessions.length === 0 && (
-        <div className="px-5">
-          <EmptyState emoji="🗂️" text="Aucun programme. Créez-en un avec le bouton ci-dessous !" />
-        </div>
+        <section className={`flex flex-col items-center gap-3 px-6 py-8 text-center ${glassCard}`}>
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-sage-50">
+            <Picto name="grille" className="h-7 w-7" />
+          </span>
+          <h2 className="text-[22px] leading-7 font-extrabold">Aucun programme</h2>
+          <p className="max-w-80 text-base leading-6 text-ink-soft">
+            Un programme regroupe des exercices et les jours où le faire. Il apparaît ensuite dans le Planning et dans Aujourd'hui.
+          </p>
+          <button type="button" onClick={() => navigate('/session/new')} className={primaryCls + ' mt-1'}>
+            <Plus className="h-5 w-5" /> Créer un programme
+          </button>
+        </section>
       )}
 
-      <Fab label="+ Programme" onClick={() => navigate('/session/new')} />
+      {/* Grand écran : détail du programme choisi en colonne de 520 px */}
+      {opened && (
+        <aside
+          aria-label={opened.name}
+          className="fixed top-0 right-0 bottom-0 hidden w-[520px] flex-col gap-5 overflow-y-auto border-l border-hairline bg-surface px-7 py-8 xl:flex"
+        >
+          <div className="flex items-center gap-3.5">
+            <CategoryRing category={displayCategory(opened, exercises)} size={56} />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm leading-5 font-semibold text-ink-soft">{summarizeSession(opened)}</p>
+              <h2 className="text-[26px] leading-8 font-extrabold">{opened.name}</h2>
+            </div>
+          </div>
+          {describeSchedule(opened, sessions, cycles) === 'Non planifié' && (
+            <div className="flex items-center gap-2 rounded-sm bg-cream px-3.5 py-3 text-[15px] leading-5 font-semibold text-ink-soft">
+              <CalendarDays className="h-5 w-5 shrink-0" />
+              Non planifié : absent du Planning et d'Aujourd'hui
+            </div>
+          )}
+          {detail(opened)}
+        </aside>
+      )}
+
+      <div className="lg:hidden">
+        <Fab label="+ Programme" onClick={() => navigate('/session/new')} />
+      </div>
     </div>
   )
 }

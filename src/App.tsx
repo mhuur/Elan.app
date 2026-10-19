@@ -37,7 +37,7 @@ function Shell() {
   const formScreen = location.pathname.startsWith('/session/') || location.pathname.startsWith('/exercise/')
   // Écrans élargis sur desktop : la fiche séance (volet banque d'exercices à droite du
   // formulaire) et la liste des programmes (cartes sur deux colonnes)
-  const asideScreen = location.pathname === '/planning' || location.pathname === '/plan'
+  const asideScreen = location.pathname === '/planning' || location.pathname === '/plan' || location.pathname === '/library'
   const wideScreen = location.pathname.startsWith('/session/') || location.pathname === '/library'
 
   return (
