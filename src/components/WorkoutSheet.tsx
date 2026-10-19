@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Check, Repeat, Route, Footprints, RefreshCw } from 'lucide-react'
-import { Sheet } from './ui'
+import { CategoryRing, Sheet } from './ui'
 import { useData } from '../data/DataContext'
 import { useStravaSync } from '../lib/useStravaSync'
 import { DAY_NAMES, addDays, formatShortFr, toDateStr } from '../lib/dates'
@@ -33,7 +33,7 @@ function StepAmount({ s }: { s: WorkoutStep }) {
   const amount = s.distanceM ? fmtDist(s.distanceM) : fmtDur(s.durationSec ?? 0)
   const isRecup = s.kind === 'recovery'
   return (
-    <p className="text-[15px] leading-tight">
+    <p className="text-base leading-[22px] tabular-nums">
       <span className="font-extrabold text-ink">{amount}</span>
       {isRecup ? (
         <span className="font-semibold text-ink-soft"> de récup.</span>
@@ -55,9 +55,9 @@ function StepRow({ s, hideLabel }: { s: WorkoutStep; hideLabel?: boolean }) {
     <div className="flex items-stretch gap-3">
       <span className="w-1 shrink-0 self-stretch rounded-full" style={{ backgroundColor: k.bar }} />
       <div className="min-w-0 flex-1 py-0.5">
-        {!hideLabel && <p className={`text-xs font-extrabold ${k.label}`}>{s.label}</p>}
+        {!hideLabel && <p className={`text-[13px] font-bold ${k.label}`}>{s.label}</p>}
         <StepAmount s={s} />
-        {s.note && <p className="mt-0.5 text-xs font-semibold text-ink-soft">{s.note}</p>}
+        {s.note && <p className="mt-0.5 text-sm text-ink-soft">{s.note}</p>}
       </div>
     </div>
   )
@@ -72,7 +72,7 @@ function WorkoutBars({ parts }: { parts: WorkoutPart[] }) {
   }
   if (bars.length < 2) return null
   return (
-    <div className="flex h-24 items-end gap-[3px] rounded-sm bg-sage-50/70 px-3 pt-3 pb-0">
+    <div className="flex h-16 items-end gap-0.5 rounded-sm bg-cream px-3 pt-3 pb-0">
       {bars.map((s, i) => (
         <span
           key={i}
@@ -87,7 +87,7 @@ function WorkoutBars({ parts }: { parts: WorkoutPart[] }) {
 function Part({ part }: { part: WorkoutPart }) {
   if (isRepeat(part)) {
     return (
-      <div className="relative rounded-2xl border border-sand bg-sage-50/40 py-2 pl-3 pr-14">
+      <div className="relative rounded-sm bg-cream py-2.5 pl-3 pr-14">
         <div className="space-y-2">
           {part.steps.map((s, i) => (
             <StepRow key={i} s={s} />
@@ -95,16 +95,16 @@ function Part({ part }: { part: WorkoutPart }) {
         </div>
         <div className="absolute right-3 top-1/2 flex -translate-y-1/2 flex-col items-center text-ink-soft">
           <Repeat className="h-4 w-4" strokeWidth={2.5} />
-          <span className=" text-2xl leading-none font-bold leading-none">{part.repeat}</span>
+          <span className="text-[22px] leading-none font-extrabold tabular-nums">{part.repeat}</span>
         </div>
       </div>
     )
   }
   const pill = part.kind === 'warmup' ? 'Échauffement' : part.kind === 'cooldown' ? 'Récupération' : undefined
   return (
-    <div className="relative rounded-2xl border border-sand bg-shoal px-3 py-2.5">
+    <div className="relative rounded-sm border border-hairline bg-surface px-3 py-3">
       {pill && (
-        <span className="absolute -top-2 left-3 rounded-full border border-sand bg-shoal px-2 py-0.5 tabular-nums text-[13px] text-ink-soft">
+        <span className="absolute -top-2 left-3 rounded-full border border-hairline bg-surface px-2 py-0.5 text-[13px] font-medium text-ink-soft">
           {pill}
         </span>
       )}
@@ -113,10 +113,25 @@ function Part({ part }: { part: WorkoutPart }) {
   )
 }
 
-/** Résumé estimé : distance et durée totales (répétitions développées) */
-function summary(parts: WorkoutPart[]): string {
+/** Distance et durée estimées (répétitions développées), en deux tuiles */
+function Measures({ parts }: { parts: WorkoutPart[] }) {
   const { sec, distM } = workoutStats({ parts })
-  return `≈ ${Math.round(distM / 100) / 10} km · ${Math.round(sec / 60)} min`
+  const tiles = [
+    { l: 'Distance', v: (Math.round(distM / 100) / 10).toLocaleString('fr-FR'), u: 'km' },
+    { l: 'Durée', v: String(Math.round(sec / 60)), u: 'min' },
+  ]
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {tiles.map((t) => (
+        <div key={t.l} className="flex flex-col gap-0.5 rounded-sm bg-cream px-3 py-2.5">
+          <span className="text-[13px] leading-[18px] font-medium text-ink-soft">{t.l}</span>
+          <span className="text-[22px] leading-7 font-extrabold tabular-nums">
+            ≈ {t.v} <span className="text-sm font-medium text-ink-soft">{t.u}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 const fmtPaceSec = (sec?: number) => (sec ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}/km` : '')
@@ -170,14 +185,14 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
 
   if (existing) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-sm bg-sage-50 px-4 py-3">
+      <div className="flex items-center justify-between gap-3 rounded-sm bg-sage-100 px-4 py-3">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-sm font-extrabold text-sage-700">
             <Check className="h-4 w-4" strokeWidth={3} /> Validée le {formatShortFr(existing.date)}
           </p>
           {assoc && <p className="mt-0.5 truncate text-xs font-semibold text-ink-soft">{activityLine(assoc)}</p>}
         </div>
-        <button type="button" onClick={() => void removeLog(existing.id)} className="shrink-0 text-xs font-bold text-hiit active:opacity-70">
+        <button type="button" onClick={() => void removeLog(existing.id)} className="min-h-11 shrink-0 px-2 text-[15px] font-bold text-flare active:opacity-70">
           Annuler
         </button>
       </div>
@@ -187,9 +202,9 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
   if (step === 'confirm') {
     return (
       <div className="space-y-3">
-        <p className="text-xs font-bold text-ink-soft">Quel jour as-tu fait cette séance ?</p>
+        <p className="text-base font-bold">Quel jour as-tu fait cette séance ?</p>
         {chosen && (
-          <div className="rounded-2xl border border-sand bg-shoal px-4 py-2.5">
+          <div className="rounded-sm border border-hairline bg-surface px-4 py-2.5">
             <p className="text-sm font-bold first-letter:uppercase">{formatShortFr(chosen.date)}</p>
             <p className="text-xs font-semibold text-ink-soft">{activityLine(chosen)}</p>
           </div>
@@ -199,16 +214,16 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
           aria-label="Date de la séance"
           value={date}
           onChange={(e) => setDate(e.target.value || plannedDate)}
-          className="w-full rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-bold text-ink outline-none focus:border-sage-400"
+          className="h-12 w-full rounded-sm border border-hairline-strong bg-surface px-3.5 text-base text-ink outline-none focus:border-ink focus:ring-4 focus:ring-sage-100"
         />
         <button
           type="button"
           onClick={validate}
-          className="w-full rounded-sm bg-ink px-5 py-3.5 tabular-nums text-sm font-bold text-onaccent active:bg-sage-700"
+          className="w-full inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full bg-sage-500 px-5 text-[17px] font-bold text-onaccent active:bg-sage-600"
         >
           Valider ✓
         </button>
-        <button type="button" onClick={() => setStep('picking')} className="w-full py-1 text-center text-xs font-bold text-ink-soft">
+        <button type="button" onClick={() => setStep('picking')} className="min-h-11 w-full text-center text-[15px] font-semibold text-ink-soft">
           Retour
         </button>
       </div>
@@ -218,13 +233,13 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
   if (step === 'picking') {
     return (
       <div className="space-y-2">
-        <p className="text-xs font-bold text-ink-soft">Quelle sortie correspond à cette séance ?</p>
+        <p className="text-base font-bold">Quelle sortie correspond à cette séance ?</p>
         {strava.configured && (
           <button
             type="button"
             onClick={() => void strava.sync()}
             disabled={strava.syncing}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-sand bg-shoal px-4 py-2.5 text-sm font-bold text-ink-soft active:bg-sage-50 disabled:opacity-50"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border-[1.5px] border-ink px-4 text-[15px] font-bold text-ink active:bg-sage-50 disabled:opacity-50"
           >
             <RefreshCw className={'h-4 w-4 ' + (strava.syncing ? 'animate-spin' : '')} />
             {strava.syncing ? 'Synchronisation…' : 'Synchroniser depuis Strava'}
@@ -232,7 +247,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
         )}
         {strava.message && <p className="text-center text-xs font-semibold text-ink-soft">{strava.message}</p>}
         {recent.length === 0 && !strava.syncing && (
-          <p className="rounded-xl bg-sand/60 px-3 py-2 text-xs font-semibold text-ink-soft">
+          <p className="rounded-sm bg-cream px-3 py-2.5 text-sm text-ink-soft">
             {strava.configured
               ? 'Aucune sortie récente (moins d\'une semaine). Tape « Synchroniser depuis Strava » ci-dessus.'
               : 'Aucune sortie récente (moins d\'une semaine). Double-clique « recuperer-mes-courses » sur ton PC, puis reviens ici.'}
@@ -243,20 +258,20 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
             key={a.id}
             type="button"
             onClick={() => pick(a)}
-            className="flex w-full items-center justify-between gap-3 rounded-2xl border border-sand bg-shoal px-4 py-2.5 text-left active:bg-sage-50"
+            className="flex min-h-[52px] w-full items-center justify-between gap-3 rounded-sm border border-hairline bg-surface px-4 py-2.5 text-left active:bg-sage-50"
           >
-            <span className="text-sm font-bold first-letter:uppercase">{formatShortFr(a.date)}</span>
-            <span className="shrink-0 text-xs font-semibold text-ink-soft">{activityLine(a)}</span>
+            <span className="text-base font-semibold first-letter:uppercase">{formatShortFr(a.date)}</span>
+            <span className="shrink-0 text-sm text-ink-soft tabular-nums">{activityLine(a)}</span>
           </button>
         ))}
         <button
           type="button"
           onClick={() => pick(null)}
-          className="w-full rounded-sm border border-hairline-strong bg-glass-soft px-4 py-2.5 tabular-nums text-[13px] font-bold text-ink active:bg-glass"
+          className="min-h-[52px] w-full rounded-full border-[1.5px] border-ink px-4 text-[17px] font-bold text-ink active:bg-sage-50"
         >
           Valider sans associer de sortie
         </button>
-        <button type="button" onClick={() => setStep('idle')} className="w-full py-1 text-center text-xs font-bold text-ink-soft">
+        <button type="button" onClick={() => setStep('idle')} className="min-h-11 w-full text-center text-[15px] font-semibold text-ink-soft">
           Annuler
         </button>
       </div>
@@ -267,7 +282,7 @@ function Validation({ title, planRef, plannedDate, onClose }: { title: string; p
     <button
       type="button"
       onClick={() => setStep('picking')}
-      className="w-full rounded-sm bg-ink px-5 py-3.5 tabular-nums text-sm font-bold text-onaccent active:bg-sage-700"
+      className="w-full inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full bg-sage-500 px-5 text-[17px] font-bold text-onaccent active:bg-sage-600"
     >
       Valider ma séance ✓
     </button>
@@ -293,15 +308,16 @@ export default function WorkoutSheet({
       onClose={onClose}
       title={
         seance ? (
-          <div className="flex items-start justify-between gap-3 pr-6">
-            <div className="min-w-0">
-              <p className="tabular-nums text-[13px] text-sage-700">
-                {DAY_NAMES[seance.day]} · Semaine {weekIdx + 1}
+          <div className="flex items-center gap-3">
+            <CategoryRing category="running" size={44} />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm leading-5 font-semibold text-sage-700">
+                {DAY_NAMES[seance.day]} · semaine {weekIdx + 1}
               </p>
-              <p className="mt-0.5 truncate text-2xl leading-none font-bold ">{seance.title}</p>
+              <p className="truncate text-[22px] leading-7 font-extrabold">{seance.title}</p>
             </div>
             {seance.workout.surface && (
-              <span className="mt-0.5 flex shrink-0 items-center gap-1 rounded-full bg-sage-100 px-2.5 py-1 text-sm font-extrabold text-sage-700">
+              <span className="flex h-8 shrink-0 items-center gap-1 rounded-full bg-sage-50 px-3 text-sm font-semibold text-ink">
                 {seance.workout.surface === 'piste' ? <Footprints className="h-3 w-3" /> : <Route className="h-3 w-3" />}
                 {seance.workout.surface}
               </span>
@@ -312,14 +328,15 @@ export default function WorkoutSheet({
     >
       {seance && (
         <div className="space-y-3">
-          <p className="-mt-2 text-xs font-bold text-ink-soft">{summary(seance.workout.parts)}</p>
+          <Measures parts={seance.workout.parts} />
+          <h3 className="pt-1 text-base leading-[22px] font-bold">Étapes</h3>
           <WorkoutBars parts={seance.workout.parts} />
-          <div className="space-y-2.5 pt-1">
+          <div className="space-y-3 pt-1">
             {seance.workout.parts.map((part, i) => (
               <Part key={i} part={part} />
             ))}
           </div>
-          <div className="border-t border-sand pt-3">
+          <div className="border-t border-hairline pt-4">
             <Validation title={seance.title} planRef={planRef} plannedDate={plannedDate} onClose={onClose} />
           </div>
         </div>

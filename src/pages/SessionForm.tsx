@@ -61,7 +61,7 @@ const row = 'flex min-h-12 items-center gap-3 border-t border-hairline px-4'
 const rowLabel = 'shrink-0 tabular-nums text-[13px] text-ink-soft'
 const iconBtn =
   'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-hairline-strong bg-glass-soft text-ink/70 active:bg-glass'
-const iconBtnOn = 'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-ink bg-ink text-onaccent'
+const iconBtnOn = 'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-ink bg-ink text-white'
 const iconBtnDanger =
   'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-hiit/40 text-hiit active:bg-hiit/10'
 const miniInput =
@@ -114,7 +114,7 @@ function DayButton({ d, on, onClick }: { d: number; on: boolean; onClick: () => 
       onClick={onClick}
       className={
         'flex h-9 w-9 items-center justify-center rounded-sm border tabular-nums text-sm font-bold transition-colors ' +
-        (on ? 'border-ink bg-ink text-onaccent' : 'border-hairline-strong text-ink/60 active:bg-glass')
+        (on ? 'border-ink bg-ink text-white' : 'border-hairline-strong text-ink/60 active:bg-glass')
       }
     >
       {DAY_LETTER[d]}

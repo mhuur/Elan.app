@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, ClipboardList, Lightbulb, MoreVertical, Pencil, Play, Repeat, X } from 'lucide-react'
+import { Check, ClipboardList, Lightbulb, MoreVertical, Pencil, Play, Repeat } from 'lucide-react'
 import { useData } from '../data/DataContext'
-import { CATEGORY_META, displayCategory, feelingOf, setTargetsOf, type Exercise, type Log, type MetricValue, type Session, type SessionItem } from '../types'
+import { displayCategory, feelingOf, setTargetsOf, type Exercise, type Log, type MetricValue, type Session, type SessionItem } from '../types'
 import { formatShortFr, relativeDayFr, todayStr } from '../lib/dates'
 import { lastDetailLine, lastPerfLine } from '../lib/format'
 import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { muscuBlocks } from '../lib/blocks'
 import { buildTimeline, collectSets, stopPoint, type SetStatus } from '../lib/timeline'
 import { progressedSession } from '../lib/progression'
-import { CategoryIcon, Eyebrow, Field, GhostButton, iconSquare, NumInput, PrimaryButton, Sheet, TextArea } from './ui'
+import { Picto } from './icons'
+import { CategoryRing, Eyebrow, Field, GhostButton, iconSquare, NumInput, PrimaryButton, Sheet, TextArea } from './ui'
 import FeelingPicker from './FeelingPicker'
 import ResultTimeline from './ResultTimeline'
 
@@ -48,11 +49,8 @@ export default function CompleteSheet({
       onClose={close}
       title={
         session ? (
-          <span className="flex items-center gap-2">
-            <CategoryIcon
-              category={displayCategory(session, exercises)}
-              className={`h-5 w-5 shrink-0 ${CATEGORY_META[displayCategory(session, exercises)].text}`}
-            />
+          <span className="flex items-center gap-3">
+            <CategoryRing category={displayCategory(session, exercises)} size={44} />
             <span className="min-w-0 truncate">{session.name}</span>
           </span>
         ) : undefined
@@ -62,12 +60,12 @@ export default function CompleteSheet({
           <>
             <div className="relative shrink-0">
               <button type="button" aria-label="Options" onClick={() => setMenuOpen((v) => !v)} className={iconSquare}>
-                <MoreVertical className="h-[18px] w-[18px]" />
+                <MoreVertical className="h-5 w-5" />
               </button>
               {menuOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute top-10 right-0 z-20 w-56 overflow-hidden rounded-md border border-hairline-strong bg-shoal shadow-xl">
+                  <div className="absolute top-12 right-0 z-20 w-60 overflow-hidden rounded-sm border border-hairline bg-surface shadow-lg">
                     {canEnter && !entering && (
                       <button
                         type="button"
@@ -75,7 +73,7 @@ export default function CompleteSheet({
                           setMenuOpen(false)
                           setEntering(true)
                         }}
-                        className="flex w-full items-center gap-3 border-b border-hairline px-4 py-3 text-left text-sm font-bold active:bg-glass"
+                        className="flex min-h-12 w-full items-center gap-3 border-b border-hairline px-4 text-left text-[15px] font-semibold active:bg-sage-50"
                       >
                         <Check className="h-4 w-4 shrink-0 text-sage-700" /> Entrer le résultat
                       </button>
@@ -87,7 +85,7 @@ export default function CompleteSheet({
                         close()
                         navigate(`/session/${session.id}`)
                       }}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold active:bg-glass"
+                      className="flex min-h-12 w-full items-center gap-3 px-4 text-left text-[15px] font-semibold active:bg-sage-50"
                     >
                       <Pencil className="h-4 w-4 shrink-0 text-sage-700" /> Modifier la séance
                     </button>
@@ -95,9 +93,6 @@ export default function CompleteSheet({
                 </>
               )}
             </div>
-            <button type="button" aria-label="Fermer" onClick={close} className={iconSquare}>
-              <X className="h-[18px] w-[18px]" />
-            </button>
           </>
         ) : undefined
       }
@@ -114,7 +109,6 @@ export default function CompleteSheet({
  *  muscu / étirements : les blocs, leurs tours et le détail d'UN tour. Partagé avec la liste
  *  des programmes (`pages/Library`), qui le déplie sous chaque carte. */
 export function ProgramView({ session, exOf }: { session: Session; exOf: (id: string) => Exercise | undefined }) {
-  const { exercises } = useData()
   if (session.category === 'hiit') {
     return (
       <div>
@@ -133,7 +127,7 @@ export function ProgramView({ session, exOf }: { session: Session; exOf: (id: st
             )
           })}
         </div>
-        <p className="border-t border-hairline pt-2 tabular-nums text-[13px] text-ink-soft">
+        <p className="border-t border-hairline pt-2.5 text-sm text-ink-soft tabular-nums">
           × {session.rounds ?? 1} tour{(session.rounds ?? 1) > 1 ? 's' : ''} · {session.restSec ?? 15} s de repos
         </p>
       </div>
@@ -147,9 +141,9 @@ export function ProgramView({ session, exOf }: { session: Session; exOf: (id: st
         <div key={bi}>
           {(blocks.length > 1 || b.rounds > 1) && (
             <p
-              className={`flex items-center gap-1.5 pt-2.5 tabular-nums text-[13px] ${CATEGORY_META[displayCategory(session, exercises)].text}`}
+              className="flex items-center gap-1.5 pt-3 text-sm font-semibold text-ink-soft"
             >
-              <Repeat className="h-3 w-3" />
+              <Repeat className="h-4 w-4" />
               {blocks.length > 1 ? `Bloc ${bi + 1}` : 'Circuit'}
               {b.rounds > 1 ? ` · × ${b.rounds} tours` : ''}
             </p>
@@ -205,32 +199,30 @@ function ProgramRow({
   unit: string
 }) {
   return (
-    <div className="flex items-center gap-2.5 py-2.5">
-      <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-1.5 text-sm font-bold">
-          <span className="min-w-0 truncate">{name}</span>
+    <div className="flex flex-col gap-0.5 py-3">
+      <div className="flex items-baseline gap-3">
+        <p className="min-w-0 flex-1 text-base leading-[22px] font-semibold">{name}</p>
+        <p className="shrink-0 text-right text-base leading-[22px] font-bold tabular-nums">
+          {value} {unit}
         </p>
-        {comment && (
-          <p className="flex items-center gap-1 text-xs font-semibold text-ink-soft">
-            <Lightbulb className="h-3 w-3 shrink-0" />
-            <span className="min-w-0 truncate">{comment}</span>
-          </p>
-        )}
       </div>
+      {comment && (
+        <p className="flex items-center gap-1.5 text-sm leading-5 text-ink-soft">
+          <Lightbulb className="h-4 w-4 shrink-0" />
+          <span className="min-w-0">{comment}</span>
+        </p>
+      )}
       {videoUrl && (
         <a
           href={videoUrl}
           target="_blank"
           rel="noreferrer"
           aria-label={`Démo ${name}`}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm text-sage-700 active:bg-glass"
+          className="inline-flex min-h-9 items-center gap-1.5 self-start text-sm font-bold text-sage-700"
         >
-          <Play className="h-4 w-4" fill="currentColor" />
+          <Picto name="video" className="h-5 w-5" /> Vidéo
         </a>
       )}
-      <p className="shrink-0 text-2xl leading-none font-extrabold text-ink">
-        {value} <span className="font-sans text-[13px] font-bold text-ink-soft">{unit}</span>
-      </p>
     </div>
   )
 }

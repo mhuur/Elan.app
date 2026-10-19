@@ -132,7 +132,7 @@ export function Sheet({ open, onClose, title, actions, children }: { open: boole
           {title && <h2 className="min-w-0 flex-1 text-[22px] leading-7 font-extrabold">{title}</h2>}
           {!title && <div className="flex-1" />}
           {actions}
-          <button type="button" aria-label="Fermer le volet" onClick={onClose} className={iconSquare}>
+          <button type="button" aria-label="Fermer" onClick={onClose} className={iconSquare}>
             <X className="h-5 w-5" />
           </button>
         </div>
