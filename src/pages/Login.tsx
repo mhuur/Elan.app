@@ -44,8 +44,8 @@ export default function Login() {
         </svg>
         Continuer avec Google
       </button>
-      {error && <p className="max-w-sm text-xs font-semibold text-hiit">{error}</p>}
-      <p className="text-xs text-ink-soft/70">Vos données sont privées et synchronisées sur vos appareils.</p>
+      {error && <p className="max-w-sm text-sm font-semibold text-flare">{error}</p>}
+      <p className="text-xs text-ink-mute">Vos données sont privées et synchronisées sur vos appareils.</p>
     </div>
   )
 }

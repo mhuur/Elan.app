@@ -45,30 +45,30 @@ import { canonicalCycles, countWeekdays, cycleStepsOf, describeSchedule, diffDay
 import { isPlanLog, planToDoOn, warmupsDueOn } from '../lib/planDay'
 import { usePlanningWeek } from '../lib/usePlanningWeek'
 import { TYPE_META } from '../data/plan'
-import { CategoryIcon, Chip, Combobox, Eyebrow, FormActions, PageHeader, Seg, Sheet, Stepper, glassCard } from '../components/ui'
+import { CategoryIcon, CategoryRing, Chip, Combobox, FormActions, PageHeader, Seg, Sheet, Stepper, glassCard } from '../components/ui'
 import { DayDot, dayCell } from '../components/DayDot'
 import ExercisePicker from '../components/ExercisePicker'
 import FloatingOverlay, { liftedClass } from '../components/FloatingOverlay'
 
-/* ── Vocabulaire de l'écran (maquette « Fiche séance », direction B, sept. 2026) ─────
- * Une carte de verre par section, des RANGÉES de 48 px « libellé mono à gauche, valeur
- * à droite », un filet entre les rangées. Les rangées portent leur `border-t` elles-mêmes
+/* ── Vocabulaire de l'écran (charte 21KM, planche Formulaires, oct. 2026) ─────
+ * Une carte blanche par section, des RANGÉES de 56 px « libellé à gauche, valeur à
+ * droite », un filet entre les rangées. Les rangées portent leur `border-t` elles-mêmes
  * (pas de `divide-y`) parce que le drag & drop intercale des enveloppes entre la carte et
- * ses lignes. Toutes les actions de ligne sont des ICÔNES dans un carré à filet.
+ * ses lignes. Les actions de ligne sont des boutons ronds de 44 px.
  */
 const card = glassCard
-const row = 'flex min-h-12 items-center gap-3 border-t border-hairline px-4'
-const rowLabel = 'shrink-0 tabular-nums text-[13px] text-ink-soft'
+const row = 'flex min-h-14 items-center gap-3 border-t border-hairline px-4'
+const rowLabel = 'shrink-0 text-sm font-semibold text-ink'
 const iconBtn =
-  'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-hairline-strong bg-glass-soft text-ink/70 active:bg-glass'
-const iconBtnOn = 'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-ink bg-ink text-white'
+  'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream text-ink active:bg-sage-50'
+const iconBtnOn = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink text-white'
 const iconBtnDanger =
-  'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-sm border border-hiit/40 text-hiit active:bg-hiit/10'
+  'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#fde7e4] text-[#b3261a] active:bg-[#f9d3cd]'
 const miniInput =
-  'h-[30px] rounded-sm border border-hairline bg-glass-sunken text-center tabular-nums text-xs font-bold tabular-nums text-ink outline-none focus:border-sage-500'
+  'h-11 rounded-sm border border-hairline-strong bg-surface text-center text-base font-semibold tabular-nums text-ink outline-none focus:border-ink focus:ring-4 focus:ring-sage-100'
 /** Bascule reps / secondes : une valeur, pas une action — d'où la pilule texte */
 const togglePill =
-  'h-[30px] rounded-sm border border-hairline-strong px-2 tabular-nums text-[13px] font-bold text-ink/70 active:bg-glass'
+  'h-11 rounded-full bg-cream px-3 text-[13px] font-semibold text-ink active:bg-sage-50'
 
 /** Petit champ numérique à saisie directe (plus compact que le Stepper dans les listes) */
 function MiniNum({ value, onChange, min = 0, max = 990, label }: { value: number; onChange: (v: number) => void; min?: number; max?: number; label?: string }) {
@@ -99,7 +99,7 @@ function MiniNum({ value, onChange, min = 0, max = 990, label }: { value: number
         editingRef.current = false
         setText(String(value))
       }}
-      className={miniInput + ' w-9'}
+      className={miniInput + ' w-14'}
     />
   )
 }
@@ -113,8 +113,8 @@ function DayButton({ d, on, onClick }: { d: number; on: boolean; onClick: () => 
       aria-pressed={on}
       onClick={onClick}
       className={
-        'flex h-9 w-9 items-center justify-center rounded-sm border tabular-nums text-sm font-bold transition-colors ' +
-        (on ? 'border-ink bg-ink text-white' : 'border-hairline-strong text-ink/60 active:bg-glass')
+        'flex h-11 min-w-0 flex-1 items-center justify-center rounded-full text-[15px] font-bold transition-colors ' +
+        (on ? 'bg-ink text-white' : 'bg-cream text-ink active:bg-sage-50')
       }
     >
       {DAY_LETTER[d]}
@@ -124,7 +124,7 @@ function DayButton({ d, on, onClick }: { d: number; on: boolean; onClick: () => 
 
 /** Grille de l'aperçu : celle du Planning sans la poignée, jours en 24 px (28 dans le Planning) — rien
  *  ne s'y déplace, et la colonne du nom est déjà la plus étreinte dans une carte. */
-const previewGrid = 'grid grid-cols-[minmax(0,1fr)_repeat(7,1.5rem)] items-center gap-x-0.5'
+const previewGrid = 'grid grid-cols-[minmax(0,1fr)_repeat(7,1.75rem)] items-center gap-x-0.5'
 
 /** Ligne de l'aperçu : une séance (la fiche en cours, une autre, ou une course du plan)
  *  et ses sept ronds — mêmes `DayDot` que le Planning. La ligne de la fiche est teintée. */
@@ -132,7 +132,7 @@ function PreviewRow({
   id,
   title,
   code,
-  hex,
+  category,
   self,
   planned,
   done,
@@ -141,7 +141,7 @@ function PreviewRow({
   id: string
   title: string
   code: string
-  hex: string
+  category: Category
   self?: boolean
   planned: boolean[]
   done: boolean[]
@@ -151,18 +151,16 @@ function PreviewRow({
     <div
       data-session={id}
       className={
-        previewGrid + ' rounded-md border p-1 ' + (self ? 'border-sage-500/60 bg-sage-500/10' : 'border-hairline bg-glass-sunken')
+        previewGrid + ' rounded-sm border py-1 pr-1 pl-2 ' + (self ? 'border-ink bg-surface' : 'border-hairline bg-cream')
       }
     >
       <div className="min-w-0 pl-1">
-        <span className="block truncate text-[15px] leading-[1.05] font-bold ">{title}</span>
-        <span className="block truncate tabular-nums text-[13px]  " style={{ color: hex }}>
-          {code}
-        </span>
+        <span className={'block truncate text-sm leading-[18px] ' + (self ? 'font-bold' : 'font-semibold text-ink-soft')}>{title}</span>
+        <span className="block truncate text-[13px] leading-[18px] text-ink-mute">{code}</span>
       </div>
       {Array.from({ length: 7 }, (_, d) => (
         <span key={d} className={dayCell(d === todayIdx)}>
-          <DayDot state={done[d] ? 'done' : planned[d] ? 'planned' : 'none'} hex={hex} small />
+          <DayDot state={done[d] ? 'done' : planned[d] ? 'planned' : 'none'} category={category} muted={!self} small />
         </span>
       ))}
     </div>
@@ -857,7 +855,7 @@ export default function SessionForm() {
       }
     >
       <div className="min-w-0">
-        <PageHeader title={existing ? 'Modifier la séance' : 'Nouvelle séance'} onBack={back} />
+        <PageHeader title={existing ? 'Modifier le programme' : 'Nouveau programme'} onBack={back} />
 
         <div className="space-y-5 px-5 pb-2">
           {/* ── Nom + catégorie ── */}
@@ -872,7 +870,7 @@ export default function SessionForm() {
                 value={name}
                 placeholder="Ex. HIIT du mardi"
                 onChange={(e) => setName(e.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-right text-[15px] font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink/40"
+                className="h-12 min-w-0 flex-1 rounded-sm border border-hairline-strong bg-surface px-3.5 text-base text-ink outline-none placeholder:text-ink-mute focus:border-ink focus:ring-4 focus:ring-sage-100"
               />
             </div>
             <div className={row}>
@@ -894,10 +892,8 @@ export default function SessionForm() {
                   />
                 </div>
               ) : (
-                <span
-                  className="ml-auto flex h-8 items-center rounded-xs border px-2 tabular-nums text-[13px] font-bold  "
-                  style={{ backgroundColor: catMeta.hex + '29', borderColor: catMeta.hex + '66', color: catMeta.hex }}
-                >
+                <span className="ml-auto flex items-center gap-2 text-[15px] font-semibold">
+                  <CategoryRing category={category} size={32} />
                   {catMeta.label}
                 </span>
               )}
@@ -907,11 +903,11 @@ export default function SessionForm() {
           {/* ── Exercices ── */}
           {hasItems && (
             <div className="space-y-2">
-              <Eyebrow className="ml-1 text-ink/60">Exercices de la séance</Eyebrow>
+              <h2 className="ml-1 text-base leading-[22px] font-bold">Exercices de la séance</h2>
               <div className={card}>
                 {/* En-tête : compte + réglages de la séance (tours, effort/repos) */}
                 <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-1.5">
-                  <span className={rowLabel + ' text-ink/45'}>
+                  <span className={rowLabel + ' text-ink-mute'}>
                     {items.length} exercice
                     {items.length > 1 ? 's' : ''}
                     {hasBreaks ? ` · ${blocksArr.length} blocs` : ''}
@@ -982,7 +978,7 @@ export default function SessionForm() {
                                   aria-label={`Déplacer le bloc ${bi + 1}`}
                                   {...blockDrag.attributes}
                                   {...blockDrag.listeners}
-                                  className="-ml-1.5 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
+                                  className="-ml-1.5 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-ink-mute active:cursor-grabbing"
                                 >
                                   <GripVertical className="h-4 w-4" />
                                 </button>
@@ -1043,7 +1039,7 @@ export default function SessionForm() {
                                       aria-label={`Réordonner ${ex?.name ?? 'cet exercice'}`}
                                       {...drag.attributes}
                                       {...drag.listeners}
-                                      className="-ml-1.5 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-ink-soft/40 active:cursor-grabbing"
+                                      className="-ml-1.5 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-ink-mute active:cursor-grabbing"
                                     >
                                       <GripVertical className="h-4 w-4" />
                                     </button>
@@ -1060,8 +1056,8 @@ export default function SessionForm() {
                                     )}
                                     <ChevronDown
                                       className={
-                                        'h-4 w-4 shrink-0 text-ink-soft/40 transition-transform duration-150 ' +
-                                        (isOpen ? 'rotate-180 text-ink-soft/70' : '')
+                                        'h-4 w-4 shrink-0 text-ink-mute transition-transform duration-150 ' +
+                                        (isOpen ? 'rotate-180 text-ink-mute' : '')
                                       }
                                     />
                                   </div>
@@ -1131,11 +1127,11 @@ export default function SessionForm() {
                                           }}
                                           autoFocus={it.comment === ''}
                                           placeholder="Commentaire (tempo, consigne…)"
-                                          className="h-[34px] w-full rounded-sm border border-hairline bg-glass-sunken px-3 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
+                                          className="h-[34px] w-full rounded-sm border border-hairline bg-glass-sunken px-3 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-mute focus:border-sage-500"
                                         />
                                       )}
 
-                                      {ex?.description && <p className="text-xs font-medium text-ink-soft/80">{ex.description}</p>}
+                                      {ex?.description && <p className="text-xs font-medium text-ink-mute">{ex.description}</p>}
 
                                       {/* Actions de la ligne, en icônes : varier · commenter · démo · fiche · retirer */}
                                       <div className="flex items-center gap-1.5">
@@ -1222,7 +1218,7 @@ export default function SessionForm() {
                           if (bi === -1) return null
                           return (
                             <div className={`flex min-h-10 items-center gap-2.5 rounded-sm px-4 ${liftedClass}`}>
-                              <GripVertical className="h-4 w-4 text-ink-soft/40" />
+                              <GripVertical className="h-4 w-4 text-ink-mute" />
                               <span className={`tabular-nums text-[13px] font-bold ${catMeta.text}`}>
                                 Bloc {bi + 1} · {blocksArr[bi].length} exo{blocksArr[bi].length > 1 ? 's' : ''}
                               </span>
@@ -1233,7 +1229,7 @@ export default function SessionForm() {
                         const ex = it && exOf(it.exerciseId)
                         return (
                           <div className={`flex min-h-12 items-center gap-3 rounded-sm px-4 ${liftedClass}`}>
-                            <GripVertical className="-ml-1.5 h-4 w-6 shrink-0 text-ink-soft/60" />
+                            <GripVertical className="-ml-1.5 h-4 w-6 shrink-0 text-ink-mute" />
                             <p className="min-w-0 flex-1 truncate text-[15px] font-bold text-ink">{ex?.name ?? '—'}</p>
                           </div>
                         )
@@ -1264,7 +1260,7 @@ export default function SessionForm() {
                       }}
                       className={
                         'ml-auto flex items-center gap-1.5 tabular-nums text-[13px] font-bold   ' +
-                        (newBlockPending ? 'text-muscu' : 'text-ink/60 active:text-ink')
+                        (newBlockPending ? 'text-muscu' : 'text-ink-mute active:text-ink')
                       }
                     >
                       <LayoutGrid className="h-3.5 w-3.5" /> nouveau bloc
@@ -1272,7 +1268,7 @@ export default function SessionForm() {
                   )}
                 </div>
                 {category === 'hiit' && items.length > 0 && (
-                  <p className="border-t border-hairline bg-glass-sunken px-4 py-2.5 text-center tabular-nums text-[13px] text-ink/45">
+                  <p className="border-t border-hairline bg-glass-sunken px-4 py-2.5 text-center tabular-nums text-[13px] text-ink-mute">
                     {items.length} exercice{items.length > 1 ? 's' : ''} × {rounds} tour{rounds > 1 ? 's' : ''} · {workSec} s
                     d'effort / {restSec} s de repos
                   </p>
@@ -1283,7 +1279,7 @@ export default function SessionForm() {
 
           {/* ── Planification ── */}
           <div className="space-y-2">
-            <Eyebrow className="ml-1 text-ink/60">Planification</Eyebrow>
+            <h2 className="ml-1 text-base leading-[22px] font-bold">Planification</h2>
             <div className={card}>
               {/* Le « quand » : trois positions. L'alternance est une section à part, plus bas. */}
               <div className="px-3 py-2.5">
@@ -1383,7 +1379,7 @@ export default function SessionForm() {
                     <div className={row + ' flex-col items-stretch gap-2 py-3'}>
                       <span className={rowLabel}>En alternance avec</span>
                       <div className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 tabular-nums text-[13px] leading-relaxed font-bold text-ink/85">
+                        <span className="min-w-0 flex-1 tabular-nums text-[13px] leading-relaxed font-bold text-ink-soft">
                           {steps.map((st) => st.map(nameOf).join(' + ')).join(' → ')}
                         </span>
                         <button type="button" aria-label="Retirer l'alternance" onClick={() => setPartner('')} className={iconBtn}>
@@ -1399,7 +1395,7 @@ export default function SessionForm() {
                           aria-label="En alternance avec"
                           value=""
                           onChange={(e) => setPartner(e.target.value)}
-                          className="h-[30px] appearance-none rounded-sm border border-hairline bg-glass-sunken pl-3 pr-7 tabular-nums text-[13px] text-ink/70 outline-none focus:border-sage-500"
+                          className="h-[30px] appearance-none rounded-sm border border-hairline bg-glass-sunken pl-3 pr-7 tabular-nums text-[13px] text-ink-soft outline-none focus:border-sage-500"
                         >
                           <option value="">Aucune</option>
                           {sessions
@@ -1410,7 +1406,7 @@ export default function SessionForm() {
                               </option>
                             ))}
                         </select>
-                        <ChevronDown className="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-ink/60" />
+                        <ChevronDown className="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-ink-mute" />
                       </div>
                     </div>
                   )}
@@ -1436,7 +1432,7 @@ export default function SessionForm() {
                     <button type="button" aria-label="Semaine précédente" onClick={() => setWeekOffset((o) => o - 1)} className={iconBtn}>
                       <ChevronLeft className="h-4 w-4" />
                     </button>
-                    <span className="min-w-[7.5rem] text-center tabular-nums text-[13px] text-ink/85">
+                    <span className="min-w-[7.5rem] text-center text-[15px] font-bold">
                       {weekOffset === 0 ? 'Cette semaine' : `Sem. du ${formatShortFr(weekDates[0])}`}
                     </span>
                     <button type="button" aria-label="Semaine suivante" onClick={() => setWeekOffset((o) => o + 1)} className={iconBtn}>
@@ -1451,13 +1447,13 @@ export default function SessionForm() {
                     const isToday = d === todayIdx
                     return (
                       <div key={d} title={DAY_NAMES[d]} className="mx-auto flex flex-col items-center gap-0.5">
-                        <span className={'tabular-nums text-[13px]  ' + (isToday ? 'text-sage-700' : 'text-ink/55')}>
+                        <span className={'tabular-nums text-[13px]  ' + (isToday ? 'text-sage-700' : 'text-ink-mute')}>
                           {letter}
                         </span>
                         <span
                           className={
                             'flex h-5 w-5 items-center justify-center rounded-full tabular-nums text-[13px] tabular-nums ' +
-                            (isToday ? 'bg-sage-500 text-onaccent' : 'text-ink/55')
+                            (isToday ? 'bg-sage-500 text-onaccent' : 'text-ink-mute')
                           }
                         >
                           {Number(weekDates[d].slice(8, 10))}
@@ -1473,7 +1469,7 @@ export default function SessionForm() {
                       id={r.session.id}
                       title={r.session.name}
                       code={r.code}
-                      hex={CATEGORY_META[r.cat].hex}
+                      category={r.cat}
                       self={r.self}
                       planned={r.planned}
                       done={r.done}
@@ -1492,7 +1488,7 @@ export default function SessionForm() {
                         id={'plan-' + st.seance.day}
                         title={st.seance.title}
                         code={t.code + ' · plan semi'}
-                        hex={t.hex}
+                        category="running"
                         planned={Array.from({ length: 7 }, (_, d) => d === st.seance.day && !st.done)}
                         done={Array.from({ length: 7 }, (_, d) => d === doneCol)}
                         todayIdx={todayIdx}
@@ -1501,11 +1497,11 @@ export default function SessionForm() {
                   })}
                 </div>
                 {noDays ? (
-                  <p className="mt-2.5 pl-1 tabular-nums text-[13px] leading-relaxed text-hiit">
+                  <p className="mt-2.5 pl-1 text-[15px] leading-[22px] font-semibold text-[#b3261a]">
                     Aucun jour choisi : ce programme n'apparaîtra ni dans le Planning ni dans Aujourd'hui.
                   </p>
                 ) : (
-                  <p className="mt-2.5 pl-1 tabular-nums text-[13px] text-ink/85">
+                  <p className="mt-2.5 pl-1 text-[15px] leading-[22px] font-semibold">
                     Prochaine fois : {preview.nextLabel}
                   </p>
                 )}
@@ -1524,7 +1520,7 @@ export default function SessionForm() {
               <span className={rowLabel}>Options avancées</span>
               {!optionsOpen && <p className="truncate text-[13px] font-semibold text-ink-soft">{optionsSummary}</p>}
               <ChevronDown
-                className={'ml-auto h-4 w-4 shrink-0 text-ink-soft/60 transition-transform duration-150 ' + (optionsOpen ? 'rotate-180' : '')}
+                className={'ml-auto h-4 w-4 shrink-0 text-ink-mute transition-transform duration-150 ' + (optionsOpen ? 'rotate-180' : '')}
               />
             </button>
             {optionsOpen && (
@@ -1552,7 +1548,7 @@ export default function SessionForm() {
         <aside className="hidden lg:block lg:pt-[4.5rem]">
           {/* Sticky : la banque reste sous les yeux pendant tout le défilement du formulaire */}
           <div className={'sticky top-5 flex max-h-[calc(100dvh-8rem)] flex-col p-4 ' + glassCard}>
-            <Eyebrow className="mb-2.5 text-ink/50">— Banque d'exercices</Eyebrow>
+            <h2 className="mb-2.5 text-base leading-[22px] font-bold">Banque d'exercices</h2>
             <ExercisePicker
               exercises={exercises}
               counts={itemCounts}

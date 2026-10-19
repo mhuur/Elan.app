@@ -176,7 +176,7 @@ function Inner({ log, onClose }: { log: Log; onClose: () => void }) {
             className="rounded-lg border border-sand bg-shoal px-2 py-1 text-sm font-bold text-ink outline-none focus:border-sage-400"
           />
         </label>
-        <span className="shrink-0 text-xs font-semibold text-ink-soft/70">
+        <span className="shrink-0 text-xs font-semibold text-ink-mute">
           enregistrée à {new Date(log.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
@@ -215,7 +215,7 @@ function Inner({ log, onClose }: { log: Log; onClose: () => void }) {
       <button
         type="button"
         onClick={del}
-        className="flex w-full items-center justify-center gap-1.5 py-1 text-sm font-bold text-hiit/70 active:text-hiit"
+        className="flex w-full items-center justify-center gap-1.5 py-1 text-sm font-bold text-flare active:opacity-70"
       >
         <Trash2 className="h-4 w-4" /> Supprimer cette séance
       </button>

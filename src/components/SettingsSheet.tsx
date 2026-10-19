@@ -188,7 +188,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
                 if (e.key === 'Enter') void submitIdea()
               }}
               placeholder="Noter un bug ou une idée…"
-              className="min-w-0 flex-1 rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink-soft/60 focus:border-sage-400"
+              className="min-w-0 flex-1 rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink-mute focus:border-sage-400"
             />
             {ideaText.trim() && (
               <button
@@ -226,7 +226,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
                     type="button"
                     aria-label="Supprimer la note"
                     onClick={() => void removeIdea(i.id)}
-                    className="shrink-0 px-1 text-ink-soft/50 active:text-hiit"
+                    className="shrink-0 px-1 text-ink-mute active:text-flare"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -264,7 +264,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
           </GhostButton>
         )}
 
-        <p className="pt-2 text-center text-xs text-ink-soft/60">21KM v2.0</p>
+        <p className="pt-2 text-center text-xs text-ink-mute">21KM v2.0</p>
       </div>
     </Sheet>
   )

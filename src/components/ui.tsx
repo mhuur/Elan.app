@@ -421,7 +421,7 @@ export function Seg<T extends string>({
           onClick={() => onChange(o.value)}
           className={
             'flex-1 rounded-full px-2 whitespace-nowrap text-ink transition-colors ' +
-            (compact ? 'min-h-9 text-sm ' : 'min-h-11 text-[15px] ') +
+            (compact ? 'min-h-9 text-[13px] sm:text-sm ' : 'min-h-11 text-[15px] ') +
             (o.value === value ? 'bg-surface font-bold shadow-sm' : 'font-semibold active:bg-hairline')
           }
         >

@@ -14,9 +14,10 @@ const items: { to: string; label: string; icon: PictoName }[] = [
  * téléphone — onglet choisi = pilule Volt de 56 × 32 autour de l'icône, libellé gras —,
  * barre latérale de 232 px sur bureau (≥ lg), avec le logo en tête.
  */
-export default function BottomNav() {
+export default function BottomNav({ sideOnly }: { sideOnly?: boolean }) {
   return (
     <>
+      {!sideOnly && (
       <nav
         aria-label="Navigation principale"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-surface px-2 pt-1.5 pb-[max(14px,env(safe-area-inset-bottom))] lg:hidden"
@@ -49,6 +50,7 @@ export default function BottomNav() {
           ))}
         </div>
       </nav>
+      )}
       <nav
         aria-label="Navigation principale"
         className="fixed inset-y-0 left-0 z-40 hidden w-[232px] flex-col gap-1.5 border-r border-hairline bg-surface px-4 py-7 lg:flex"

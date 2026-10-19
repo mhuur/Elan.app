@@ -87,7 +87,7 @@ export default function ExercisePicker({
   return (
     <div className="flex min-h-0 flex-col">
       <div className="relative shrink-0">
-        <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink/45" />
+        <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-mute" />
         <input
           ref={searchRef}
           type="search"
@@ -95,7 +95,7 @@ export default function ExercisePicker({
           onChange={(e) => setQuery(e.target.value)}
           placeholder={`Rechercher ou créer…`}
           aria-label="Rechercher un exercice"
-          className="w-full rounded-sm border border-hairline bg-shoal py-2.5 pr-3 pl-9 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
+          className="w-full rounded-sm border border-hairline bg-shoal py-2.5 pr-3 pl-9 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink-mute focus:border-sage-500"
         />
       </div>
       {/* Filtre de sous-type en liste déroulante (oct. 2026, retour utilisateur : la rangée de
@@ -136,7 +136,7 @@ export default function ExercisePicker({
                     {/* Même police que la liste de la séance : un exercice a une seule tête, des deux côtés */}
                     <span className="min-w-0 flex-1 truncate text-[15px] font-bold text-ink">{e.name}</span>
                     {e.measure === 'sec' && (
-                      <span className="shrink-0 rounded-full border border-hairline px-2 py-[3px] tabular-nums text-[13px] text-ink/60">
+                      <span className="shrink-0 rounded-full border border-hairline px-2 py-[3px] tabular-nums text-[13px] text-ink-mute">
                         sec
                       </span>
                     )}
@@ -146,7 +146,7 @@ export default function ExercisePicker({
                         {n > 1 ? `×${n}` : ''}
                       </span>
                     ) : (
-                      <Plus className="h-4 w-4 shrink-0 text-ink/40" />
+                      <Plus className="h-4 w-4 shrink-0 text-ink-mute" />
                     )}
                   </button>
                 )
@@ -155,7 +155,7 @@ export default function ExercisePicker({
           </section>
         ))}
         {visible.length === 0 && !q && (
-          <p className="px-1 py-2 text-sm font-semibold text-ink/50">
+          <p className="px-1 py-2 text-sm font-semibold text-ink-mute">
             Aucun exercice pour l'instant.
           </p>
         )}
@@ -172,7 +172,7 @@ export default function ExercisePicker({
 
       {creating && (
         <div className="mt-3 shrink-0 space-y-2 border-t border-hairline-strong pt-3">
-          <p className="tabular-nums text-[13px] text-ink/60">
+          <p className="tabular-nums text-[13px] text-ink-mute">
             Nouvel exercice
           </p>
           <input
@@ -187,7 +187,7 @@ export default function ExercisePicker({
             }}
             autoFocus
             placeholder="Nom"
-            className="w-full rounded-sm border border-hairline bg-shoal px-3 py-2.5 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink/40 focus:border-sage-500"
+            className="w-full rounded-sm border border-hairline bg-shoal px-3 py-2.5 text-sm font-semibold outline-none placeholder:font-normal placeholder:text-ink-mute focus:border-sage-500"
           />
           <div className="grid grid-cols-2 gap-2">
             <select
@@ -227,7 +227,7 @@ export default function ExercisePicker({
             <button
               type="button"
               onClick={() => setCreating(false)}
-              className="rounded-sm border border-hairline px-3 py-2.5 tabular-nums text-sm font-bold text-ink/60"
+              className="rounded-sm border border-hairline px-3 py-2.5 tabular-nums text-sm font-bold text-ink-mute"
             >
               Annuler
             </button>

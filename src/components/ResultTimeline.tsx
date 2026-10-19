@@ -67,7 +67,7 @@ export default function ResultTimeline({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span
-                      className={`block truncate text-sm font-bold ${st === 'no' ? 'text-ink-soft/40 line-through' : ''}`}
+                      className={`block truncate text-sm font-bold ${st === 'no' ? 'text-ink-mute line-through' : ''}`}
                     >
                       {row.name}
                       {row.setLabel && (
@@ -75,12 +75,12 @@ export default function ResultTimeline({
                       )}
                     </span>
                     {row.sub && (
-                      <span className="block truncate text-sm font-semibold text-ink-soft/60">{row.sub}</span>
+                      <span className="block truncate text-sm font-semibold text-ink-mute">{row.sub}</span>
                     )}
                   </span>
                   <span
                     className={`shrink-0 text-xs font-extrabold ${
-                      st === 'no' ? 'text-ink-soft/40' : st === 'flag' ? 'text-amber-400' : 'text-ink-soft'
+                      st === 'no' ? 'text-ink-mute' : st === 'flag' ? 'text-amber-400' : 'text-ink-soft'
                     }`}
                   >
                     {st === 'no' ? 'non faite' : st === 'flag' ? 'mal réalisée' : `${row.value} ${row.unit}`}
@@ -92,7 +92,7 @@ export default function ResultTimeline({
                   onClick={() => onFlag(gi)}
                   disabled={st === 'no'}
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                    st === 'flag' ? 'text-amber-500' : st === 'no' ? 'text-ink-soft/15' : 'text-ink-soft/35 active:text-amber-500'
+                    st === 'flag' ? 'text-amber-500' : st === 'no' ? 'text-ink-mute' : 'text-ink-mute active:text-amber-500'
                   }`}
                 >
                   <TriangleAlert className="h-4 w-4" />

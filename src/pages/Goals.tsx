@@ -6,7 +6,7 @@ import { effectiveMetrics, goalLevels, objectiveLevels } from '../lib/metrics'
 import { CategoryIcon, EmptyState, Fab, Field, NumInput, PageHeader, PrimaryButton, Seg, Select, Sheet } from '../components/ui'
 
 const inputSm =
-  'w-full rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-soft/50 focus:border-sage-400'
+  'w-full rounded-xl border border-sand bg-shoal px-3 py-2.5 text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-mute focus:border-sage-400'
 
 function ProgressBar({ ratio, reached }: { ratio: number; reached: boolean }) {
   return (
@@ -201,7 +201,7 @@ export default function Goals() {
                     type="button"
                     aria-label="Modifier cet objectif"
                     onClick={() => openEditExercise(e)}
-                    className="px-1 text-ink-soft/50 active:text-sage-600"
+                    className="px-1 text-ink-mute active:text-sage-600"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
@@ -211,7 +211,7 @@ export default function Goals() {
                     onClick={() => {
                       if (window.confirm(`Supprimer l'objectif sur « ${e.name} » ?`)) void updateExercise(e.id, { goal: null })
                     }}
-                    className="px-1 text-ink-soft/50 active:text-hiit"
+                    className="px-1 text-ink-mute active:text-flare"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -235,7 +235,7 @@ export default function Goals() {
                 {levels
                   .filter((l) => cur < l.value && l !== next)
                   .map((l) => (
-                    <p key={l.value} className="text-sm font-semibold text-ink-soft/70">
+                    <p key={l.value} className="text-sm font-semibold text-ink-mute">
                       Puis {l.value} {unit}
                       {l.reward ? ` · 🎁 ${l.reward}` : ''}
                     </p>
@@ -266,7 +266,7 @@ export default function Goals() {
                     type="button"
                     aria-label="Modifier cet objectif"
                     onClick={() => openEditSession(s)}
-                    className="px-1 text-ink-soft/50 active:text-sage-600"
+                    className="px-1 text-ink-mute active:text-sage-600"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
@@ -276,7 +276,7 @@ export default function Goals() {
                     onClick={() => {
                       if (window.confirm(`Supprimer l'objectif sur « ${s.name} » ?`)) void updateSession(s.id, { objective: null })
                     }}
-                    className="px-1 text-ink-soft/50 active:text-hiit"
+                    className="px-1 text-ink-mute active:text-flare"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -313,7 +313,7 @@ export default function Goals() {
                 {levels
                   .filter((lv) => !sessionLevelReached(s, lv) && lv !== next)
                   .map((lv, i) => (
-                    <p key={i} className="text-sm font-semibold text-ink-soft/70">
+                    <p key={i} className="text-sm font-semibold text-ink-mute">
                       Puis {targetsLabel(lv)}
                       {lv.reward ? ` · 🎁 ${lv.reward}` : ''}
                     </p>
@@ -380,7 +380,7 @@ export default function Goals() {
                             type="button"
                             aria-label="Retirer ce palier"
                             onClick={() => setExDrafts((p) => p.filter((_, j) => j !== i))}
-                            className="px-1 text-ink-soft/50"
+                            className="px-1 text-ink-mute"
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -429,7 +429,7 @@ export default function Goals() {
                             type="button"
                             aria-label="Retirer ce palier"
                             onClick={() => setSessDrafts((p) => p.filter((_, j) => j !== i))}
-                            className="px-1 text-ink-soft/50"
+                            className="px-1 text-ink-mute"
                           >
                             <X className="h-4 w-4" />
                           </button>

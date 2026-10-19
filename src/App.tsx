@@ -68,7 +68,8 @@ function Shell() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      {!fullScreen && !formScreen && <BottomNav />}
+      {/* Formulaires : pas de barre du bas (une barre d'action la remplace), barre latérale gardée sur bureau */}
+      {!fullScreen && <BottomNav sideOnly={formScreen} />}
     </>
   )
 }

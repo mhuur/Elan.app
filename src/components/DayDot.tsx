@@ -9,7 +9,7 @@ export type DayState = 'done' | 'planned' | 'missed' | 'none'
  * mais non fait, petit point = rien ce jour-là. Partagé entre le Planning et l'aperçu de
  * la fiche séance, qui montre la même grille.
  */
-export function DayDot({ state, category = 'muscu', hex, small }: { state: DayState; category?: Category; hex?: string; small?: boolean }) {
+export function DayDot({ state, category = 'muscu', hex, small, muted }: { state: DayState; category?: Category; hex?: string; small?: boolean; muted?: boolean }) {
   if (state === 'none') return <span className="h-1.5 w-1.5 rounded-full bg-hairline-strong" />
   return (
     <CategoryRing
@@ -17,6 +17,7 @@ export function DayDot({ state, category = 'muscu', hex, small }: { state: DaySt
       hex={hex}
       done={state === 'done'}
       missed={state === 'missed'}
+      muted={muted}
       className={small ? 'h-6 w-6' : 'h-[30px] w-[30px] lg:h-10 lg:w-10'}
     />
   )
