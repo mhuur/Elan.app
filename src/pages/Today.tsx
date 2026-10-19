@@ -40,7 +40,7 @@ function SortableCard({ id, label, children }: { id: string; label: string; chil
         {...listeners}
         className="flex h-11 w-8 shrink-0 cursor-grab touch-none items-center justify-center text-ink-mute active:cursor-grabbing"
       >
-        <Picto name="poignee" className="h-5 w-5" strokeWidth={3} />
+        <Picto name="poignee" className="grip h-5 w-5" strokeWidth={3} />
       </button>
       {children}
     </div>
@@ -165,7 +165,7 @@ export default function Today() {
       >
         <CategoryRing category={cat} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-[17px] leading-[22px] font-semibold">{plan ? item.st.seance.title : item.s.name}</span>
+          <p className="truncate text-[17px] leading-[22px] font-semibold">{plan ? item.st.seance.title : item.s.name}</p>
           <span className="truncate text-sm leading-5 text-ink-soft">{meta1}</span>
           {meta2 && <span className="truncate text-sm leading-5 text-ink-mute tabular-nums">{meta2}</span>}
         </span>
@@ -258,7 +258,7 @@ export default function Today() {
               {dragItem && (
                 <div className={`flex min-h-[88px] items-center gap-1 rounded-md ${liftedClass}`}>
                   <span className="flex h-11 w-8 items-center justify-center text-ink-mute">
-                    <Picto name="poignee" className="h-5 w-5" strokeWidth={3} />
+                    <Picto name="poignee" className="grip h-5 w-5" strokeWidth={3} />
                   </span>
                   {dayItemBody(dragItem)}
                 </div>

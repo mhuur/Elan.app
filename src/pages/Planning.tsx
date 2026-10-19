@@ -74,7 +74,7 @@ function RowFace({ session, todayIdx, states, sublabel, onDay, onEdit, handle }:
         {...handle}
         className="flex h-11 w-6 cursor-grab touch-none items-center justify-center text-ink-mute active:cursor-grabbing"
       >
-        <Picto name="poignee" className="h-4 w-4" strokeWidth={3} />
+        <Picto name="poignee" className="grip h-4 w-4" strokeWidth={3} />
       </button>
       <button type="button" onClick={onEdit} className="min-w-0 pr-1 pl-0.5 text-left">
         <span className="line-clamp-2 text-[15px] leading-[19px] font-semibold lg:line-clamp-1 lg:text-base lg:leading-[22px]">
@@ -379,7 +379,7 @@ export default function Planning() {
                             {...drag.listeners}
                             className="flex h-9 w-8 cursor-grab touch-none items-center justify-center text-ink-mute active:cursor-grabbing"
                           >
-                            <Picto name="poignee" className="h-[18px] w-[18px]" strokeWidth={3} />
+                            <Picto name="poignee" className="grip h-[18px] w-[18px]" strokeWidth={3} />
                           </button>,
                         )
                       }
@@ -395,7 +395,7 @@ export default function Planning() {
                 )}
                 {dragSection && (
                   <div className={'flex items-center gap-1 rounded-sm px-2 py-2.5 ' + liftedClass}>
-                    <Picto name="poignee" className="h-[18px] w-[18px] text-ink-mute" strokeWidth={3} />
+                    <Picto name="poignee" className="grip h-[18px] w-[18px] text-ink-mute" strokeWidth={3} />
                     <span className="text-base font-bold">{dragSection.group || emptyLabel}</span>
                     <span className="text-sm text-ink-soft">
                       · {dragSection.sessions.filter(visibleInWeek).length + (dragSection.plan ? planStates.length : 0)} séances

@@ -155,11 +155,11 @@ function PreviewRow({
       }
     >
       <div className="min-w-0 pl-1">
-        <span className={'block truncate text-sm leading-[18px] ' + (self ? 'font-bold' : 'font-semibold text-ink-soft')}>{title}</span>
+        <span data-title className={'block truncate text-sm leading-[18px] ' + (self ? 'font-bold' : 'font-semibold text-ink-soft')}>{title}</span>
         <span className="block truncate text-[13px] leading-[18px] text-ink-mute">{code}</span>
       </div>
       {Array.from({ length: 7 }, (_, d) => (
-        <span key={d} className={dayCell(d === todayIdx)}>
+        <span key={d} data-state={done[d] ? 'done' : planned[d] ? 'planned' : 'none'} className={dayCell(d === todayIdx)}>
           <DayDot state={done[d] ? 'done' : planned[d] ? 'planned' : 'none'} category={category} muted={!self} small />
         </span>
       ))}

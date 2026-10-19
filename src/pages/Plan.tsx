@@ -276,8 +276,8 @@ export default function Plan() {
           </div>
           {chart(true)}
           <div className="flex gap-1.5">
-            {phases.map((p) => (
-              <span key={p.l} className="flex min-w-0 flex-col gap-1" style={{ flex: p.f }}>
+            {phases.map((p, i) => (
+              <span key={i} className="flex min-w-0 flex-col gap-1" style={{ flex: p.f }}>
                 <span className="h-1 rounded-full" style={{ backgroundColor: p.on ? '#0E1116' : p.past ? '#9AA3AF' : '#DDE1E7' }} />
                 <span className="truncate text-[13px] leading-[18px] font-semibold text-ink-soft">{p.l}</span>
               </span>
@@ -363,7 +363,8 @@ export default function Plan() {
         <div className="min-w-0 flex-1 text-center">
           <p className="text-lg leading-6 font-extrabold">{weekIdx >= planStart ? `Semaine ${n} sur ${planLen}` : 'Préparation juin'}</p>
           <p className="text-sm leading-5 text-ink-soft">
-            {weekIdx === cur ? 'Cette semaine · ' : weekIdx < planStart ? 'Historique · ' : ''}
+            {weekIdx === cur ? 'Cette semaine · ' : ''}
+            {weekIdx < planStart ? 'historique · ' : ''}
             {formatShortFr(week.start)} – {formatShortFr(end)}
           </p>
         </div>
