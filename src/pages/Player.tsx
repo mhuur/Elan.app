@@ -500,6 +500,16 @@ export default function Player() {
     goTo(stepIdx + 1)
   }
 
+  /** Valider une série chronométrée avant la fin du chrono : le temps réellement tenu est
+   *  journalisé (au moins 1 s) et le minuteur enchaîne, comme à la fin normale du chrono.
+   *  Un temps plus court que la cible ne fait jamais baisser l'objectif (progression.ts). */
+  const validateEarly = () => {
+    const elapsed = Math.max(1, Math.round((step.sec * 1000 - remainMsRef.current) / 1000))
+    recordSet(step.exerciseId, elapsed)
+    tone(520, 0.2)
+    goTo(stepIdx + 1)
+  }
+
   // Démo vidéo de l'exercice en cours, si l'exercice en a une
   const stepExercise = step?.exerciseId ? exercises.find((e) => e.id === step.exerciseId) : undefined
   // Temps restant estimé (étapes manuelles comptées à leur durée forfaitaire)
@@ -751,6 +761,17 @@ export default function Player() {
               </Ring>
               {step.type === 'work' && step.comment && !paused && (
                 <p className="max-w-[640px] text-[21px] leading-[1.3] font-medium lg:text-[30px]">{step.comment}</p>
+              )}
+              {/* Série chronométrée terminée avant la fin du chrono (demande de Romain, 23/10/2026) */}
+              {step.type === 'work' && !paused && (
+                <button
+                  type="button"
+                  onClick={validateEarly}
+                  className="inline-flex min-h-[52px] items-center gap-2 rounded-full px-6 text-[17px] font-bold text-white ring-[1.5px] ring-white ring-inset active:scale-[0.97] active:bg-night"
+                >
+                  <Check className="h-5 w-5" strokeWidth={2.6} />
+                  Valider maintenant
+                </button>
               )}
               {paused && (
                 <button type="button" onClick={() => setPaused(false)} className={xlBtn}>
