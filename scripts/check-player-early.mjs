@@ -1,6 +1,6 @@
 // Vérif Playwright (oct. 2026) : au minuteur, « Valider maintenant » termine une série
-// chronométrée avant la fin du chrono, enchaîne sur l'étape suivante et journalise le temps
-// réellement tenu (et non la cible). Prérequis : `npm run dev:demo` (port 5174).
+// chronométrée avant la fin du chrono, enchaîne sur l'étape suivante et journalise la durée
+// PRÉVUE de la série (choix de Romain, 23/10/2026), pas le temps tenu. Prérequis : `npm run dev:demo` (port 5174).
 import { chromium } from 'playwright'
 
 const BASE = 'http://localhost:5174'
@@ -31,10 +31,12 @@ try {
   const data = await page.evaluate(() => JSON.parse(localStorage.getItem('elan-data-v1')))
   const log = [...data.logs].sort((a, b) => b.createdAt - a.createdAt)[0]
   const first = log?.results?.[0]?.sets?.[0]
-  if (!(first >= 2 && first <= 5))
-    throw new Error(`Le temps tenu (≈ 3 s) devrait être journalisé, trouvé : ${JSON.stringify(log?.results)}`)
+  const hiit = data.sessions.find((s) => s.name.includes('Cardio express'))
+  const planned = hiit.items[0].durationSec ?? hiit.workSec ?? 45
+  if (first !== planned)
+    throw new Error(`La durée prévue (${planned} s) devrait être journalisée, pas le temps tenu (≈ 3 s) ; trouvé : ${JSON.stringify(log?.results)}`)
   if (errors.length) throw new Error(errors.join(' | '))
-  console.log(`PLAYER-EARLY OK — série validée avant la fin du chrono, ${first} s journalisées, étape suivante enchaînée`)
+  console.log(`PLAYER-EARLY OK — série validée avant la fin du chrono, ${first} s journalisées (durée prévue), étape suivante enchaînée`)
 } catch (e) {
   await page.screenshot({ path: 'screenshots/99-echec-player-early.png' })
   console.error('ÉCHEC :', e.message)

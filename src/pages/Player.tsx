@@ -500,12 +500,11 @@ export default function Player() {
     goTo(stepIdx + 1)
   }
 
-  /** Valider une série chronométrée avant la fin du chrono : le temps réellement tenu est
-   *  journalisé (au moins 1 s) et le minuteur enchaîne, comme à la fin normale du chrono.
-   *  Un temps plus court que la cible ne fait jamais baisser l'objectif (progression.ts). */
+  /** Valider une série chronométrée avant la fin du chrono : elle compte pour sa durée
+   *  PRÉVUE (choix de Romain, 23/10/2026), exactement comme si le chrono était allé au bout,
+   *  et le minuteur enchaîne. (« Passer », lui, journalise le temps réellement tenu.) */
   const validateEarly = () => {
-    const elapsed = Math.max(1, Math.round((step.sec * 1000 - remainMsRef.current) / 1000))
-    recordSet(step.exerciseId, elapsed)
+    recordSet(step.exerciseId, step.sec)
     tone(520, 0.2)
     goTo(stepIdx + 1)
   }
