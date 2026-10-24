@@ -41,7 +41,18 @@ import {
   type SessionItem,
 } from '../types'
 import { DAY_LETTER, DAY_NAMES, addDays, formatShortFr, mondayIndex, toDateStr, todayStr } from '../lib/dates'
-import { canonicalCycles, countWeekdays, cycleStepsOf, describeSchedule, diffDays, ownerOf, plannedSessionIdsOn } from '../lib/schedule'
+import {
+  cadenceOf,
+  canonicalCycles,
+  countWeekdays,
+  cycleDays,
+  cycleStepsOf,
+  describeSchedule,
+  diffDays,
+  ownerOf,
+  plannedSessionIdsOn,
+  weekdaysOf,
+} from '../lib/schedule'
 import { isPlanLog, planToDoOn, warmupsDueOn } from '../lib/planDay'
 import { usePlanningWeek } from '../lib/usePlanningWeek'
 import { TYPE_META } from '../data/plan'
@@ -105,20 +116,78 @@ function MiniNum({ value, onChange, min = 0, max = 990, label }: { value: number
 }
 
 /** Case de jour de semaine (jours fixes ou jours de l'alternance) */
-function DayButton({ d, on, onClick }: { d: number; on: boolean; onClick: () => void }) {
+function DayButton({ d, on, onClick, disabled }: { d: number; on: boolean; onClick: () => void; disabled?: boolean }) {
   return (
     <button
       type="button"
       title={DAY_NAMES[d]}
       aria-pressed={on}
       onClick={onClick}
+      disabled={disabled}
       className={
-        'flex h-11 min-w-0 flex-1 items-center justify-center rounded-full text-[15px] font-bold transition-colors ' +
+        'flex h-11 min-w-0 flex-1 items-center justify-center rounded-full text-[15px] font-bold transition-colors disabled:opacity-60 ' +
         (on ? 'bg-ink text-white' : 'bg-cream text-ink active:bg-sage-50')
       }
     >
       {DAY_LETTER[d]}
     </button>
+  )
+}
+
+/** Séance choisie dans la planification (« En alternance avec », « Les jours sans ») :
+ *  pastille pleine largeur à sa couleur, avec sa croix */
+function SessionPill({
+  session,
+  category,
+  removeLabel,
+  onRemove,
+}: {
+  session: Session
+  category: Category
+  removeLabel: string
+  onRemove: () => void
+}) {
+  const meta = CATEGORY_META[category]
+  return (
+    <div
+      className={`flex h-[30px] items-center justify-between rounded-full border pl-3 pr-1 ${meta.soft} ${meta.text}`}
+      style={{ borderColor: meta.hex + '73' }}
+    >
+      <span className="flex min-w-0 items-center gap-2 tabular-nums text-[13px] font-bold  ">
+        <CategoryIcon category={category} className="h-3 w-3 shrink-0" />
+        <span className="truncate">{session.name}</span>
+      </span>
+      <button
+        type="button"
+        aria-label={removeLabel}
+        onClick={onRemove}
+        className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full opacity-75 active:opacity-100"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  )
+}
+
+/** Sélecteur natif compact « Aucune » d'une séance, avant qu'elle devienne une `SessionPill` */
+function SessionSelect({ label, sessions, onChange }: { label: string; sessions: Session[]; onChange: (id: string) => void }) {
+  return (
+    <div className="relative ml-auto">
+      <select
+        aria-label={label}
+        value=""
+        onChange={(e) => onChange(e.target.value)}
+        className="h-[30px] appearance-none rounded-sm border border-hairline bg-glass-sunken pl-3 pr-7 tabular-nums text-[13px] text-ink-soft outline-none focus:border-sage-500"
+      >
+        <option value="">Aucune</option>
+        {sessions.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-ink-mute" />
+    </div>
   )
 }
 
@@ -179,6 +248,8 @@ interface Draft {
   category: Category
   planMode: PlanMode
   days: number[]
+  /** « Les jours sans » : séance dont les jours sont exclus ('' = aucune) */
+  offOf: string
   everyDays: number
   startDate: string
   steps: string[][]
@@ -308,12 +379,15 @@ export default function SessionForm() {
   const [days, setDays] = useState<number[]>(
     d ? d.days : cycleOwner?.repeat?.onDays?.length ? cycleOwner.repeat.onDays : (existing?.days ?? []),
   )
+  // « Les jours sans » (oct. 2026) : en Jours choisis, une séance dont les jours sont exclus —
+  // les cases montrent alors les jours restants, en lecture seule
+  const [offOf, setOffOf] = useState(d?.offOf ?? cycleOwner?.repeat?.offDaysOf ?? '')
   // Jours choisis / tous les X jours / avant une autre (warmupFor) — un seul « quand »
   const [planMode, setPlanMode] = useState<PlanMode>(
     d
       ? d.planMode
       : cycleOwner
-        ? cycleOwner.repeat?.onDays?.length
+        ? cycleOwner.repeat?.onDays?.length || cycleOwner.repeat?.offDaysOf
           ? 'weekly'
           : 'every'
         : existing?.warmupFor && !existing.days.length
@@ -332,7 +406,8 @@ export default function SessionForm() {
     if (d) return d.startStep
     const r = cycleOwner?.repeat
     if (!r || ownerSteps.length < 2) return 0
-    if (r.onDays?.length) return countWeekdays(r.startDate, nextOccurrenceStr(r.onDays), r.onDays) % ownerSteps.length
+    const wd = cycleDays(r, sessions)
+    if (wd.length) return countWeekdays(r.startDate, nextOccurrenceStr(wd), wd) % ownerSteps.length
     return nextEveryOccurrence(r.startDate, r.everyDays).index % ownerSteps.length
   })
   // `comment: ''` (un commentaire ajouté puis laissé vide — Firestore stocke les champs vidés
@@ -411,6 +486,13 @@ export default function SessionForm() {
   const shownCat = displayCategory({ category, items }, exercises)
   const catMeta = CATEGORY_META[shownCat]
   const partnerCat = partner ? displayCategory(partner, exercises) : shownCat
+  // « Les jours sans » : la séance exclue, et les jours de semaine qui restent pour ce
+  // programme (`cycleWd`). Sans jours de semaine à elle, repli sur les cases cochées.
+  const offRef = planMode === 'weekly' && offOf ? sessions.find((s) => s.id === offOf) : undefined
+  const offBusy = offRef ? weekdaysOf(offRef.id, sessions) : []
+  const cycleWd = offBusy.length ? [0, 1, 2, 3, 4, 5, 6].filter((x) => !offBusy.includes(x)) : days
+  // Séances proposées : celles posées sur des jours de semaine, hors cette fiche et son partenaire
+  const offOptions = sessions.filter((s) => s.id !== existing?.id && s.id !== partnerId && weekdaysOf(s.id, sessions).length > 0)
   // Groupes de blocs pour l'affichage et le drag & drop (un seul bloc si pas de découpage)
   const blocksArr: DraftItem[][] = []
   items.forEach((it, i) => {
@@ -603,7 +685,10 @@ export default function SessionForm() {
     // en alternance. Jours choisis sans alternance, avant une autre, ou alternance sans aucun
     // jour coché → pas de cycle — et surtout pas la cadence « tous les X jours » héritée
     // d'un autre onglet, invisible à l'écran (bug relevé le 05/09/2026).
-    const cycle = planMode === 'every' || (planMode === 'weekly' && alternating && days.length > 0)
+    // « Les jours sans » fait toujours un cycle, même sans partenaire : c'est le cycle qui
+    // relit les jours de la séance exclue à chaque affichage.
+    const cycle =
+      planMode === 'every' || (planMode === 'weekly' && (alternating || !!offRef) && cycleWd.length > 0)
 
     if (!cycle) {
       const rest = ownerSteps.map((st) => st.filter((x) => x !== selfId && !!byId(x))).filter((st) => st.length)
@@ -611,14 +696,7 @@ export default function SessionForm() {
       if (cycleOwner?.repeat && restIds.length) {
         writes.push({
           id: rest[0][0],
-          patch: {
-            repeat: {
-              everyDays: cycleOwner.repeat.everyDays,
-              startDate: cycleOwner.repeat.startDate,
-              ...(cycleOwner.repeat.onDays?.length ? { onDays: cycleOwner.repeat.onDays } : {}),
-              steps: rest.map((ids) => ({ ids })),
-            },
-          },
+          patch: { repeat: { ...cadenceOf(cycleOwner.repeat), steps: rest.map((ids) => ({ ids })) } },
         })
         for (const mid of restIds.slice(1)) {
           if (byId(mid)?.repeat) writes.push({ id: mid, patch: { repeat: null } })
@@ -636,8 +714,8 @@ export default function SessionForm() {
       const n = cleanSteps.length
       const chosen = startStep % n
       if (planMode === 'weekly') {
-        const d0 = nextOccurrenceStr(days)
-        if (countWeekdays(startDate, d0, days) % n !== chosen) cycleStart = backOccurrences(d0, chosen, days)
+        const d0 = nextOccurrenceStr(cycleWd)
+        if (countWeekdays(startDate, d0, cycleWd) % n !== chosen) cycleStart = backOccurrences(d0, chosen, cycleWd)
       } else {
         const next = nextEveryOccurrence(startDate, everyDays)
         const back = (((chosen - next.index) % n) + n) % n
@@ -650,7 +728,8 @@ export default function SessionForm() {
         repeat: {
           everyDays,
           startDate: cycleStart,
-          ...(planMode === 'weekly' ? { onDays: [...days].sort((a, b) => a - b) } : {}),
+          ...(planMode === 'weekly' ? { onDays: [...cycleWd].sort((a, b) => a - b) } : {}),
+          ...(offRef ? { offDaysOf: offRef.id } : {}),
           steps: cleanSteps.map((ids) => ({ ids })),
         },
       },
@@ -674,12 +753,7 @@ export default function SessionForm() {
         writes.push({
           id: s.id,
           patch: {
-            repeat: {
-              everyDays: s.repeat.everyDays,
-              startDate: s.repeat.startDate,
-              ...(s.repeat.onDays?.length ? { onDays: s.repeat.onDays } : {}),
-              steps: kept.map((ids) => ({ ids })),
-            },
+            repeat: { ...cadenceOf(s.repeat), steps: kept.map((ids) => ({ ids })) },
           },
         })
       }
@@ -690,7 +764,7 @@ export default function SessionForm() {
     for (const w of scheduleWrites(selfId)) await updateSession(w.id, w.patch)
   }
 
-  const noDays = planMode === 'weekly' && days.length === 0
+  const noDays = planMode === 'weekly' && cycleWd.length === 0
 
   // --- Aperçu : la grille du Planning (une ligne par séance, un rond par jour, semaine
   // navigable), pour caler ce programme en fonction de ce qui est déjà posé — séances de
@@ -752,7 +826,7 @@ export default function SessionForm() {
     }
     return { rows, nextLabel }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessions, exercises, logs, existing, selfKey, name, category, shownCat, planMode, days, everyDays, startDate, steps, startStep, warmupFor, weekDates[0]])
+  }, [sessions, exercises, logs, existing, selfKey, name, category, shownCat, planMode, days, offOf, everyDays, startDate, steps, startStep, warmupFor, weekDates[0]])
 
   const save = async () => {
     const maxOrder = sessions.reduce((a, s) => Math.max(a, s.sortOrder ?? -1), -1)
@@ -811,7 +885,7 @@ export default function SessionForm() {
   // Garde-fou du retour : « Retour » sur une fiche modifiée demandait zéro confirmation et
   // perdait tout en silence. On compare un instantané du formulaire à celui du montage.
   const draft: Draft = {
-    name, category, planMode, days, everyDays, startDate, steps, startStep,
+    name, category, planMode, days, offOf, everyDays, startDate, steps, startStep,
     items: items.map(({ uid: _uid, ...rest }) => rest),
     workSec, restSec, rounds, muscuRounds, group, warmupFor,
   }
@@ -1303,11 +1377,40 @@ export default function SessionForm() {
                 <div className={row + ' min-h-14'}>
                   <div className="flex w-full items-center justify-between">
                     {DAY_LETTER.map((_, d) => (
-                      <DayButton key={d} d={d} on={days.includes(d)} onClick={() => toggleDay(d)} />
+                      <DayButton
+                        key={d}
+                        d={d}
+                        on={cycleWd.includes(d)}
+                        disabled={offBusy.length > 0}
+                        onClick={() => toggleDay(d)}
+                      />
                     ))}
                   </div>
                 </div>
               )}
+
+              {/* ── Les jours sans : une séance dont les jours sont exclus (oct. 2026, demande
+                  utilisateur : HIIT/Vélo les jours sans course). Les cases au-dessus montrent
+                  alors les jours qui restent, en lecture seule, et suivent cette séance. ── */}
+              {planMode === 'weekly' &&
+                (offRef ? (
+                  <div className={row + ' flex-col items-stretch gap-2 py-3'}>
+                    <span className={rowLabel}>Les jours sans</span>
+                    <SessionPill
+                      session={offRef}
+                      category={displayCategory(offRef, exercises)}
+                      removeLabel="Retirer les jours sans"
+                      onRemove={() => setOffOf('')}
+                    />
+                  </div>
+                ) : (
+                  offOptions.length > 0 && (
+                    <div className={row}>
+                      <span className={rowLabel}>Les jours sans</span>
+                      <SessionSelect label="Les jours sans" sessions={offOptions} onChange={setOffOf} />
+                    </div>
+                  )
+                ))}
 
               {/* Jumelée : s'invite dans Aujourd'hui les jours où une séance de la
                   catégorie cible est due (courses du plan comprises) — pas de jour propre.
@@ -1357,23 +1460,7 @@ export default function SessionForm() {
                   {partner ? (
                     <div className={row + ' flex-col items-stretch gap-2 py-3'}>
                       <span className={rowLabel}>En alternance avec</span>
-                      <div
-                        className={`flex h-[30px] items-center justify-between rounded-full border pl-3 pr-1 ${CATEGORY_META[partnerCat].soft} ${CATEGORY_META[partnerCat].text}`}
-                        style={{ borderColor: CATEGORY_META[partnerCat].hex + '73' }}
-                      >
-                        <span className="flex min-w-0 items-center gap-2 tabular-nums text-[13px] font-bold  ">
-                          <CategoryIcon category={partnerCat} className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{partner.name}</span>
-                        </span>
-                        <button
-                          type="button"
-                          aria-label="Retirer l'alternance"
-                          onClick={() => setPartner('')}
-                          className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full opacity-75 active:opacity-100"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
+                      <SessionPill session={partner} category={partnerCat} removeLabel="Retirer l'alternance" onRemove={() => setPartner('')} />
                     </div>
                   ) : !simpleSteps ? (
                     <div className={row + ' flex-col items-stretch gap-2 py-3'}>
@@ -1390,27 +1477,14 @@ export default function SessionForm() {
                   ) : (
                     <div className={row}>
                       <span className={rowLabel}>En alternance avec</span>
-                      <div className="relative ml-auto">
-                        <select
-                          aria-label="En alternance avec"
-                          value=""
-                          onChange={(e) => setPartner(e.target.value)}
-                          className="h-[30px] appearance-none rounded-sm border border-hairline bg-glass-sunken pl-3 pr-7 tabular-nums text-[13px] text-ink-soft outline-none focus:border-sage-500"
-                        >
-                          <option value="">Aucune</option>
-                          {sessions
-                            .filter((s) => s.id !== existing?.id)
-                            .map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name}
-                              </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-ink-mute" />
-                      </div>
+                      <SessionSelect
+                        label="En alternance avec"
+                        sessions={sessions.filter((s) => s.id !== existing?.id && s.id !== offRef?.id)}
+                        onChange={setPartner}
+                      />
                     </div>
                   )}
-                  {steps.length > 1 && (planMode === 'every' || days.length > 0) && (
+                  {steps.length > 1 && (planMode === 'every' || cycleWd.length > 0) && (
                     <div className={row + ' flex-col items-stretch gap-2 py-3'}>
                       <span className={rowLabel}>Commencer par</span>
                       <Seg

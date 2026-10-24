@@ -151,6 +151,13 @@ export interface Repeat {
    */
   onDays?: number[]
   /**
+   * « Les jours sans » (oct. 2026) : id d'une séance dont les jours de semaine sont exclus —
+   * le cycle se pose sur les AUTRES jours, recalculés à chaque lecture (`cycleDays`), et suit
+   * donc cette séance si ses jours changent. `onDays` en garde une copie, reprise si elle
+   * disparaît ou n'a plus de jours de semaine.
+   */
+  offDaysOf?: string
+  /**
    * Rotation par jours : chaque étape regroupe les séances faites le même jour
    * (ex. [[Pompes, Abdos], [Jambes, Dos]] = jour A puis jour B, et on recommence).
    * Pas de tableaux imbriqués dans Firestore → tableau d'objets `{ ids }`.

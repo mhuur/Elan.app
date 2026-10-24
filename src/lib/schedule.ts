@@ -1,4 +1,4 @@
-import { CATEGORY_META, type Session } from '../types'
+import { CATEGORY_META, type Repeat, type Session } from '../types'
 import { DAY_SHORT, mondayIndex, toDateStr } from './dates'
 
 /** Nombre de jours entre deux dates YYYY-MM-DD (positif si to > from) */
@@ -83,6 +83,50 @@ export function ownerOf(
 }
 
 /**
+ * Jours de semaine où une séance est posée : ses jours fixes, ou ceux de son cycle s'il est
+ * sur jours de semaine (copie `onDays`, sans résoudre un éventuel `offDaysOf` du cycle — pas
+ * de récursion). [] pour « tous les X jours » ou une séance non planifiée.
+ */
+export function weekdaysOf(
+  sessionId: string,
+  sessions: Session[],
+  cycles: Map<string, string[][]> = canonicalCycles(sessions),
+): number[] {
+  const s = sessions.find((x) => x.id === sessionId)
+  if (!s) return []
+  const owner = ownerOf(sessionId, sessions, cycles)
+  if (owner?.repeat) return owner.repeat.onDays ?? []
+  return s.days
+}
+
+/**
+ * Jours de semaine d'un cycle : `onDays`, ou — « Les jours sans » (`offDaysOf`) — les jours
+ * où la séance désignée n'est pas posée. Repli sur la copie `onDays` si elle a disparu ou n'a
+ * pas de jours de semaine.
+ */
+export function cycleDays(
+  r: Repeat,
+  sessions: Session[],
+  cycles: Map<string, string[][]> = canonicalCycles(sessions),
+): number[] {
+  if (r.offDaysOf) {
+    const busy = weekdaysOf(r.offDaysOf, sessions, cycles)
+    if (busy.length) return [0, 1, 2, 3, 4, 5, 6].filter((d) => !busy.includes(d))
+  }
+  return r.onDays ?? []
+}
+
+/** Cadence d'un cycle recopiée telle quelle (réécriture des crans sans toucher au « quand ») */
+export function cadenceOf(r: Repeat): Omit<Repeat, 'steps'> {
+  return {
+    everyDays: r.everyDays,
+    startDate: r.startDate,
+    ...(r.onDays?.length ? { onDays: r.onDays } : {}),
+    ...(r.offDaysOf ? { offDaysOf: r.offDaysOf } : {}),
+  }
+}
+
+/**
  * Séances planifiées à une date donnée : jours fixes hebdomadaires,
  * intervalles (« tous les X jours ») et cycles d'alternance (toutes les
  * séances de l'étape du jour). Les membres d'un cycle sont pilotés par la
@@ -102,10 +146,11 @@ export function plannedSessionIdsOn(
     if (!owner?.repeat) continue
     const r = owner.repeat
     let occurrence: number
-    if (r.onDays && r.onDays.length) {
+    const onDays = cycleDays(r, sessions, cycles)
+    if (onDays.length || r.offDaysOf) {
       // Cycle posé sur des jours de semaine choisis : occurrence = nb de ces jours déjà passés
-      if (!r.onDays.includes(dayIdx) || diffDays(r.startDate, dStr) < 0) continue
-      occurrence = countWeekdays(r.startDate, dStr, r.onDays)
+      if (!onDays.includes(dayIdx) || diffDays(r.startDate, dStr) < 0) continue
+      occurrence = countWeekdays(r.startDate, dStr, onDays)
     } else {
       const diff = diffDays(r.startDate, dStr)
       if (diff < 0 || diff % r.everyDays !== 0) continue
@@ -130,9 +175,13 @@ export function describeSchedule(
   if (owner?.repeat) {
     const r = owner.repeat
     const steps = cycles.get(owner.id) ?? []
-    const base =
-      r.onDays && r.onDays.length
-        ? r.onDays.slice().sort((a, b) => a - b).map((d) => DAY_SHORT[d]).join(' · ')
+    const onDays = cycleDays(r, all, cycles)
+    const dayList = onDays.slice().sort((a, b) => a - b).map((d) => DAY_SHORT[d]).join(' · ')
+    const offRef = r.offDaysOf ? all.find((x) => x.id === r.offDaysOf) : undefined
+    const base = offRef
+      ? `Jours sans ${offRef.name}${dayList ? ` (${dayList})` : ''}`
+      : onDays.length
+        ? dayList
         : r.everyDays === 1
           ? 'Tous les jours'
           : `Tous les ${r.everyDays} jours`
