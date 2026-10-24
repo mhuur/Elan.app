@@ -45,7 +45,9 @@ Le `.env` (gitignoré) contient la config Firebase du projet `routine-sport-ca44
 
 **Depuis le 24/10/2026, un push ne publie plus rien : la publication se fait depuis le PC de Romain.** Du 01/09 au 23/10/2026, le workflow GitHub Actions `.github/workflows/firebase-hosting.yml` publiait à chaque push sur `main` avec le compte de service `github-action-avel@routine-sport-ca440.iam.gserviceaccount.com` (secret `FIREBASE_SERVICE_ACCOUNT`). L'audit de sécurité des applis du 23/10/2026 a supprimé ce compte de service (aucune clé de compte de service hors de Google Cloud) : les publications de `4a83711`, `4746539` et `44eae31` ont échoué en `PERMISSION_DENIED`, et le workflow a été retiré le 24/10 (décision de Romain). Les secrets GitHub `FIREBASE_SERVICE_ACCOUNT` et `AVEL_DOTENV` ne servent plus ; leur suppression est à faire par Romain (refusée au classificateur de Claude Code). Le `.env` local fait foi pour les variables `VITE_*`.
 
-Publication (le `firebase` local est connecté avec le compte Google de Romain) :
+**Livraison automatique (demandée par Romain le 24/10/2026, « tu te débrouilles pour automatiser ça », comme sur Recettes et Vocabulaire)** : à la fin de chaque tâche qui modifie l'app, enchaîner **sans redemander** : `npx tsc --noEmit -p .` → `git commit` + `push` → `npm run build` → `npx firebase-tools deploy --only hosting`. Si la compilation ou le build échoue, ne pas déployer. Retour arrière = `git revert <sha>` puis redéployer. Ne jamais demander à Romain de lancer `publier-l-app.bat`.
+
+Publication (le `firebase` local est connecté avec le compte Google de Romain, `saintilan.romain@gmail.com`, projet `routine-sport-ca440`) :
 
 ```
 npm run build
