@@ -27,7 +27,7 @@ export default function SettingsSheet({ open, onClose }: { open: boolean; onClos
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `avel-sauvegarde-${todayStr()}.json`
+    a.download = `21km-sauvegarde-${todayStr()}.json`
     a.click()
     URL.revokeObjectURL(url)
   }

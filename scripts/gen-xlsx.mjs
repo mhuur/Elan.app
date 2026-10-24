@@ -1,6 +1,6 @@
 // Génère Plan-Semi-Rennes-2026.xlsx (vrai .xlsx, sans dépendance de tableur) à partir du plan.
 //
-// SOURCE UNIQUE : le plan vient de src/data/plan.ts, comme l'app Avel et comme
+// SOURCE UNIQUE : le plan vient de src/data/plan.ts, comme l'app 21KM et comme
 // scripts/push-to-intervals.mjs (→ intervals.icu → montre COROS). Ne jamais redéclarer les
 // séances ici : c'est ce qui avait fait diverger le tableur de l'app d'une semaine entière.
 // Seuls le journal (JOURNAL, ce qui a réellement eu lieu) et la stratégie de course (feuille

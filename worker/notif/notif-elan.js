@@ -1,11 +1,11 @@
-// Cloudflare Worker — rappels de séance d'Avel
+// Cloudflare Worker — rappels de séance de 21KM
 //
 // Pourquoi ce Worker existe : une PWA ne peut PAS programmer une notification locale à
 // l'avance (l'API Notification Triggers a été abandonnée, jamais livrée nulle part) et un
 // `setTimeout` dans un service worker ne survit pas à son éviction. Il faut donc un serveur
 // qui envoie un push Web à l'heure voulue — c'est lui, réveillé par un Cron Trigger.
 //
-// Ce Worker NE CALCULE JAMAIS le planning. La planification d'Avel (cycles d'alternance,
+// Ce Worker NE CALCULE JAMAIS le planning. La planification de 21KM (cycles d'alternance,
 // « tous les X jours », repeat.onDays, plan semi) est complexe et vit dans l'app
 // (src/lib/schedule.ts, src/lib/planDay.ts). La réimplémenter ici créerait une seconde source
 // de vérité vouée à diverger. L'app envoie donc un agenda pré-calculé « date → noms de

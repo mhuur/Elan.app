@@ -13,7 +13,7 @@ export const AGENDA_DAYS = 30
  * Construit l'agenda des `days` prochains jours (aujourd'hui inclus), pour l'envoyer au
  * Worker `elan-notif` qui poussera les rappels.
  *
- * POURQUOI ICI, ET PAS DANS LE WORKER — la planification d'Avel est tout sauf triviale
+ * POURQUOI ICI, ET PAS DANS LE WORKER — la planification de 21KM est tout sauf triviale
  * (cycles d'alternance, « tous les X jours », `repeat.onDays`, plan semi aligné au lundi).
  * La réimplémenter côté serveur créerait une seconde source de vérité, vouée à diverger de
  * `plannedSessionIdsOn` / `planToDoOn`. On calcule donc ici, avec les mêmes fonctions que les

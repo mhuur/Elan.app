@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 //
-// Service worker d'Avel. Deux rôles :
+// Service worker de 21KM. Deux rôles :
 //   1. le pré-cache hors ligne (ce que `vite-plugin-pwa` générait tout seul avant) ;
 //   2. la réception des rappels de séance envoyés par le Worker Cloudflare `notif-elan`.
 //
@@ -61,7 +61,7 @@ self.addEventListener('push', (event) => {
   )
 })
 
-/** Au clic : on ramène l'onglet Avel existant au premier plan, sinon on en ouvre un. */
+/** Au clic : on ramène l'onglet 21KM existant au premier plan, sinon on en ouvre un. */
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const url = (event.notification.data as { url?: string } | undefined)?.url ?? '/'

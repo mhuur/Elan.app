@@ -58,7 +58,7 @@ async function ask(question) {
   return answer.trim()
 }
 
-// ---- Conversion d'une séance Avel → texte d'entraînement intervals.icu ----
+// ---- Conversion d'une séance 21KM → texte d'entraînement intervals.icu ----
 const fmtDur = (sec) => {
   if (sec < 60) return `${sec}s`
   const m = Math.floor(sec / 60), s = sec % 60
@@ -123,7 +123,7 @@ async function clearOurs() {
   const existing = await api(`/athlete/${ATHLETE}/events?oldest=${oldest}&newest=${newest}&category=WORKOUT`)
   const ours = existing.filter((e) => (e.external_id ?? '').startsWith('elan-'))
   for (const e of ours) await api(`/athlete/${ATHLETE}/events/${e.id}`, { method: 'DELETE' })
-  console.log(`Nettoyage : ${ours.length} séance(s) Avel existante(s) supprimée(s).`)
+  console.log(`Nettoyage : ${ours.length} séance(s) 21KM existante(s) supprimée(s).`)
 }
 
 // ---- Exécution ----

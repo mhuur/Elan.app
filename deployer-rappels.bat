@@ -58,7 +58,7 @@ echo  2. Redeploie l'app :   npm run build ^&^& npx firebase-tools deploy
 echo  3. Sur le telephone : Reglages ^> Activer les rappels,
 echo     puis "Envoyer une notification de test".
 echo.
-echo  Pense a ajouter Avel a l'ecran d'accueil : Chrome desabonne
+echo  Pense a ajouter 21KM a l'ecran d'accueil : Chrome desabonne
 echo  les sites peu consultes, mais pas les PWA installees.
 echo ============================================================
 pause

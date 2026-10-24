@@ -1,7 +1,7 @@
-# Worker Strava → Avel
+# Worker Strava → 21KM
 
 Mini-relais qui détient les identifiants Strava et renvoie tes courses récentes au format
-Avel. Il existe parce que Strava **bloque le navigateur** sur le rafraîchissement du token
+21KM. Il existe parce que Strava **bloque le navigateur** sur le rafraîchissement du token
 (CORS) : ce relais fait cette étape côté serveur, l'app n'a alors qu'à lire la liste.
 
 ## Mise en place (une fois)
@@ -35,13 +35,13 @@ npx wrangler deploy
 ```
 Wrangler affiche l'URL publique, ex. `https://strava-elan.<toi>.workers.dev`.
 
-### 5. Brancher Avel
+### 5. Brancher 21KM
 Dans `Sport/.env` (gitignoré) :
 ```
 VITE_STRAVA_SYNC_URL=https://strava-elan.<toi>.workers.dev
 VITE_STRAVA_SYNC_KEY=<la même chaîne que ELAN_SYNC_KEY, si tu en as mis une>
 ```
-Puis `npm run build` + déploiement Firebase. Le bouton **« Synchroniser »** apparaît dans Avel
+Puis `npm run build` + déploiement Firebase. Le bouton **« Synchroniser »** apparaît dans 21KM
 (sélecteur de validation + Réglages).
 
 ## Vérifier le Worker

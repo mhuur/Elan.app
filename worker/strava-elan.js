@@ -1,9 +1,9 @@
-// Cloudflare Worker — pont Strava → Avel
+// Cloudflare Worker — pont Strava → 21KM
 //
 // Détient les identifiants Strava (en secrets, jamais dans l'app). À chaque appel il
 // rafraîchit le token Strava côté serveur (l'étape que le navigateur ne peut PAS faire :
 // Strava bloque le CORS sur /oauth/token), récupère les courses récentes et les renvoie
-// au format Avel. Le navigateur (app Avel) ne voit jamais le secret ni le token Strava.
+// au format 21KM. Le navigateur (app 21KM) ne voit jamais le secret ni le token Strava.
 //
 // Secrets attendus (wrangler secret put …) :
 //   STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, STRAVA_REFRESH_TOKEN
@@ -48,7 +48,7 @@ async function stravaAccessToken(env) {
 // Disciplines « course à pied » Strava qu'on importe
 const RUN_TYPES = new Set(['Run', 'TrailRun', 'VirtualRun'])
 
-/** Mappe une activité Strava vers le format Activity d'Avel */
+/** Mappe une activité Strava vers le format Activity de 21KM */
 function toActivity(a) {
   const distanceKm = (a.distance ?? 0) / 1000
   const durationSec = a.moving_time ?? a.elapsed_time ?? 0

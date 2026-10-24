@@ -1,4 +1,4 @@
-# Publication automatique d'Avel sur Firebase Hosting à chaque push sur `main`.
+# Publication automatique de 21KM sur Firebase Hosting à chaque push sur `main`.
 #
 # Remplace le double-clic sur `publier-l-app.bat` : commit + push = en ligne.
 # Deux secrets GitHub (Settings → Secrets and variables → Actions) :

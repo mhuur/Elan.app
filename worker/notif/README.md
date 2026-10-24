@@ -20,7 +20,7 @@ ce Worker, réveillé par un Cron Trigger toutes les 5 minutes.
 
 ## Le Worker ne calcule jamais le planning
 
-La planification d'Avel est complexe : cycles d'alternance, « tous les X jours », `repeat.onDays`,
+La planification de 21KM est complexe : cycles d'alternance, « tous les X jours », `repeat.onDays`,
 plan semi aligné au lundi. Elle vit dans l'app (`src/lib/schedule.ts`, `src/lib/planDay.ts`).
 La réimplémenter ici créerait une seconde source de vérité, vouée à diverger — et un jour un
 rappel pour la mauvaise séance.
@@ -28,7 +28,7 @@ rappel pour la mauvaise séance.
 L'app calcule donc un **agenda des 30 prochains jours** (`src/lib/reminderAgenda.ts`) et l'envoie
 au Worker, qui se contente de lire `2026-07-10 → ["Fractionné 6×800m", "Gainage"]`.
 
-Conséquence assumée : **l'agenda périme**. Si Avel n'est pas ouverte pendant plus de 30 jours, les
+Conséquence assumée : **l'agenda périme**. Si 21KM n'est pas ouverte pendant plus de 30 jours, les
 rappels s'arrêtent — et repartent seuls à la réouverture.
 
 ## Identité : la clé KV est le SHA-256 de l'endpoint push
@@ -173,7 +173,7 @@ Le premier tourne sans réseau ni KV réel : KV factice, `fetch` bouchonné, cl�
 Le seul test qui prouve la chaîne complète reste **« Envoyer une notification de test »** depuis
 les Réglages, sur le vrai téléphone.
 
-## Android : installer Avel sur l'écran d'accueil
+## Android : installer 21KM sur l'écran d'accueil
 
 Ce n'est pas requis pour recevoir les pushs sur Chrome Android (contrairement à iOS), mais depuis
 fin 2025 Chrome désabonne d'office les sites peu consultés qui notifient beaucoup — **les PWA

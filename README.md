@@ -1,4 +1,4 @@
-# 💨 Avel — Suivi sport
+# 💨 21KM — Suivi sport
 
 Application web mobile-first pour planifier vos séances de sport, enregistrer vos performances et suivre vos progrès. Charte « bord de mer » (ardoise & écume, thème sombre), installable sur l'écran d'accueil du téléphone.
 
