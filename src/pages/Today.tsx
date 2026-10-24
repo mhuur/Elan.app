@@ -23,22 +23,24 @@ import WorkoutSheet from '../components/WorkoutSheet'
 /** « 52 min », « 1 h 35 » */
 const fmtMin = (min: number) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`)
 
-/** Carte déplaçable : la poignée à gauche porte le glisser, le reste de la carte s'ouvre au toucher.
- *  Pendant le glisser, c'est sa copie flottante qui suit le doigt ; elle reste en fantôme à sa place. */
+/** Carte déplaçable, même modèle que le Planning (MyTodo) : au doigt, appui long de 250 ms
+ *  n'importe où sur la carte (un toucher bref l'ouvre, un geste rapide fait défiler) ; à la
+ *  souris, par la poignée `data-grip`. Pendant le glisser, sa place devient un trou invisible. */
 function SortableCard({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
   return (
     <div
       ref={setNodeRef}
+      {...listeners}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`flex min-h-[88px] items-center gap-1 ${glassCard}` + (isDragging ? ' opacity-30' : '')}
+      className={`flex min-h-[88px] touch-manipulation items-center gap-1 select-none [-webkit-touch-callout:none] ${glassCard}` + (isDragging ? ' invisible' : '')}
     >
       <button
         type="button"
+        data-grip
         aria-label={`Déplacer ${label}`}
         {...attributes}
-        {...listeners}
-        className="flex h-11 w-8 shrink-0 cursor-grab touch-none items-center justify-center text-ink-mute active:cursor-grabbing"
+        className="flex h-11 w-8 shrink-0 cursor-grab items-center justify-center text-ink-mute active:cursor-grabbing"
       >
         <Picto name="poignee" className="grip h-5 w-5" strokeWidth={3} />
       </button>

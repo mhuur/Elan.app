@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { DndContext, MeasuringStrategy, closestCenter } from '@dnd-kit/core'
+import { DndContext, closestCenter, type Modifier } from '@dnd-kit/core'
 import FloatingOverlay, { liftedClass } from '../components/FloatingOverlay'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -38,26 +38,37 @@ type RowProps = {
   onEdit: () => void
 }
 
-/**
- * Place de l'élément glissé : un simple espace vide, sans cadre ni copie pâle, que les
- * autres lignes contournent (modèle Google Tasks). Oct. 2026, retours successifs : la
- * copie à 30 % puis le cadre pointillé rendaient l'ensemble « brouillon ».
+/*
+ * Glisser-déposer calqué sur MyTodo (`todolist-app/index.html`, `dragPointerDown`), à la
+ * demande de Romain (24/10/2026, après le rejet de la copie pâle puis du cadre pointillé) :
+ * au doigt, appui long de 250 ms n'importe où sur la ligne (bouger avant = défilement) et
+ * vibration ; à la souris, par la poignée. La copie flottante ne bouge qu'à la verticale,
+ * sans inclinaison ; la place d'origine devient un trou invisible que les voisines
+ * comblent en glissant.
  */
-const SLOT = ' border-transparent bg-transparent [&>*]:invisible'
 
-/** Poignée tactile : défilement natif tant que l'appui long n'a pas pris, ni sélection ni menu */
-const HANDLE = 'cursor-grab touch-manipulation select-none [-webkit-touch-callout:none] items-center justify-center text-ink-mute active:cursor-grabbing'
+/** Zone saisissable au doigt : défilement natif tant que l'appui long n'a pas pris, ni sélection ni menu */
+const TOUCH_LIFT = 'touch-manipulation select-none [-webkit-touch-callout:none]'
 
-/** Ligne déplaçable : sa place devient un emplacement vide, sa copie flottante (`RowFace`) suit le doigt */
+/** Poignée (souris) : `data-grip` est ce que `GripMouseSensor` reconnaît */
+const GRIP = 'cursor-grab items-center justify-center text-ink-mute active:cursor-grabbing'
+
+/** Copie flottante et lignes décalées : axe vertical seulement */
+const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 })
+
+type SectionDrag = Pick<ReturnType<typeof useSortable>, 'attributes' | 'listeners'>
+
+/** Ligne déplaçable : sa place devient un trou invisible, sa copie flottante (`RowFace`) suit le doigt */
 function Row(props: RowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.session.id })
   return (
     <div
       ref={setNodeRef}
+      {...listeners}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={ROW + (isDragging ? SLOT : '')}
+      className={ROW + ' ' + TOUCH_LIFT + (isDragging ? ' invisible' : '')}
     >
-      <RowFace {...props} handle={{ ...attributes, ...listeners }} />
+      <RowFace {...props} handle={attributes} />
     </div>
   )
 }
@@ -80,9 +91,10 @@ function RowFace({ session, todayIdx, states, sublabel, onDay, onEdit, handle }:
     <>
       <button
         type="button"
+        data-grip
         aria-label={`Déplacer ${session.name}`}
         {...handle}
-        className={'flex h-11 w-6 ' + HANDLE}
+        className={'flex h-11 w-6 ' + GRIP}
       >
         <Picto name="poignee" className="grip h-4 w-4" strokeWidth={3} />
       </button>
@@ -147,14 +159,14 @@ function SortableSection({
   children,
 }: {
   uid: string
-  children: (drag: Pick<ReturnType<typeof useSortable>, 'attributes' | 'listeners'>) => ReactNode
+  children: (drag: SectionDrag) => ReactNode
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: uid })
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={isDragging ? SLOT : undefined}
+      className={isDragging ? 'invisible' : undefined}
     >
       {children({ attributes, listeners })}
     </div>
@@ -240,6 +252,58 @@ export default function Planning() {
   const dragSession = dragId && !dragId.startsWith('sec-') ? sessions.find((s) => s.id === dragId) : undefined
   const dragSection = dragId?.startsWith('sec-') ? sections.find((sec) => 'sec-' + sec.group === dragId) : undefined
   const showHeaders = hasGroups || !!planWeek
+
+  /**
+   * Une section : en-tête puis lignes. `drag` la rend déplaçable (au doigt, appui long sur
+   * tout l'en-tête ; à la souris, par la poignée). `copy` : rendu de la copie flottante,
+   * lignes figées sans sortable.
+   */
+  const sectionBody = (sec: (typeof sections)[number], drag?: SectionDrag, copy = false) => {
+    const g = sec.group
+    const list = sec.sessions.filter(visibleInWeek)
+    // La section « Running » porte les séances du plan, posées en tête
+    const isRun = sec.plan
+    return (
+      <section aria-label={copy ? undefined : g || emptyLabel} className="flex flex-col gap-2 pt-1.5">
+        {showHeaders && (
+          <h2 {...drag?.listeners} className={'flex items-center gap-0.5 text-base leading-[22px] font-bold' + (drag ? ' ' + TOUCH_LIFT : '')}>
+            {drag || copy ? (
+              <button
+                type="button"
+                data-grip
+                aria-label={copy ? undefined : `Déplacer la section ${g || emptyLabel}`}
+                {...drag?.attributes}
+                className={'flex h-9 w-8 ' + GRIP}
+              >
+                <Picto name="poignee" className="grip h-[18px] w-[18px]" strokeWidth={3} />
+              </button>
+            ) : (
+              <span className="w-1" />
+            )}
+            <span>{g || emptyLabel}</span>
+            {isRun && planWeek && <span className="text-sm font-medium text-ink-soft">&nbsp;· plan semi, semaine {planWeekIdx + 1}</span>}
+          </h2>
+        )}
+        {isRun &&
+          planStates.map((st) => (
+            <PlanRow key={'plan-' + st.seance.day} s={st.seance} states={planStatesOf(st)} todayIdx={todayIdx} onOpen={() => setSheet(st.seance)} />
+          ))}
+        {copy ? (
+          list.map((s) => (
+            <div key={s.id} className={ROW}>
+              <RowFace {...rowProps(s)} />
+            </div>
+          ))
+        ) : (
+          <SortableContext items={list.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+            {list.map((s) => (
+              <Row key={s.id} {...rowProps(s)} />
+            ))}
+          </SortableContext>
+        )}
+      </section>
+    )
+  }
 
   /**
    * Toucher un rond : valide (crée un log) ou dévalide (supprime le log) la séance ce
@@ -344,9 +408,12 @@ export default function Planning() {
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
-              // Les sections se replient au début du glisser : remesurer en continu
-              measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-              onDragStart={(e) => setDragId(String(e.active.id))}
+              modifiers={[verticalOnly]}
+              onDragStart={(e) => {
+                setDragId(String(e.active.id))
+                // Au doigt, une vibration de 12 ms signale que la ligne est saisie (comme MyTodo)
+                if (typeof TouchEvent !== 'undefined' && e.activatorEvent instanceof TouchEvent) navigator.vibrate?.(12)
+              }}
               onDragCancel={() => setDragId(null)}
               onDragEnd={(e) => {
                 setDragId(null)
@@ -361,69 +428,22 @@ export default function Planning() {
                   const isRun = sec.plan
                   if (!isRun && list.length === 0) return null
                   const draggable = canDragSections && (list.length > 0 || isRun)
-                  const body = (handle?: ReactNode) => (
-                    <section aria-label={g || emptyLabel} className="flex flex-col gap-2 pt-1.5">
-                      {showHeaders && (
-                        <h2 className="flex items-center gap-0.5 text-base leading-[22px] font-bold">
-                          {handle ?? <span className="w-1" />}
-                          <span>{g || emptyLabel}</span>
-                          {isRun && planWeek && (
-                            <span className="text-sm font-medium text-ink-soft">&nbsp;· plan semi, semaine {planWeekIdx + 1}</span>
-                          )}
-                        </h2>
-                      )}
-                      {/* Pendant le glisser d'une section, toutes se replient sur leur en-tête :
-                          la place libérée a la hauteur d'un en-tête, pas d'une section entière */}
-                      {isRun &&
-                        !dragSection &&
-                        planStates.map((st) => (
-                          <PlanRow key={'plan-' + st.seance.day} s={st.seance} states={planStatesOf(st)} todayIdx={todayIdx} onOpen={() => setSheet(st.seance)} />
-                        ))}
-                      {!dragSection && (
-                        <SortableContext items={list.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-                          {list.map((s) => (
-                            <Row key={s.id} {...rowProps(s)} />
-                          ))}
-                        </SortableContext>
-                      )}
-                    </section>
-                  )
-                  if (!draggable) return <div key={g || '—'}>{body()}</div>
+                  if (!draggable) return <div key={g || '—'}>{sectionBody(sec)}</div>
                   return (
                     <SortableSection key={'sec-' + g} uid={'sec-' + g}>
-                      {(drag) =>
-                        body(
-                          <button
-                            type="button"
-                            aria-label={`Déplacer la section ${g || emptyLabel}`}
-                            {...drag.attributes}
-                            {...drag.listeners}
-                            className={'flex h-9 w-8 ' + HANDLE}
-                          >
-                            <Picto name="poignee" className="grip h-[18px] w-[18px]" strokeWidth={3} />
-                          </button>,
-                        )
-                      }
+                      {(drag) => sectionBody(sec, drag)}
                     </SortableSection>
                   )
                 })}
               </SortableContext>
-              <FloatingOverlay>
+              <FloatingOverlay modifiers={[verticalOnly]}>
                 {dragSession && (
                   <div className={GRID + ' rounded-sm py-1 pr-1.5 pl-0.5 ' + liftedClass}>
                     <RowFace {...rowProps(dragSession)} />
                   </div>
                 )}
-                {dragSection && (
-                  <div className={'flex items-center gap-1 rounded-sm px-2 py-2.5 ' + liftedClass}>
-                    <Picto name="poignee" className="grip h-[18px] w-[18px] text-ink-mute" strokeWidth={3} />
-                    <span className="text-base font-bold">{dragSection.group || emptyLabel}</span>
-                    {(() => {
-                      const n = dragSection.sessions.filter(visibleInWeek).length + (dragSection.plan ? planStates.length : 0)
-                      return <span className="text-sm text-ink-soft">· {n} séance{n > 1 ? 's' : ''}</span>
-                    })()}
-                  </div>
-                )}
+                {/* Section glissée : copie de la section entière, comme MyTodo copie une tâche avec ses sous-tâches */}
+                {dragSection && <div className={'rounded-md px-1 pb-1 ' + liftedClass}>{sectionBody(dragSection, undefined, true)}</div>}
               </FloatingOverlay>
             </DndContext>
           </div>

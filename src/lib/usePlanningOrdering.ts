@@ -1,8 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import type { Session } from '../types'
 import { PLAN_SECTION, planningSections, type LayoutSection } from './planningLayout'
+
+/**
+ * Souris : ne saisit que depuis une poignée `[data-grip]`. Les écouteurs sont posés sur
+ * toute la ligne pour l'appui long au doigt ; à la souris, un clic sur le nom ou un rond
+ * doit rester un clic.
+ */
+class GripMouseSensor extends MouseSensor {
+  static activators = [
+    {
+      eventName: 'onMouseDown' as const,
+      handler: ({ nativeEvent: e }: ReactMouseEvent) => e.button === 0 && !!(e.target as Element).closest('[data-grip]'),
+    },
+  ]
+}
 
 export interface PlanningOrdering {
   sensors: ReturnType<typeof useSensors>
@@ -51,13 +65,14 @@ export function usePlanningOrdering({
     setOrderIds(sessions.map((s) => s.id))
   }, [sessions])
 
-  // Souris : 5 px suffisent. Doigt : appui maintenu 300 ms sans bouger de plus de 6 px,
-  // sinon le geste reste un défilement (oct. 2026, retour : « dès qu'on veut scroller,
-  // on sélectionne un sport »). Pas de PointerSensor : il réagit aussi au doigt, au
-  // premier mouvement de 5 px, et court-circuitait le délai tactile.
+  // Réglages de MyTodo (`dragPointerDown`) : souris par la poignée, 4 px ; doigt n'importe
+  // où sur la ligne, appui maintenu 250 ms sans bouger de plus de 8 px, sinon le geste
+  // reste un défilement (oct. 2026, retour : « dès qu'on veut scroller, on sélectionne un
+  // sport »). Pas de PointerSensor : il réagit aussi au doigt dès 5 px et court-circuitait
+  // le délai tactile.
   const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 6 } }),
+    useSensor(GripMouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
   )
 
   const ordered = orderIds.map((id) => sessions.find((s) => s.id === id)).filter((s): s is Session => !!s)

@@ -12,7 +12,8 @@ const MAX_GAP = 8 // px entre le centre de la poignée de la copie et le pointeu
 const browser = await chromium.launch()
 const failures = []
 
-async function probe(page, name, handleSel, nth = 0) {
+// `yOnly` : le Planning bloque la copie sur l'axe vertical (modèle MyTodo, 24/10/2026)
+async function probe(page, name, handleSel, nth = 0, yOnly = false) {
   const h = page.locator(handleSel).nth(nth)
   await h.scrollIntoViewIfNeeded()
   const box = await h.boundingBox()
@@ -38,7 +39,7 @@ async function probe(page, name, handleSel, nth = 0) {
   await page.screenshot({ path: `screenshots/dnd-${name}.png` })
   await page.mouse.up()
   await page.waitForTimeout(300)
-  const gap = r ? Math.hypot(r.x - mx, r.y - my) : Infinity
+  const gap = r ? (yOnly ? Math.abs(r.y - my) : Math.hypot(r.x - mx, r.y - my)) : Infinity
   console.log(`${name.padEnd(16)} écart ${r ? gap.toFixed(0) : '∅ (aucune copie flottante)'} px`)
   if (gap > MAX_GAP) failures.push(`${name} : ${r ? gap.toFixed(0) + ' px' : 'pas de copie flottante'}`)
 }
@@ -57,8 +58,8 @@ try {
     await probe(page, `today-${vp.tag}`, '[aria-label^="Déplacer "]')
     await page.getByRole('link', { name: 'Planning' }).click()
     await page.waitForTimeout(500)
-    await probe(page, `planning-${vp.tag}`, '[aria-label^="Déplacer "]:not([aria-label*="section"])')
-    await probe(page, `section-${vp.tag}`, '[aria-label^="Déplacer la section"]')
+    await probe(page, `planning-${vp.tag}`, '[aria-label^="Déplacer "]:not([aria-label*="section"])', 0, true)
+    await probe(page, `section-${vp.tag}`, '[aria-label^="Déplacer la section"]', 0, true)
     await page.getByRole('link', { name: 'Exercices', exact: true }).click()
     await page.waitForSelector('text=Mes programmes')
     await page.click('p:has-text("Muscu — Full body")')
