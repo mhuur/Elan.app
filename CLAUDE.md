@@ -43,9 +43,9 @@ Le `.env` (gitignoré) contient la config Firebase du projet `routine-sport-ca44
 
 ## Déploiement
 
-**Depuis le 1er septembre 2026, un push sur `main` publie tout seul** : le workflow `.github/workflows/firebase-hosting.yml` (GitHub Actions) fait `npm ci` → reconstruit le `.env` depuis le secret `AVEL_DOTENV` (le `.env` local sans `VAPID_PRIVATE_KEY`) → `npm run build` → `FirebaseExtended/action-hosting-deploy` sur les deux sites, avec le compte de service `github-action-avel@routine-sport-ca440.iam.gserviceaccount.com` (secret `FIREBASE_SERVICE_ACCOUNT`, rôles Hosting Admin / Auth Admin / API Keys Viewer / Cloud Run Viewer — ceux de `firebase init hosting:github`, créés à la main via l'API IAM parce que l'assistant est interactif). Suivi : `gh run list -R mhuur/Sport` / `gh run watch`. ⚠ Une nouvelle variable `VITE_*` dans le `.env` local doit être **reportée dans le secret** (depuis PowerShell : `cmd /c "gh secret set AVEL_DOTENV -R mhuur/Sport < fichier"` — jamais via un pipe PowerShell, qui corrompt l'encodage de la 1ʳᵉ ligne du secret : cause de la panne du 01/09), sinon la version en ligne ne l'a pas. Un commit **sans push** ne publie toujours rien.
+**Depuis le 24/10/2026, un push ne publie plus rien : la publication se fait depuis le PC de Romain.** Du 01/09 au 23/10/2026, le workflow GitHub Actions `.github/workflows/firebase-hosting.yml` publiait à chaque push sur `main` avec le compte de service `github-action-avel@routine-sport-ca440.iam.gserviceaccount.com` (secret `FIREBASE_SERVICE_ACCOUNT`). L'audit de sécurité des applis du 23/10/2026 a supprimé ce compte de service (aucune clé de compte de service hors de Google Cloud) : les publications de `4a83711`, `4746539` et `44eae31` ont échoué en `PERMISSION_DENIED`, et le workflow a été retiré le 24/10 (décision de Romain). Les secrets GitHub `FIREBASE_SERVICE_ACCOUNT` et `AVEL_DOTENV` ne servent plus ; leur suppression est à faire par Romain (refusée au classificateur de Claude Code). Le `.env` local fait foi pour les variables `VITE_*`.
 
-Publication manuelle (secours, ou pour tester sans committer) :
+Publication (le `firebase` local est connecté avec le compte Google de Romain) :
 
 ```
 npm run build
