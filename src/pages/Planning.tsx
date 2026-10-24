@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { DndContext, closestCenter } from '@dnd-kit/core'
+import { DndContext, MeasuringStrategy, closestCenter } from '@dnd-kit/core'
 import FloatingOverlay, { liftedClass } from '../components/FloatingOverlay'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -39,11 +39,11 @@ type RowProps = {
 }
 
 /**
- * Emplacement vide laissé par l'élément glissé : contour pointillé, contenu masqué.
- * Remplace le fantôme à 30 % d'opacité (oct. 2026, retour : la copie pâle à l'arrivée
- * « rend l'ensemble brouillon »).
+ * Place de l'élément glissé : un simple espace vide, sans cadre ni copie pâle, que les
+ * autres lignes contournent (modèle Google Tasks). Oct. 2026, retours successifs : la
+ * copie à 30 % puis le cadre pointillé rendaient l'ensemble « brouillon ».
  */
-const SLOT = ' border-dashed border-ink-mute/40 bg-transparent [&>*]:invisible'
+const SLOT = ' border-transparent bg-transparent [&>*]:invisible'
 
 /** Poignée tactile : défilement natif tant que l'appui long n'a pas pris, ni sélection ni menu */
 const HANDLE = 'cursor-grab touch-manipulation select-none [-webkit-touch-callout:none] items-center justify-center text-ink-mute active:cursor-grabbing'
@@ -154,7 +154,7 @@ function SortableSection({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={isDragging ? 'rounded-sm border' + SLOT : undefined}
+      className={isDragging ? SLOT : undefined}
     >
       {children({ attributes, listeners })}
     </div>
@@ -344,6 +344,8 @@ export default function Planning() {
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
+              // Les sections se replient au début du glisser : remesurer en continu
+              measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
               onDragStart={(e) => setDragId(String(e.active.id))}
               onDragCancel={() => setDragId(null)}
               onDragEnd={(e) => {
@@ -370,15 +372,20 @@ export default function Planning() {
                           )}
                         </h2>
                       )}
+                      {/* Pendant le glisser d'une section, toutes se replient sur leur en-tête :
+                          la place libérée a la hauteur d'un en-tête, pas d'une section entière */}
                       {isRun &&
+                        !dragSection &&
                         planStates.map((st) => (
                           <PlanRow key={'plan-' + st.seance.day} s={st.seance} states={planStatesOf(st)} todayIdx={todayIdx} onOpen={() => setSheet(st.seance)} />
                         ))}
-                      <SortableContext items={list.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-                        {list.map((s) => (
-                          <Row key={s.id} {...rowProps(s)} />
-                        ))}
-                      </SortableContext>
+                      {!dragSection && (
+                        <SortableContext items={list.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                          {list.map((s) => (
+                            <Row key={s.id} {...rowProps(s)} />
+                          ))}
+                        </SortableContext>
+                      )}
                     </section>
                   )
                   if (!draggable) return <div key={g || '—'}>{body()}</div>
@@ -411,9 +418,10 @@ export default function Planning() {
                   <div className={'flex items-center gap-1 rounded-sm px-2 py-2.5 ' + liftedClass}>
                     <Picto name="poignee" className="grip h-[18px] w-[18px] text-ink-mute" strokeWidth={3} />
                     <span className="text-base font-bold">{dragSection.group || emptyLabel}</span>
-                    <span className="text-sm text-ink-soft">
-                      · {dragSection.sessions.filter(visibleInWeek).length + (dragSection.plan ? planStates.length : 0)} séances
-                    </span>
+                    {(() => {
+                      const n = dragSection.sessions.filter(visibleInWeek).length + (dragSection.plan ? planStates.length : 0)
+                      return <span className="text-sm text-ink-soft">· {n} séance{n > 1 ? 's' : ''}</span>
+                    })()}
                   </div>
                 )}
               </FloatingOverlay>
