@@ -38,14 +38,24 @@ type RowProps = {
   onEdit: () => void
 }
 
-/** Ligne déplaçable : elle reste en fantôme à sa place, sa copie flottante (`RowFace`) suit le doigt */
+/**
+ * Emplacement vide laissé par l'élément glissé : contour pointillé, contenu masqué.
+ * Remplace le fantôme à 30 % d'opacité (oct. 2026, retour : la copie pâle à l'arrivée
+ * « rend l'ensemble brouillon »).
+ */
+const SLOT = ' border-dashed border-ink-mute/40 bg-transparent [&>*]:invisible'
+
+/** Poignée tactile : défilement natif tant que l'appui long n'a pas pris, ni sélection ni menu */
+const HANDLE = 'cursor-grab touch-manipulation select-none [-webkit-touch-callout:none] items-center justify-center text-ink-mute active:cursor-grabbing'
+
+/** Ligne déplaçable : sa place devient un emplacement vide, sa copie flottante (`RowFace`) suit le doigt */
 function Row(props: RowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.session.id })
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={ROW + (isDragging ? ' opacity-30' : '')}
+      className={ROW + (isDragging ? SLOT : '')}
     >
       <RowFace {...props} handle={{ ...attributes, ...listeners }} />
     </div>
@@ -72,7 +82,7 @@ function RowFace({ session, todayIdx, states, sublabel, onDay, onEdit, handle }:
         type="button"
         aria-label={`Déplacer ${session.name}`}
         {...handle}
-        className="flex h-11 w-6 cursor-grab touch-none items-center justify-center text-ink-mute active:cursor-grabbing"
+        className={'flex h-11 w-6 ' + HANDLE}
       >
         <Picto name="poignee" className="grip h-4 w-4" strokeWidth={3} />
       </button>
@@ -141,7 +151,11 @@ function SortableSection({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: uid })
   return (
-    <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }} className={isDragging ? 'opacity-30' : undefined}>
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={isDragging ? 'rounded-sm border' + SLOT : undefined}
+    >
       {children({ attributes, listeners })}
     </div>
   )
@@ -377,7 +391,7 @@ export default function Planning() {
                             aria-label={`Déplacer la section ${g || emptyLabel}`}
                             {...drag.attributes}
                             {...drag.listeners}
-                            className="flex h-9 w-8 cursor-grab touch-none items-center justify-center text-ink-mute active:cursor-grabbing"
+                            className={'flex h-9 w-8 ' + HANDLE}
                           >
                             <Picto name="poignee" className="grip h-[18px] w-[18px]" strokeWidth={3} />
                           </button>,

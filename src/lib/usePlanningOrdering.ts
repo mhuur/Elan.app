@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { MouseSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import type { Session } from '../types'
 import { PLAN_SECTION, planningSections, type LayoutSection } from './planningLayout'
@@ -51,9 +51,13 @@ export function usePlanningOrdering({
     setOrderIds(sessions.map((s) => s.id))
   }, [sessions])
 
+  // Souris : 5 px suffisent. Doigt : appui maintenu 300 ms sans bouger de plus de 6 px,
+  // sinon le geste reste un défilement (oct. 2026, retour : « dès qu'on veut scroller,
+  // on sélectionne un sport »). Pas de PointerSensor : il réagit aussi au doigt, au
+  // premier mouvement de 5 px, et court-circuitait le délai tactile.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 6 } }),
   )
 
   const ordered = orderIds.map((id) => sessions.find((s) => s.id === id)).filter((s): s is Session => !!s)
