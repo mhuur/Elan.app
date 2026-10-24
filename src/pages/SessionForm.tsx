@@ -180,6 +180,11 @@ function SessionSelect({ label, sessions, onChange }: { label: string; sessions:
         className="h-[30px] appearance-none rounded-sm border border-hairline bg-glass-sunken pl-3 pr-7 tabular-nums text-[13px] text-ink-soft outline-none focus:border-sage-500"
       >
         <option value="">Aucune</option>
+        {!sessions.length && (
+          <option value="" disabled>
+            Aucune séance posée sur des jours
+          </option>
+        )}
         {sessions.map((s) => (
           <option key={s.id} value={s.id}>
             {s.name}
@@ -1391,8 +1396,11 @@ export default function SessionForm() {
 
               {/* ── Les jours sans : une séance dont les jours sont exclus (oct. 2026, demande
                   utilisateur : HIIT/Vélo les jours sans course). Les cases au-dessus montrent
-                  alors les jours qui restent, en lecture seule, et suivent cette séance. ── */}
-              {planMode === 'weekly' &&
+                  alors les jours qui restent, en lecture seule, et suivent cette séance. Toujours
+                  visible hors « Avant une autre » (introuvable quand elle n'apparaissait qu'en
+                  Jours choisis avec au moins une séance à jours fixes) : choisir bascule en
+                  Jours choisis. ── */}
+              {planMode !== 'warmup' &&
                 (offRef ? (
                   <div className={row + ' flex-col items-stretch gap-2 py-3'}>
                     <span className={rowLabel}>Les jours sans</span>
@@ -1404,12 +1412,17 @@ export default function SessionForm() {
                     />
                   </div>
                 ) : (
-                  offOptions.length > 0 && (
-                    <div className={row}>
-                      <span className={rowLabel}>Les jours sans</span>
-                      <SessionSelect label="Les jours sans" sessions={offOptions} onChange={setOffOf} />
-                    </div>
-                  )
+                  <div className={row}>
+                    <span className={rowLabel}>Les jours sans</span>
+                    <SessionSelect
+                      label="Les jours sans"
+                      sessions={offOptions}
+                      onChange={(id) => {
+                        setOffOf(id)
+                        if (id) setPlanMode('weekly')
+                      }}
+                    />
+                  </div>
                 ))}
 
               {/* Jumelée : s'invite dans Aujourd'hui les jours où une séance de la
